@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+.superpowers/
+.agents/
+.env
+.env.*
+!.env.example
+docs/
+design-preview.html
+design2.md
+*.local
+coverage/
+*.log
+skills-lock.json

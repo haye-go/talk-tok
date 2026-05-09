@@ -1,0 +1,52 @@
+:root {
+  --canvas: oklch(15% 0.005 82.2);
+  --surface: oklch(18% 0.012 82.2);
+  --surface-strong: oklch(22% 0.018 82.2);
+  --line: oklch(36% 0.025 82.2);
+  --ink: oklch(95% 0.01 82.2);
+  --body: oklch(85% 0.015 82.2);
+  --muted: oklch(70% 0.018 82.2);
+  --accent: oklch(82% 0.16 145);
+  --on-accent: oklch(16% 0.02 145);
+  --font-sans: "Aptos", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  color: var(--body);
+  background: var(--canvas);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, oklch(32% 0.075 145 / 0.38), transparent 34rem),
+    radial-gradient(circle at bottom right, oklch(28% 0.065 35 / 0.35), transparent 30rem),
+    var(--canvas);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+code {
+  border-radius: 0.35rem;
+  background: oklch(12% 0.01 82.2 / 0.75);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  padding: 0.08rem 0.32rem;
+}
