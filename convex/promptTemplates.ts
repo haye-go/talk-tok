@@ -26,7 +26,7 @@ const DEFAULT_PROMPTS = [
       "",
       "Return JSON with reasoningBand, originalityBand, specificityBand, summary, strengths, improvement, nextQuestion.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.3,
       maxOutputTokens: 700,
@@ -52,7 +52,7 @@ const DEFAULT_PROMPTS = [
       "",
       "Return JSON with categories and assignments. Each assignment must reference a provided submission id.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.2,
       maxOutputTokens: 3000,
@@ -73,7 +73,7 @@ const DEFAULT_PROMPTS = [
       "",
       "Return JSON with flagged, reason, severity.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0,
       maxOutputTokens: 300,
@@ -94,7 +94,7 @@ const DEFAULT_PROMPTS = [
       "",
       "Return JSON with overlaps and recommendations.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.1,
       maxOutputTokens: 1200,
@@ -119,7 +119,7 @@ const DEFAULT_PROMPTS = [
       "",
       "Return JSON with body. Keep body under 120 words.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.5,
       maxOutputTokens: 500,
@@ -145,7 +145,7 @@ const DEFAULT_PROMPTS = [
       "",
       "Return JSON with summary, attackerStrength, defenderStrength, strongerRebuttal, nextPractice.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.3,
       maxOutputTokens: 900,
@@ -172,7 +172,7 @@ const DEFAULT_PROMPTS = [
       "Return JSON with title, summary, keyPoints, uniqueInsights, opposingViews, quotes.",
       "quotes must be an array of objects with submissionId, quote, quoteRole.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.2,
       maxOutputTokens: 1800,
@@ -200,7 +200,7 @@ const DEFAULT_PROMPTS = [
       "Return JSON with title, summary, keyPoints, uniqueInsights, opposingViews, quotes.",
       "quotes must be an array of objects with submissionId, quote, quoteRole.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.2,
       maxOutputTokens: 2600,
@@ -225,7 +225,7 @@ const DEFAULT_PROMPTS = [
       "",
       "Return JSON with title, summary, keyPoints, uniqueInsights, opposingViews, quotes.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.2,
       maxOutputTokens: 1800,
@@ -255,7 +255,7 @@ const DEFAULT_PROMPTS = [
       "",
       "Return JSON with participationBand, reasoningBand, originalityBand, responsivenessBand, summary, contributionTrace, argumentEvolution, growthOpportunity.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.25,
       maxOutputTokens: 1600,
@@ -284,7 +284,7 @@ const DEFAULT_PROMPTS = [
       "Allowed entity types: submission, category, synthesisArtifact.",
       "Allowed link types: supports, contradicts, extends, questions, bridges.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.1,
       maxOutputTokens: 3000,

@@ -30,7 +30,7 @@ function renderTemplate(template: string, variables: JsonRecord) {
 }
 
 function parseModelOverride(value: string | undefined, fallbackKey: string | undefined) {
-  return value || fallbackKey || "openai:gpt-4.1-mini";
+  return value || fallbackKey || "openai:gpt-4.1";
 }
 
 function estimateCostUsd(args: {
