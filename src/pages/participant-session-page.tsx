@@ -9,10 +9,14 @@ import {
   type ResponseComposerSubmit,
 } from "@/components/submission/response-composer";
 import { SubmissionCard } from "@/components/submission/submission-card";
+import { DiscoverAct } from "@/components/acts/discover-act";
+import { ChallengeAct } from "@/components/acts/challenge-act";
+import { SynthesizeAct } from "@/components/acts/synthesize-act";
+import { FightThread } from "@/components/fight/fight-thread";
+import { PresenceBar } from "@/components/stream/presence-bar";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
 import { PretextDisplay } from "@/components/text/pretext-display";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -163,93 +167,99 @@ export function ParticipantSessionPage() {
     <ParticipantShell
       main={
         <div className="grid gap-4">
-          <Card title={session.title} eyebrow={`Act ${session.currentAct} - ${session.phase}`}>
-            <PretextDisplay text={session.openingPrompt} />
-            <p className="mt-3 text-xs text-[var(--c-muted)]">
-              Signed in as {participant.nickname}
-            </p>
-          </Card>
-          <Card title="Your response">
-            {submissionError ? (
-              <InlineAlert tone="error" className="mb-3">
-                {submissionError}
-              </InlineAlert>
-            ) : null}
-            <ResponseComposer
-              softWordLimit={session.responseSoftLimitWords}
-              submitLabel="Submit response"
-              onSubmit={(_text, _tone, submission) => handleCreateSubmission(submission)}
-            />
-            <div className="mt-3">
-              <Badge tone="warning">{session.critiqueToneDefault} tone</Badge>
-            </div>
-          </Card>
+          {/* Submit act: topic card + composer with real submission handler */}
+          {session.currentAct === "submit" && (
+            <>
+              <div className="rounded-md bg-[var(--c-sig-cream)] p-3.5">
+                <p className="text-sm font-medium leading-relaxed text-[var(--c-on-sig-light)]">
+                  &ldquo;{session.openingPrompt}&rdquo;
+                </p>
+              </div>
+              {submissionError && (
+                <InlineAlert tone="error">{submissionError}</InlineAlert>
+              )}
+              <ResponseComposer
+                softWordLimit={session.responseSoftLimitWords}
+                submitLabel="Submit response"
+                onSubmit={(_text, _tone, submission) => handleCreateSubmission(submission)}
+              />
+              <p className="text-xs text-[var(--c-muted)]">
+                Signed in as {participant.nickname}
+              </p>
+            </>
+          )}
+          {session.currentAct === "discover" && <DiscoverAct />}
+          {session.currentAct === "challenge" && <ChallengeAct />}
+          {session.currentAct === "synthesize" && <SynthesizeAct />}
         </div>
       }
       stream={
         <div className="grid gap-4">
-          <Card title="Lobby Presence">
-            {lobby ? (
-              <div className="grid gap-3 text-sm">
-                <p>
-                  {lobby.aggregate.total} joined - {lobby.aggregate.idle} idle -{" "}
-                  {lobby.aggregate.typing} typing - {lobby.aggregate.offline} offline
-                </p>
-                <div className="grid gap-2">
-                  {lobby.recentParticipants.map((item) => (
-                    <div
-                      key={item.participantSlug}
-                      className="flex items-center justify-between rounded-sm bg-[var(--c-surface-strong)] px-3 py-2"
-                    >
-                      <span>{item.nickname}</span>
-                      <span className="text-xs text-[var(--c-muted)]">{item.presenceState}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <LoadingState label="Loading lobby..." />
-            )}
-          </Card>
-          <Card title="Response Stream">
-            {session.visibilityMode === "raw_responses_visible" && sessionSubmissions ? (
-              <div className="grid gap-3">
-                {sessionSubmissions.map((submission) => (
-                  <SubmissionCard key={submission.id} submission={submission} />
-                ))}
-              </div>
-            ) : (
+          {lobby && (
+            <PresenceBar
+              typing={lobby.aggregate.typing}
+              submitted={lobby.aggregate.submitted ?? 0}
+              idle={lobby.aggregate.idle}
+            />
+          )}
+          {session.visibilityMode === "raw_responses_visible" && sessionSubmissions ? (
+            <div className="grid gap-3">
+              {sessionSubmissions.map((submission) => (
+                <SubmissionCard key={submission.id} submission={submission} />
+              ))}
+            </div>
+          ) : (
+            <Card>
               <PretextDisplay
                 text={`${sessionSubmissions?.length ?? 0} responses collected. Peer responses remain private until the instructor releases them.`}
               />
-            )}
-          </Card>
-        </div>
-      }
-      fightMe={<Card title="Fight Me">Fight Me entry and debate states will mount here.</Card>}
-      myZone={
-        <div className="grid gap-4">
-          <Card title="My Zone">
-            {mySubmissions === undefined ? (
-              <LoadingState label="Loading your responses..." />
-            ) : null}
-            {mySubmissions?.length === 0 ? (
-              <p className="text-sm text-[var(--c-muted)]">Your submitted responses appear here.</p>
-            ) : null}
-            {mySubmissions && mySubmissions.length > 0 ? (
-              <div className="grid gap-3">
-                {mySubmissions.map((submission) => (
-                  <SubmissionCard
-                    key={submission.id}
-                    submission={submission}
-                    showAuthor={false}
-                    onAddFollowUp={(submissionId) => setFollowUpParentId(submissionId)}
-                  />
+            </Card>
+          )}
+          {lobby && lobby.recentParticipants.length > 0 && (
+            <Card title="Lobby">
+              <div className="grid gap-2">
+                {lobby.recentParticipants.map((item) => (
+                  <div
+                    key={item.participantSlug}
+                    className="flex items-center justify-between rounded-sm bg-[var(--c-surface-strong)] px-3 py-2 text-sm"
+                  >
+                    <span className="text-[var(--c-ink)]">{item.nickname}</span>
+                    <span className="text-xs text-[var(--c-muted)]">{item.presenceState}</span>
+                  </div>
                 ))}
               </div>
-            ) : null}
-          </Card>
-          {followUpParentId ? (
+            </Card>
+          )}
+        </div>
+      }
+      fightMe={<FightThread />}
+      myZone={
+        <div className="grid gap-4">
+          <div className="-mx-4 -mt-4 bg-[var(--c-sig-peach)] px-4 py-4">
+            <h2 className="font-display text-lg font-medium text-[var(--c-on-sig-light)]">
+              My Zone
+            </h2>
+            <p className="text-xs text-[var(--c-on-sig-light-body)]" style={{ opacity: 0.7 }}>
+              Your responses and analysis
+            </p>
+          </div>
+          {mySubmissions === undefined && <LoadingState label="Loading your responses..." />}
+          {mySubmissions?.length === 0 && (
+            <p className="text-sm text-[var(--c-muted)]">Your submitted responses appear here.</p>
+          )}
+          {mySubmissions && mySubmissions.length > 0 && (
+            <div className="grid gap-3">
+              {mySubmissions.map((submission) => (
+                <SubmissionCard
+                  key={submission.id}
+                  submission={submission}
+                  showAuthor={false}
+                  onAddFollowUp={(submissionId) => setFollowUpParentId(submissionId)}
+                />
+              ))}
+            </div>
+          )}
+          {followUpParentId && (
             <Card
               title="Add follow-up"
               action={
@@ -272,7 +282,7 @@ export function ParticipantSessionPage() {
                 }
               />
             </Card>
-          ) : null}
+          )}
           <Card title="Nickname">
             <form className="grid gap-3" onSubmit={handleNicknameSubmit}>
               <Input
