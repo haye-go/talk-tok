@@ -32,7 +32,7 @@ import {
   storeParticipant,
 } from "@/lib/client-identity";
 import { DEMO_SESSION_SLUG } from "@/lib/constants";
-import type { TabId } from "@/lib/constants";
+import type { ActId, TabId } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 
 export function ParticipantSessionPage() {
@@ -65,7 +65,9 @@ export function ParticipantSessionPage() {
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("main");
+  const [demoActOverride, setDemoActOverride] = useState<ActId | null>(null);
   const touchedPresenceKey = useRef<string | null>(null);
+  const isDemoParticipant = sessionSlug === DEMO_SESSION_SLUG && clientKey?.startsWith("demo-");
 
   useEffect(() => {
     const demoClientKey = new URLSearchParams(window.location.search).get("demoClientKey");
@@ -93,6 +95,12 @@ export function ParticipantSessionPage() {
     touchedPresenceKey.current = presenceKey;
     void touchPresence({ sessionSlug, clientKey, presenceState: "idle" });
   }, [clientKey, participant, sessionSlug, touchPresence]);
+
+  useEffect(() => {
+    if (!isDemoParticipant) {
+      setDemoActOverride(null);
+    }
+  }, [isDemoParticipant]);
 
   async function handleNicknameSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -211,6 +219,7 @@ export function ParticipantSessionPage() {
   // Workspace data (may still be loading after join gate passes)
   const ws = workspace;
   const currentAct = ws?.session.currentAct ?? session.currentAct;
+  const visibleAct = isDemoParticipant && demoActOverride ? demoActOverride : currentAct;
   const firstFeedback = ws?.feedbackBySubmission?.[0] ?? null;
   const firstAssignment = ws?.assignmentsBySubmission?.[0] ?? null;
   const firstInitialResponse = ws?.myZoneHistory.initialResponses?.[0] ?? null;
@@ -220,8 +229,12 @@ export function ParticipantSessionPage() {
           (request) => request.submissionId === firstInitialResponse.id,
         ) ?? null)
       : null;
-  const isDemoParticipant = sessionSlug === DEMO_SESSION_SLUG && clientKey?.startsWith("demo-");
   const canUseFightMe = Boolean(clientKey && firstInitialResponse);
+  function handleDemoActChange(actId: ActId) {
+    setDemoActOverride(actId);
+    setActiveTab("main");
+  }
+
   const followUpComposer = followUpParentId ? (
     <Card
       title="Add follow-up"
@@ -244,10 +257,12 @@ export function ParticipantSessionPage() {
   return (
     <ParticipantShell
       topBar={<DemoIdentityBar sessionSlug={sessionSlug} />}
-      currentActId={currentAct}
+      currentActId={visibleAct}
       activeTab={activeTab}
       onActiveTabChange={setActiveTab}
       unlockAllTabs={Boolean(isDemoParticipant)}
+      canSelectActs={Boolean(isDemoParticipant)}
+      onActChange={isDemoParticipant ? handleDemoActChange : undefined}
       main={
         <div className="grid gap-4">
           <div className="rounded-md bg-[var(--c-sig-cream)] p-3.5">
@@ -258,7 +273,7 @@ export function ParticipantSessionPage() {
               &ldquo;{session.openingPrompt}&rdquo;
             </p>
           </div>
-          {currentAct === "submit" && (
+          {visibleAct === "submit" && (
             <>
               {submissionError && <InlineAlert tone="error">{submissionError}</InlineAlert>}
               <ResponseComposer
@@ -269,7 +284,7 @@ export function ParticipantSessionPage() {
               <p className="text-xs text-[var(--c-muted)]">Signed in as {participant.nickname}</p>
             </>
           )}
-          {currentAct === "discover" && (
+          {visibleAct === "discover" && (
             <>
               <DiscoverAct
                 mySubmissionBody={firstInitialResponse?.body}
@@ -290,7 +305,7 @@ export function ParticipantSessionPage() {
               {followUpComposer}
             </>
           )}
-          {currentAct === "challenge" && (
+          {visibleAct === "challenge" && (
             <ChallengeAct
               activeFollowUps={ws?.activeFollowUps}
               fightMeEnabled={ws?.session.fightMeEnabled ?? session.fightMeEnabled}
@@ -305,7 +320,7 @@ export function ParticipantSessionPage() {
               onNavigateToFightMe={() => setActiveTab("fight-me")}
             />
           )}
-          {currentAct === "synthesize" && clientKey && (
+          {visibleAct === "synthesize" && clientKey && (
             <SynthesizeAct
               publishedArtifacts={ws?.synthesis?.publishedArtifacts}
               finalArtifacts={ws?.synthesis?.finalArtifacts}

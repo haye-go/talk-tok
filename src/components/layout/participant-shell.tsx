@@ -16,6 +16,8 @@ export interface ParticipantShellProps {
   activeTab?: TabId;
   onActiveTabChange?: (tab: TabId) => void;
   unlockAllTabs?: boolean;
+  canSelectActs?: boolean;
+  onActChange?: (actId: ActId) => void;
 }
 
 export function ParticipantShell({
@@ -29,6 +31,8 @@ export function ParticipantShell({
   activeTab: controlledActiveTab,
   onActiveTabChange,
   unlockAllTabs = false,
+  canSelectActs = false,
+  onActChange,
 }: ParticipantShellProps) {
   const { actIndex, currentAct, isTabUnlocked } = useAct(currentActId);
   const [internalActiveTab, setInternalActiveTab] = useState<TabId>(defaultTab);
@@ -59,7 +63,7 @@ export function ParticipantShell({
   return (
     <div className="mx-auto flex h-dvh w-full max-w-[680px] flex-col bg-[var(--c-canvas)] shadow-sm">
       {topBar}
-      <ActProgressBar actIndex={actIndex} />
+      <ActProgressBar actIndex={actIndex} selectable={canSelectActs} onActSelect={onActChange} />
       <main className="flex-1 overflow-y-auto p-4">{content[activeTab]}</main>
       <BottomTabBar
         activeTab={activeTab}
