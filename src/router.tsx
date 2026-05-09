@@ -1,6 +1,10 @@
 import { createRoute, createRootRoute, createRouter, Outlet } from "@tanstack/react-router";
 import App from "./App";
-import { AdminPage } from "@/pages/admin-page";
+import { AdminModelsPage } from "@/pages/admin-models-page";
+import { AdminObservabilityPage } from "@/pages/admin-observability-page";
+import { AdminPromptsPage } from "@/pages/admin-prompts-page";
+import { AdminProtectionPage } from "@/pages/admin-protection-page";
+import { AdminRetrievalPage } from "@/pages/admin-retrieval-page";
 import { FightPage } from "@/pages/fight-page";
 import { InstructorDashboardPage } from "@/pages/instructor-dashboard-page";
 import { InstructorSessionPage } from "@/pages/instructor-session-page";
@@ -8,6 +12,8 @@ import { JoinPage } from "@/pages/join-page";
 import { ParticipantSessionPage } from "@/pages/participant-session-page";
 import { ProjectorPage } from "@/pages/projector-page";
 import { ReviewPage } from "@/pages/review-page";
+import { SessionNewPage } from "@/pages/session-new-page";
+import { TemplatesPage } from "@/pages/templates-page";
 
 function RootLayout() {
   return <Outlet />;
@@ -56,12 +62,7 @@ const instructorRoute = createRoute({
 const instructorSessionNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/session/new",
-  component: () => (
-    <AdminPage
-      title="Create Session"
-      description="Session setup placeholder with templates and defaults."
-    />
-  ),
+  component: SessionNewPage,
 });
 
 const instructorSessionRoute = createRoute({
@@ -79,64 +80,37 @@ const instructorProjectorRoute = createRoute({
 const instructorTemplatesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/templates",
-  component: () => (
-    <AdminPage title="Templates" description="Reusable session template placeholder." />
-  ),
+  component: TemplatesPage,
 });
 
 const instructorAdminModelsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/models",
-  component: () => (
-    <AdminPage
-      title="Providers & Models"
-      description="Model registry and feature assignment placeholder."
-    />
-  ),
+  component: AdminModelsPage,
 });
 
 const instructorAdminPromptsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/prompts",
-  component: () => (
-    <AdminPage
-      title="Prompt Templates"
-      description="Editable prompt defaults and versioning placeholder."
-    />
-  ),
+  component: AdminPromptsPage,
 });
 
 const instructorAdminRetrievalRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/retrieval",
-  component: () => (
-    <AdminPage
-      title="Retrieval / Context"
-      description="Embedding and context assembly placeholder."
-    />
-  ),
+  component: AdminRetrievalPage,
 });
 
 const instructorAdminProtectionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/protection",
-  component: () => (
-    <AdminPage
-      title="Protection"
-      description="Rate limits, moderation, telemetry disclosure, and budgets."
-    />
-  ),
+  component: AdminProtectionPage,
 });
 
 const instructorAdminObservabilityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/observability",
-  component: () => (
-    <AdminPage
-      title="Observability"
-      description="LLM calls, costs, latency, errors, and debug traces."
-    />
-  ),
+  component: AdminObservabilityPage,
 });
 
 const routeTree = rootRoute.addChildren([
