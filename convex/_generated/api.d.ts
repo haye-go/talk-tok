@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as modelSettings from "../modelSettings.js";
 import type * as participants from "../participants.js";
+import type * as promptTemplates from "../promptTemplates.js";
 import type * as sessions from "../sessions.js";
 import type * as submissions from "../submissions.js";
 
@@ -19,7 +21,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  modelSettings: typeof modelSettings;
   participants: typeof participants;
+  promptTemplates: typeof promptTemplates;
   sessions: typeof sessions;
   submissions: typeof submissions;
 }>;

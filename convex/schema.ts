@@ -146,6 +146,92 @@ export default defineSchema({
     updatedAt: timestamp,
   }).index("by_key", ["key"]),
 
+  submissionFeedback: defineTable({
+    sessionId: v.id("sessions"),
+    submissionId: v.id("submissions"),
+    participantId: v.id("participants"),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("success"),
+      v.literal("error"),
+    ),
+    tone: v.union(v.literal("gentle"), v.literal("direct"), v.literal("spicy"), v.literal("roast")),
+    reasoningBand: v.optional(
+      v.union(
+        v.literal("emerging"),
+        v.literal("solid"),
+        v.literal("strong"),
+        v.literal("exceptional"),
+      ),
+    ),
+    originalityBand: v.optional(
+      v.union(
+        v.literal("common"),
+        v.literal("above_average"),
+        v.literal("distinctive"),
+        v.literal("novel"),
+      ),
+    ),
+    specificityBand: v.optional(
+      v.union(v.literal("basic"), v.literal("clear"), v.literal("detailed"), v.literal("nuanced")),
+    ),
+    summary: v.optional(v.string()),
+    strengths: v.optional(v.string()),
+    improvement: v.optional(v.string()),
+    nextQuestion: v.optional(v.string()),
+    llmCallId: v.optional(v.id("llmCalls")),
+    error: v.optional(v.string()),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_submission", ["submissionId"])
+    .index("by_participant", ["participantId"])
+    .index("by_session", ["sessionId"]),
+
+  aiJobs: defineTable({
+    sessionId: v.id("sessions"),
+    submissionId: v.optional(v.id("submissions")),
+    type: v.union(
+      v.literal("feedback"),
+      v.literal("categorisation"),
+      v.literal("moderation"),
+      v.literal("synthesis"),
+    ),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("success"),
+      v.literal("error"),
+    ),
+    requestedBy: v.union(v.literal("system"), v.literal("instructor"), v.literal("participant")),
+    progressTotal: v.optional(v.number()),
+    progressDone: v.optional(v.number()),
+    error: v.optional(v.string()),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_type_and_status", ["type", "status"])
+    .index("by_submission", ["submissionId"]),
+
+  modelSettings: defineTable({
+    key: v.string(),
+    provider: v.string(),
+    model: v.string(),
+    enabled: v.boolean(),
+    features: v.array(v.string()),
+    inputCostPerMillion: v.number(),
+    cachedInputCostPerMillion: v.optional(v.number()),
+    outputCostPerMillion: v.number(),
+    reasoningCostPerMillion: v.optional(v.number()),
+    variablesJson: v.any(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_key", ["key"])
+    .index("by_provider", ["provider"]),
+
   llmCalls: defineTable({
     sessionId: v.optional(v.id("sessions")),
     feature: v.string(),

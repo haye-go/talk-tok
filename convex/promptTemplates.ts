@@ -1,0 +1,183 @@
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+
+const now = () => Date.now();
+
+const DEFAULT_PROMPTS = [
+  {
+    key: "feedback.private.v1",
+    name: "Private submission feedback",
+    surface: "participant_feedback",
+    systemPrompt: [
+      "You are an instructor assistant for a live discussion platform.",
+      "Give private feedback on the submitted response.",
+      "Critique the response, not the student's identity.",
+      "For spicy or roast tones, stay playful and specific without personal insults.",
+      "Return strict JSON matching the requested schema.",
+    ].join("\n"),
+    userTemplate: [
+      "Session title: {{sessionTitle}}",
+      "Opening prompt: {{openingPrompt}}",
+      "Tone: {{tone}}",
+      "Word count: {{wordCount}}",
+      "Input telemetry: {{inputTelemetry}}",
+      "Submission:",
+      "{{submissionBody}}",
+      "",
+      "Return JSON with reasoningBand, originalityBand, specificityBand, summary, strengths, improvement, nextQuestion.",
+    ].join("\n"),
+    modelOverride: "openai:gpt-4.1-mini",
+    variablesJson: {
+      temperature: 0.3,
+      maxOutputTokens: 700,
+      responseFormat: "json_object",
+    },
+  },
+  {
+    key: "categorisation.session.v1",
+    name: "Session categorisation",
+    surface: "instructor_categorisation",
+    systemPrompt: [
+      "You categorise live discussion responses into useful instructor-facing categories.",
+      "Prefer merging into existing categories over creating too many new categories.",
+      "Respect the configured category soft cap.",
+      "Return strict JSON matching the requested schema.",
+    ].join("\n"),
+    userTemplate: [
+      "Session title: {{sessionTitle}}",
+      "Opening prompt: {{openingPrompt}}",
+      "Category soft cap: {{categorySoftCap}}",
+      "Existing categories: {{existingCategoriesJson}}",
+      "Submissions: {{submissionsJson}}",
+      "",
+      "Return JSON with categories and assignments. Each assignment must reference a provided submission id.",
+    ].join("\n"),
+    modelOverride: "openai:gpt-4.1-mini",
+    variablesJson: {
+      temperature: 0.2,
+      maxOutputTokens: 3000,
+      responseFormat: "json_object",
+    },
+  },
+  {
+    key: "moderation.light.v1",
+    name: "Light moderation boundary",
+    surface: "moderation",
+    systemPrompt: [
+      "You flag obviously abusive, hateful, or unsafe content for a classroom discussion context.",
+      "Return strict JSON and avoid over-flagging normal disagreement.",
+    ].join("\n"),
+    userTemplate: [
+      "Text to inspect:",
+      "{{text}}",
+      "",
+      "Return JSON with flagged, reason, severity.",
+    ].join("\n"),
+    modelOverride: "openai:gpt-4.1-mini",
+    variablesJson: {
+      temperature: 0,
+      maxOutputTokens: 300,
+      responseFormat: "json_object",
+    },
+  },
+  {
+    key: "category.merge.v1",
+    name: "Category overlap and merge suggestions",
+    surface: "instructor_category_review",
+    systemPrompt: [
+      "You review discussion categories for overlap and suggest safe merge or rename options.",
+      "Return strict JSON with recommendations only; do not modify categories directly.",
+    ].join("\n"),
+    userTemplate: [
+      "Session title: {{sessionTitle}}",
+      "Categories: {{categoriesJson}}",
+      "",
+      "Return JSON with overlaps and recommendations.",
+    ].join("\n"),
+    modelOverride: "openai:gpt-4.1-mini",
+    variablesJson: {
+      temperature: 0.1,
+      maxOutputTokens: 1200,
+      responseFormat: "json_object",
+    },
+  },
+] as const;
+
+export const seedDefaults = mutation({
+  args: {},
+  handler: async (ctx) => {
+    let inserted = 0;
+
+    for (const prompt of DEFAULT_PROMPTS) {
+      const existing = await ctx.db
+        .query("promptTemplates")
+        .withIndex("by_key", (q) => q.eq("key", prompt.key))
+        .unique();
+
+      if (existing) {
+        continue;
+      }
+
+      await ctx.db.insert("promptTemplates", {
+        ...prompt,
+        version: 1,
+        updatedAt: now(),
+      });
+      inserted += 1;
+    }
+
+    return { inserted, totalDefaults: DEFAULT_PROMPTS.length };
+  },
+});
+
+export const list = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("promptTemplates").collect();
+  },
+});
+
+export const getByKey = query({
+  args: { key: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("promptTemplates")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .unique();
+  },
+});
+
+export const update = mutation({
+  args: {
+    key: v.string(),
+    name: v.string(),
+    surface: v.string(),
+    systemPrompt: v.string(),
+    userTemplate: v.string(),
+    modelOverride: v.optional(v.string()),
+    variablesJson: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("promptTemplates")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .unique();
+
+    if (!existing) {
+      throw new Error("Prompt template not found.");
+    }
+
+    await ctx.db.patch(existing._id, {
+      name: args.name.trim(),
+      surface: args.surface.trim(),
+      systemPrompt: args.systemPrompt,
+      userTemplate: args.userTemplate,
+      modelOverride: args.modelOverride,
+      variablesJson: args.variablesJson,
+      version: existing.version + 1,
+      updatedAt: now(),
+    });
+
+    return await ctx.db.get(existing._id);
+  },
+});
