@@ -1,4 +1,4 @@
-import { ArrowCounterClockwise, CheckCircle, FloppyDisk, WarningCircle } from "@phosphor-icons/react";
+import { CheckCircle, FloppyDisk } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -43,7 +43,10 @@ export function AdminPromptsPage() {
   }
 
   return (
-    <AdminShell title="Prompt Templates" description="Edit and version prompts for each AI feature.">
+    <AdminShell
+      title="Prompt Templates"
+      description="Edit and version prompts for each AI feature."
+    >
       {prompts === undefined && <LoadingState label="Loading prompts..." />}
       {prompts && (
         <div className="flex gap-4">
@@ -77,7 +80,10 @@ export function AdminPromptsPage() {
                 }
               >
                 <p className="mb-2 text-xs text-[var(--c-muted)]">System prompt:</p>
-                <pre className="mb-3 rounded-sm bg-[var(--c-surface-strong)] p-2 font-mono text-[10px] text-[var(--c-body)]" style={{ whiteSpace: "pre-wrap" }}>
+                <pre
+                  className="mb-3 rounded-sm bg-[var(--c-surface-strong)] p-2 font-mono text-[10px] text-[var(--c-body)]"
+                  style={{ whiteSpace: "pre-wrap" }}
+                >
                   {selected.systemPrompt}
                 </pre>
 
@@ -90,7 +96,12 @@ export function AdminPromptsPage() {
                 />
 
                 <div className="mt-3 flex justify-end gap-2">
-                  <Button size="sm" icon={<FloppyDisk size={14} />} onClick={handleSave} disabled={saving}>
+                  <Button
+                    size="sm"
+                    icon={<FloppyDisk size={14} />}
+                    onClick={handleSave}
+                    disabled={saving}
+                  >
                     {saving ? "Saving..." : "Save"}
                   </Button>
                 </div>

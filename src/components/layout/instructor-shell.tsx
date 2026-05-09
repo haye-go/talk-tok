@@ -7,7 +7,11 @@ import { useAct } from "@/hooks/use-act";
 
 export interface InstructorShellProps {
   sessionTitle?: string;
+  sessionCode?: string;
   participantCount?: number;
+  actIndex?: number;
+  onPreviousAct?: () => void;
+  onNextAct?: () => void;
   left?: ReactNode;
   center?: ReactNode;
   right?: ReactNode;
@@ -15,21 +19,26 @@ export interface InstructorShellProps {
 
 export function InstructorShell({
   sessionTitle = "Session",
+  sessionCode,
   participantCount = 0,
+  actIndex,
+  onPreviousAct,
+  onNextAct,
   left,
   center,
   right,
 }: InstructorShellProps) {
-  const { actIndex, advanceAct, goBackAct } = useAct();
+  const fallbackAct = useAct();
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--c-canvas)]">
       <InstructorTopBar
         sessionTitle={sessionTitle}
+        sessionCode={sessionCode}
         participantCount={participantCount}
-        actIndex={actIndex}
-        onPreviousAct={goBackAct}
-        onNextAct={advanceAct}
+        actIndex={actIndex ?? fallbackAct.actIndex}
+        onPreviousAct={onPreviousAct ?? fallbackAct.goBackAct}
+        onNextAct={onNextAct ?? fallbackAct.advanceAct}
       />
       <ThreePanelLayout
         left={left ?? <Card title="Categories">Category board placeholder.</Card>}

@@ -8,6 +8,7 @@ export function cleanRouteSegment(segment: ReadableSegment) {
 
 export const routes = {
   home: () => "/",
+  joinEntry: () => "/join",
   join: (sessionCode: string) => `/join/${cleanRouteSegment(sessionCode).toUpperCase()}`,
   session: (sessionSlug: ReadableSegment = DEMO_SESSION_SLUG) =>
     `/session/${cleanRouteSegment(sessionSlug)}`,
@@ -31,6 +32,7 @@ export const routes = {
 
 export const routeRegistry = [
   { id: "home", path: routes.home(), surface: "public" },
+  { id: "join-entry", path: routes.joinEntry(), surface: "participant" },
   { id: "join", path: "/join/:sessionCode", surface: "participant" },
   { id: "session", path: "/session/:sessionSlug", surface: "participant" },
   { id: "fight", path: "/session/:sessionSlug/fight/:fightSlug", surface: "participant" },

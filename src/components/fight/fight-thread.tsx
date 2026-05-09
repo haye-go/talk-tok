@@ -1,4 +1,4 @@
-import { Swords } from "@phosphor-icons/react";
+import { Sword } from "@phosphor-icons/react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { FightBubble } from "@/components/fight/fight-bubble";
@@ -8,7 +8,7 @@ import { FightDraftComposer } from "@/components/fight/fight-draft-composer";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/state/loading-state";
 import { ErrorState } from "@/components/state/error-state";
-import { MOCK_DEBRIEF, MOCK_FIGHT_ME_TURNS } from "@/lib/mock-data";
+import { MOCK_FIGHT_ME_TURNS } from "@/lib/mock-data";
 
 interface FightThreadProps {
   sessionSlug?: string;
@@ -42,7 +42,8 @@ export function FightThread({
     return <ErrorState title="Fight not found" description="This fight thread does not exist." />;
   }
 
-  const isCompleted = thread.status === "completed" || thread.status === "timed_out" || thread.status === "forfeited";
+  const isCompleted =
+    thread.status === "completed" || thread.status === "timed_out" || thread.status === "forfeited";
   const isPending = thread.status === "pending_acceptance";
   const isActive = thread.status === "active";
   const isMyTurn = isActive && thread.currentTurnParticipantId === myParticipantId;
@@ -53,7 +54,7 @@ export function FightThread({
       {/* Header */}
       <div className="flex items-center justify-between bg-[var(--c-sig-coral)] px-4 py-2.5 text-[var(--c-on-sig-dark)]">
         <span className="font-display text-sm font-semibold">
-          <Swords size={14} className="mr-1 inline" /> FIGHT ME — {modeLabel}
+          <Sword size={14} className="mr-1 inline" /> FIGHT ME — {modeLabel}
         </span>
         <div className="flex items-center gap-2">
           <Badge tone={isPending ? "warning" : isActive ? "sky" : "success"} className="text-[9px]">
@@ -69,7 +70,11 @@ export function FightThread({
       {isPending && thread.acceptanceDeadlineAt && (
         <div className="border-b border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3 text-center">
           <p className="text-xs text-[var(--c-muted)]">Waiting for opponent to accept...</p>
-          <FightCountdown deadlineAt={thread.acceptanceDeadlineAt} label="Expires in:" className="mt-1 justify-center" />
+          <FightCountdown
+            deadlineAt={thread.acceptanceDeadlineAt}
+            label="Expires in:"
+            className="mt-1 justify-center"
+          />
         </div>
       )}
 
@@ -159,7 +164,7 @@ export function FightThread({
         <div className="p-3">
           <div className="mb-3 text-center">
             <p className="font-display text-base font-medium text-[var(--c-ink)]">
-              <Swords size={16} className="mr-1 inline" /> Fight Complete!
+              <Sword size={16} className="mr-1 inline" /> Fight Complete!
             </p>
           </div>
           <FightDebrief
@@ -182,9 +187,11 @@ function MockFightThread() {
     <div>
       <div className="flex items-center justify-between bg-[var(--c-sig-coral)] px-4 py-2.5 text-[var(--c-on-sig-dark)]">
         <span className="font-display text-sm font-semibold">
-          <Swords size={14} className="mr-1 inline" /> FIGHT ME — vs AI
+          <Sword size={14} className="mr-1 inline" /> FIGHT ME — vs AI
         </span>
-        <span className="text-[11px]" style={{ opacity: 0.8 }}>Preview</span>
+        <span className="text-[11px]" style={{ opacity: 0.8 }}>
+          Preview
+        </span>
       </div>
       <div className="space-y-2.5 p-3">
         {MOCK_FIGHT_ME_TURNS.map((turn, i) => (

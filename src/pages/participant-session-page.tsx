@@ -8,7 +8,6 @@ import {
   ResponseComposer,
   type ResponseComposerSubmit,
 } from "@/components/submission/response-composer";
-import { SubmissionCard } from "@/components/submission/submission-card";
 import { DiscoverAct } from "@/components/acts/discover-act";
 import { ChallengeAct } from "@/components/acts/challenge-act";
 import { SynthesizeAct } from "@/components/acts/synthesize-act";
@@ -140,7 +139,10 @@ export function ParticipantSessionPage() {
   if (session === null) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[var(--c-canvas)] p-4">
-        <ErrorState title="Session not found" description="This readable session URL does not match an existing session." />
+        <ErrorState
+          title="Session not found"
+          description="This readable session URL does not match an existing session."
+        />
       </main>
     );
   }
@@ -151,7 +153,11 @@ export function ParticipantSessionPage() {
           <p className="text-sm text-[var(--c-muted)]">
             This browser does not have a participant identity for {session.title}.
           </p>
-          <Button type="button" className="mt-4 w-full" onClick={() => (window.location.href = routes.join(session.joinCode))}>
+          <Button
+            type="button"
+            className="mt-4 w-full"
+            onClick={() => (window.location.href = routes.join(session.joinCode))}
+          >
             Join with nickname
           </Button>
         </Card>
@@ -198,8 +204,15 @@ export function ParticipantSessionPage() {
               fightMeEnabled={ws?.session.fightMeEnabled ?? session.fightMeEnabled}
             />
           )}
-          {currentAct === "synthesize" && (
-            <SynthesizeAct categories={ws?.categorySummary} />
+          {currentAct === "synthesize" && clientKey && (
+            <SynthesizeAct
+              publishedArtifacts={ws?.synthesis?.publishedArtifacts}
+              finalArtifacts={ws?.synthesis?.finalArtifacts}
+              personalReport={ws?.personalReport}
+              sessionSlug={sessionSlug}
+              clientKey={clientKey}
+              onNavigateToReport={() => (window.location.href = routes.sessionReview(sessionSlug))}
+            />
           )}
         </div>
       }
@@ -230,13 +243,20 @@ export function ParticipantSessionPage() {
             assignmentsBySubmission={ws?.assignmentsBySubmission}
             recategorisationRequests={ws?.recategorisationRequests}
             fightThreads={ws?.fightMe.mine}
+            personalReport={ws?.personalReport}
             loading={ws === undefined}
+            onViewReport={() => (window.location.href = routes.sessionReview(sessionSlug))}
           />
           {followUpParentId && (
             <Card
               title="Add follow-up"
               action={
-                <Button type="button" variant="ghost" size="sm" onClick={() => setFollowUpParentId(null)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFollowUpParentId(null)}
+                >
                   Cancel
                 </Button>
               }
@@ -259,7 +279,9 @@ export function ParticipantSessionPage() {
                 onChange={(event) => setNickname(event.target.value)}
                 error={nicknameError ?? undefined}
               />
-              <Button type="submit" variant="secondary">Update nickname</Button>
+              <Button type="submit" variant="secondary">
+                Update nickname
+              </Button>
             </form>
           </Card>
         </div>

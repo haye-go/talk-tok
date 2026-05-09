@@ -1,4 +1,4 @@
-import { Swords, Timer } from "@phosphor-icons/react";
+import { ChartBar, CircleNotch, Sword, Timer } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/state/loading-state";
 import { categoryColorToTone } from "@/lib/category-colors";
@@ -41,6 +41,17 @@ interface FightRecord {
   createdAt: number;
 }
 
+interface PersonalReportSummary {
+  id: string;
+  status: string;
+  participationBand?: string | null;
+  reasoningBand?: string | null;
+  originalityBand?: string | null;
+  responsivenessBand?: string | null;
+  summary?: string | null;
+  error?: string | null;
+}
+
 interface MyZoneTabProps {
   initialResponses?: Submission[];
   followUpResponses?: (Submission & { followUpTitle?: string })[];
@@ -48,8 +59,10 @@ interface MyZoneTabProps {
   assignmentsBySubmission?: Assignment[];
   recategorisationRequests?: RecatRequest[];
   fightThreads?: FightRecord[];
+  personalReport?: PersonalReportSummary | null;
   loading?: boolean;
   onViewFight?: (fightSlug: string) => void;
+  onViewReport?: () => void;
 }
 
 function formatDuration(ms?: number) {
@@ -58,6 +71,23 @@ function formatDuration(ms?: number) {
   return sec >= 60 ? `${Math.floor(sec / 60)}m ${sec % 60}s` : `${sec}s`;
 }
 
+const BAND_LABELS: Record<string, string> = {
+  quiet: "Quiet",
+  active: "Active",
+  highly_active: "Highly Active",
+  emerging: "Emerging",
+  solid: "Solid",
+  strong: "Strong",
+  exceptional: "Exceptional",
+  common: "Common",
+  above_average: "Above Avg",
+  distinctive: "Distinctive",
+  novel: "Novel",
+  limited: "Limited",
+  responsive: "Responsive",
+  highly_responsive: "Highly Responsive",
+};
+
 export function MyZoneTab({
   initialResponses,
   followUpResponses,
@@ -65,18 +95,14 @@ export function MyZoneTab({
   assignmentsBySubmission,
   recategorisationRequests,
   fightThreads,
+  personalReport,
   loading,
   onViewFight,
+  onViewReport,
 }: MyZoneTabProps) {
-  const feedbackMap = new Map(
-    (feedbackBySubmission ?? []).map((f) => [f.submissionId, f]),
-  );
-  const assignmentMap = new Map(
-    (assignmentsBySubmission ?? []).map((a) => [a.submissionId, a]),
-  );
-  const recatMap = new Map(
-    (recategorisationRequests ?? []).map((r) => [r.submissionId, r]),
-  );
+  const feedbackMap = new Map((feedbackBySubmission ?? []).map((f) => [f.submissionId, f]));
+  const assignmentMap = new Map((assignmentsBySubmission ?? []).map((a) => [a.submissionId, a]));
+  const recatMap = new Map((recategorisationRequests ?? []).map((r) => [r.submissionId, r]));
 
   const initials = initialResponses ?? [
     {
@@ -98,6 +124,62 @@ export function MyZoneTab({
           Your responses and analysis
         </p>
       </div>
+
+      {personalReport?.status === "success" && (
+        <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
+          <div className="flex items-center justify-between">
+            <span className="font-display text-xs font-semibold text-[var(--c-success)]">
+              <ChartBar size={12} className="mr-0.5 inline" /> Personal Report
+            </span>
+            {onViewReport && (
+              <button
+                type="button"
+                onClick={onViewReport}
+                className="text-[10px] text-[var(--c-link)] underline"
+              >
+                View full report
+              </button>
+            )}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {personalReport.participationBand && (
+              <Badge tone="sky" className="text-[9px]">
+                {BAND_LABELS[personalReport.participationBand] ?? personalReport.participationBand}
+              </Badge>
+            )}
+            {personalReport.reasoningBand && (
+              <Badge tone="peach" className="text-[9px]">
+                {BAND_LABELS[personalReport.reasoningBand] ?? personalReport.reasoningBand}
+              </Badge>
+            )}
+            {personalReport.originalityBand && (
+              <Badge tone="mustard" className="text-[9px]">
+                {BAND_LABELS[personalReport.originalityBand] ?? personalReport.originalityBand}
+              </Badge>
+            )}
+            {personalReport.responsivenessBand && (
+              <Badge tone="cream" className="text-[9px]">
+                {BAND_LABELS[personalReport.responsivenessBand] ??
+                  personalReport.responsivenessBand}
+              </Badge>
+            )}
+          </div>
+          {personalReport.summary && (
+            <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--c-body)]">
+              {personalReport.summary.length > 120
+                ? `${personalReport.summary.slice(0, 120)}...`
+                : personalReport.summary}
+            </p>
+          )}
+        </div>
+      )}
+
+      {(personalReport?.status === "queued" || personalReport?.status === "processing") && (
+        <div className="flex items-center gap-2 rounded-md bg-[var(--c-surface-soft)] p-3">
+          <CircleNotch size={14} className="animate-spin text-[var(--c-success)]" />
+          <span className="text-xs text-[var(--c-muted)]">Generating personal report...</span>
+        </div>
+      )}
 
       {loading && <LoadingState label="Loading your responses..." />}
 
@@ -131,7 +213,10 @@ export function MyZoneTab({
                   <Badge tone="neutral">Uncategorized</Badge>
                 )}
                 <span className="text-[10px] text-[var(--c-muted)]">
-                  {new Date(sub.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  {new Date(sub.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
               </div>
               <div className="mt-1.5 flex gap-1.5">
@@ -163,9 +248,15 @@ export function MyZoneTab({
                 </p>
                 <p className="mt-0.5 text-[10px] text-[var(--c-muted)]">
                   {recat.suggestedCategoryName ?? "Different category"} →{" "}
-                  {recat.status === "approved" && <span className="text-[var(--c-success)]">Approved ✓</span>}
-                  {recat.status === "rejected" && <span className="text-[var(--c-error)]">Rejected</span>}
-                  {recat.status === "pending" && <span className="text-[var(--c-sig-mustard)]">Pending</span>}
+                  {recat.status === "approved" && (
+                    <span className="text-[var(--c-success)]">Approved ✓</span>
+                  )}
+                  {recat.status === "rejected" && (
+                    <span className="text-[var(--c-error)]">Rejected</span>
+                  )}
+                  {recat.status === "pending" && (
+                    <span className="text-[var(--c-sig-mustard)]">Pending</span>
+                  )}
                 </p>
               </div>
             )}
@@ -198,10 +289,18 @@ export function MyZoneTab({
         >
           <div className="flex items-center justify-between">
             <span className="font-display text-xs font-semibold text-[var(--c-sig-coral)]">
-              <Swords size={12} className="mr-0.5 inline" />
+              <Sword size={12} className="mr-0.5 inline" />
               Fight Me {fight.mode === "vs_ai" ? "vs AI" : "1v1"}
             </span>
-            <Badge tone={fight.status === "completed" ? "success" : fight.status === "active" ? "sky" : "neutral"}>
+            <Badge
+              tone={
+                fight.status === "completed"
+                  ? "success"
+                  : fight.status === "active"
+                    ? "sky"
+                    : "neutral"
+              }
+            >
               {fight.status}
             </Badge>
           </div>

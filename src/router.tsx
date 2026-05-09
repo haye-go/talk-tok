@@ -7,6 +7,7 @@ import { AdminProtectionPage } from "@/pages/admin-protection-page";
 import { AdminRetrievalPage } from "@/pages/admin-retrieval-page";
 import { FightPage } from "@/pages/fight-page";
 import { InstructorDashboardPage } from "@/pages/instructor-dashboard-page";
+import { JoinCodePage } from "@/pages/join-code-page";
 import { InstructorSessionPage } from "@/pages/instructor-session-page";
 import { JoinPage } from "@/pages/join-page";
 import { ParticipantSessionPage } from "@/pages/participant-session-page";
@@ -30,6 +31,12 @@ const indexRoute = createRoute({
 });
 
 const joinRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/join",
+  component: JoinCodePage,
+});
+
+const joinWithCodeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/join/$sessionCode",
   component: JoinPage,
@@ -116,6 +123,7 @@ const instructorAdminObservabilityRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   joinRoute,
+  joinWithCodeRoute,
   sessionRoute,
   sessionFightRoute,
   sessionReviewRoute,

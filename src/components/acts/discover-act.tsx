@@ -46,12 +46,14 @@ export function DiscoverAct({
   onRequestRecategorisation,
   onAddFollowUp,
 }: DiscoverActProps) {
-  const cats = categories ?? MOCK_CATEGORIES.map((c, i) => ({
-    id: c.id,
-    name: c.name,
-    color: c.color,
-    assignmentCount: c.count,
-  }));
+  const cats =
+    categories ??
+    MOCK_CATEGORIES.map((c) => ({
+      id: c.id,
+      name: c.name,
+      color: c.color,
+      assignmentCount: c.count,
+    }));
 
   const fb: FeedbackData = feedback ?? {
     status: "success" as const,

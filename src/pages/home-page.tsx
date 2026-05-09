@@ -3,7 +3,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { DEMO_SESSION_CODE, DEMO_SESSION_SLUG } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 
 const checkpoints = [
@@ -36,17 +35,17 @@ export function HomePage() {
             <Button
               type="button"
               icon={<QrCode size={18} />}
-              onClick={() => (window.location.href = routes.join(DEMO_SESSION_CODE))}
+              onClick={() => (window.location.href = routes.joinEntry())}
             >
-              Join demo
+              Join discussion
             </Button>
             <Button
               type="button"
               variant="secondary"
               icon={<ArrowRight size={18} />}
-              onClick={() => (window.location.href = routes.instructorSession(DEMO_SESSION_SLUG))}
+              onClick={() => (window.location.href = routes.instructor())}
             >
-              Instructor shell
+              Instructor dashboard
             </Button>
           </div>
         </section>

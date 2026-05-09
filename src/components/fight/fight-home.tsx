@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lightning, Robot, Swords } from "@phosphor-icons/react";
+import { Lightning, Robot, Sword } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { FightCountdown } from "@/components/fight/fight-countdown";
@@ -73,7 +73,9 @@ export function FightHome({
   if (!fightMeEnabled) {
     return (
       <Card>
-        <p className="text-sm text-[var(--c-muted)]">Fight Me mode is not enabled for this session.</p>
+        <p className="text-sm text-[var(--c-muted)]">
+          Fight Me mode is not enabled for this session.
+        </p>
       </Card>
     );
   }
@@ -97,7 +99,7 @@ export function FightHome({
       <div className="space-y-3">
         <Card>
           <div className="text-center">
-            <Swords size={24} className="mx-auto mb-2 text-[var(--c-sig-coral)]" />
+            <Sword size={24} className="mx-auto mb-2 text-[var(--c-sig-coral)]" />
             <p className="font-display text-sm font-medium text-[var(--c-ink)]">
               You have an active fight!
             </p>
@@ -126,7 +128,7 @@ export function FightHome({
         >
           <div className="flex items-center justify-between">
             <p className="font-display text-sm font-medium text-[var(--c-sig-coral)]">
-              <Swords size={14} className="mr-1 inline" />
+              <Sword size={14} className="mr-1 inline" />
               Incoming Challenge!
             </p>
             {challenge.acceptanceDeadlineAt && (
@@ -138,7 +140,9 @@ export function FightHome({
               variant="coral"
               size="sm"
               className="flex-1"
-              onClick={() => void acceptChallenge({ sessionSlug, fightSlug: challenge.slug, clientKey })}
+              onClick={() =>
+                void acceptChallenge({ sessionSlug, fightSlug: challenge.slug, clientKey })
+              }
             >
               Accept
             </Button>
@@ -146,7 +150,9 @@ export function FightHome({
               variant="secondary"
               size="sm"
               className="flex-1"
-              onClick={() => void declineChallenge({ sessionSlug, fightSlug: challenge.slug, clientKey })}
+              onClick={() =>
+                void declineChallenge({ sessionSlug, fightSlug: challenge.slug, clientKey })
+              }
             >
               Decline
             </Button>
@@ -155,9 +161,14 @@ export function FightHome({
       ))}
 
       {/* Start new fight CTAs */}
-      <div className="rounded-md bg-[var(--c-surface-soft)] p-4 text-center" style={{ border: "1px solid var(--c-sig-coral)" }}>
+      <div
+        className="rounded-md bg-[var(--c-surface-soft)] p-4 text-center"
+        style={{ border: "1px solid var(--c-sig-coral)" }}
+      >
         <Lightning size={28} weight="fill" className="mx-auto mb-1 text-[var(--c-sig-coral)]" />
-        <p className="font-display text-base font-medium text-[var(--c-sig-coral)]">Fight Me Mode</p>
+        <p className="font-display text-base font-medium text-[var(--c-sig-coral)]">
+          Fight Me Mode
+        </p>
         <p className="mt-1 text-xs text-[var(--c-muted)]">
           Challenge AI or another participant to a structured debate
         </p>
@@ -182,7 +193,13 @@ export function FightHome({
   );
 }
 
-function PastFights({ fights, onNavigate }: { fights: FightThread[]; onNavigate: (slug: string) => void }) {
+function PastFights({
+  fights,
+  onNavigate,
+}: {
+  fights: FightThread[];
+  onNavigate: (slug: string) => void;
+}) {
   return (
     <Card title="Past Fights">
       <div className="space-y-2">
