@@ -162,9 +162,7 @@ select {
   cursor: not-allowed;
 }
 
-a,
-a:visited,
-a:link {
+a:not([class]) {
   color: inherit;
   text-decoration: inherit;
 }
