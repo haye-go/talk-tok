@@ -10,6 +10,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { aiWorkpool, rateLimiter } from "./components";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -160,6 +161,21 @@ export const triggerForSession = mutation({
       throw new Error("Session not found.");
     }
 
+    await rateLimiter.limit(ctx, "heavyAiAction", {
+      key: `categorisation:${session._id}`,
+      throws: true,
+    });
+    await rateLimiter.limit(ctx, "dailyAiAction", { key: session._id, throws: true });
+
+    const budget = await ctx.runQuery(internal.budget.checkSessionBudget, {
+      sessionId: session._id,
+      feature: "categorisation",
+    });
+
+    if (!budget.allowed) {
+      throw new Error("AI budget hard stop is active for this session.");
+    }
+
     const now = Date.now();
     const jobId = await ctx.db.insert("aiJobs", {
       sessionId: session._id,
@@ -175,12 +191,18 @@ export const triggerForSession = mutation({
       action: "categorisation.triggered",
       targetType: "aiJob",
       targetId: jobId,
+      metadataJson: { budget },
     });
 
-    await ctx.scheduler.runAfter(0, internal.categorisation.runForSession, {
-      sessionId: session._id,
-      jobId,
-    });
+    await aiWorkpool.enqueueAction(
+      ctx,
+      internal.categorisation.runForSession,
+      {
+        sessionId: session._id,
+        jobId,
+      },
+      { name: "categorisation.runForSession", retry: true },
+    );
 
     return await ctx.db.get(jobId);
   },

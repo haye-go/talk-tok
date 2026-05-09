@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { rateLimiter } from "./components";
 
 const MAX_REASON_LENGTH = 1000;
 const REQUEST_WINDOW_MS = 60_000;
@@ -119,6 +120,11 @@ export const request = mutation({
     if (!participant) {
       throw new Error("Participant not found.");
     }
+
+    await rateLimiter.limit(ctx, "recategorisationRequest", {
+      key: participant._id,
+      throws: true,
+    });
 
     const submission = await ctx.db.get(args.submissionId);
 

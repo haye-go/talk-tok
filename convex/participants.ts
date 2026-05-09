@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { rateLimiter } from "./components";
 
 const OFFLINE_AFTER_MS = 60_000;
 const MAX_NICKNAME_LENGTH = 40;
@@ -163,6 +164,11 @@ export const join = mutation({
     const nickname = normalizeNickname(args.nickname);
     const clientKeyHash = await hashClientKey(args.clientKey);
     const existing = await findParticipantByClientKey(ctx, session, args.clientKey);
+
+    await rateLimiter.limit(ctx, "sessionJoin", {
+      key: `${session._id}:${clientKeyHash}`,
+      throws: true,
+    });
 
     if (existing) {
       await ctx.db.patch(existing._id, {

@@ -86,6 +86,7 @@ async function getSetting(ctx: QueryCtx | MutationCtx, key: string, sessionId?: 
 
 function toPublicSetting(setting: Doc<"protectionSettings">) {
   return {
+    _id: setting._id,
     id: setting._id,
     sessionId: setting.sessionId,
     key: setting.key,

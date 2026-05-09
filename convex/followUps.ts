@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { rateLimiter } from "./components";
 
 const FOLLOW_UP_LIMIT = 80;
 const TARGET_LIMIT = 20;
@@ -225,6 +226,32 @@ async function assertParticipantEligible(
   }
 
   return false;
+}
+
+async function assertSummaryGateOpen(ctx: QueryCtx | MutationCtx, session: Doc<"sessions">) {
+  if (!session.summaryGateEnabled) {
+    return;
+  }
+
+  const published = await ctx.db
+    .query("synthesisArtifacts")
+    .withIndex("by_session_and_status", (q) =>
+      q.eq("sessionId", session._id).eq("status", "published"),
+    )
+    .take(1);
+
+  if (published.length > 0) {
+    return;
+  }
+
+  const finalArtifacts = await ctx.db
+    .query("synthesisArtifacts")
+    .withIndex("by_session_and_status", (q) => q.eq("sessionId", session._id).eq("status", "final"))
+    .take(1);
+
+  if (finalArtifacts.length === 0) {
+    throw new Error("Follow-up responses open after the instructor publishes a synthesis summary.");
+  }
 }
 
 async function toPublicPrompt(ctx: QueryCtx | MutationCtx, prompt: Doc<"followUpPrompts">) {
@@ -535,6 +562,9 @@ export const submitResponse = mutation({
     if (!prompt || prompt.sessionId !== session._id || prompt.status !== "active") {
       throw new Error("Follow-up prompt is not active in this session.");
     }
+
+    await rateLimiter.limit(ctx, "followUpResponse", { key: participant._id, throws: true });
+    await assertSummaryGateOpen(ctx, session);
 
     if (!(await assertParticipantEligible(ctx, prompt, participant._id))) {
       throw new Error("This follow-up is not targeted to this participant.");

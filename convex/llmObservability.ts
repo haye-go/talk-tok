@@ -25,6 +25,7 @@ async function getSessionBySlug(ctx: QueryCtx, sessionSlug: string) {
 
 function toPublicCall(call: Doc<"llmCalls">) {
   return {
+    _id: call._id,
     id: call._id,
     sessionId: call.sessionId,
     feature: call.feature,
@@ -50,18 +51,40 @@ function summarize(calls: Doc<"llmCalls">[]) {
     .filter((latency): latency is number => typeof latency === "number");
   const totalLatency = latencyValues.reduce((sum, latency) => sum + latency, 0);
 
+  const inputTokens = calls.reduce((sum, call) => sum + (call.inputTokens ?? 0), 0);
+  const cachedInputTokens = calls.reduce((sum, call) => sum + (call.cachedInputTokens ?? 0), 0);
+  const outputTokens = calls.reduce((sum, call) => sum + (call.outputTokens ?? 0), 0);
+  const reasoningTokens = calls.reduce((sum, call) => sum + (call.reasoningTokens ?? 0), 0);
+  const estimatedCostUsd = calls.reduce((sum, call) => sum + (call.estimatedCostUsd ?? 0), 0);
+  const byFeature: Record<string, { calls: number; errors: number; estimatedCostUsd: number }> =
+    {};
+
+  for (const call of calls) {
+    byFeature[call.feature] ??= { calls: 0, errors: 0, estimatedCostUsd: 0 };
+    byFeature[call.feature].calls += 1;
+    byFeature[call.feature].errors += call.status === "error" ? 1 : 0;
+    byFeature[call.feature].estimatedCostUsd += call.estimatedCostUsd ?? 0;
+  }
+
+  const errors = calls.filter((call) => call.status === "error").length;
+
   return {
     calls: calls.length,
+    totalCalls: calls.length,
     successes: successCalls.length,
-    errors: calls.filter((call) => call.status === "error").length,
+    errors,
+    errorCount: errors,
     queued: calls.filter((call) => call.status === "queued").length,
-    inputTokens: calls.reduce((sum, call) => sum + (call.inputTokens ?? 0), 0),
-    cachedInputTokens: calls.reduce((sum, call) => sum + (call.cachedInputTokens ?? 0), 0),
-    outputTokens: calls.reduce((sum, call) => sum + (call.outputTokens ?? 0), 0),
-    reasoningTokens: calls.reduce((sum, call) => sum + (call.reasoningTokens ?? 0), 0),
-    estimatedCostUsd: calls.reduce((sum, call) => sum + (call.estimatedCostUsd ?? 0), 0),
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+    reasoningTokens,
+    totalTokens: inputTokens + cachedInputTokens + outputTokens + reasoningTokens,
+    estimatedCostUsd,
+    totalEstimatedCostUsd: estimatedCostUsd,
     averageLatencyMs:
       latencyValues.length > 0 ? Math.round(totalLatency / latencyValues.length) : 0,
+    byFeature,
   };
 }
 

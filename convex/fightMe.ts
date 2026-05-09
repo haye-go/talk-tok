@@ -10,6 +10,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { aiWorkpool, rateLimiter } from "./components";
 
 const ACCEPTANCE_TIMEOUT_MS = 20_000;
 const TURN_TIMEOUT_MS = 60_000;
@@ -173,6 +174,28 @@ async function getDraft(
     .unique();
 }
 
+async function getFightThreadByIdOrSlug(
+  ctx: QueryCtx | MutationCtx,
+  sessionId: Id<"sessions">,
+  fightThreadId?: Id<"fightThreads">,
+  fightSlug?: string,
+) {
+  if (fightThreadId) {
+    return await ctx.db.get(fightThreadId);
+  }
+
+  if (fightSlug) {
+    return await ctx.db
+      .query("fightThreads")
+      .withIndex("by_session_slug", (q) =>
+        q.eq("sessionId", sessionId).eq("slug", slugify(fightSlug)),
+      )
+      .unique();
+  }
+
+  return null;
+}
+
 function toPublicTurn(turn: Doc<"fightTurns">) {
   return {
     id: turn._id,
@@ -284,7 +307,12 @@ async function queueDebrief(ctx: MutationCtx, thread: Doc<"fightThreads">) {
     updatedAt: now,
   });
 
-  await ctx.scheduler.runAfter(0, internal.fightMe.generateDebrief, { debriefId, jobId });
+  await aiWorkpool.enqueueAction(
+    ctx,
+    internal.fightMe.generateDebrief,
+    { debriefId, jobId },
+    { name: "fightMe.generateDebrief", retry: true },
+  );
   return debriefId;
 }
 
@@ -350,11 +378,16 @@ async function advanceAfterTurn(
       updatedAt: now,
     });
 
-    await ctx.scheduler.runAfter(0, internal.fightMe.generateAiTurn, {
-      fightThreadId: thread._id,
-      jobId,
-      expectedTurnNumber: nextTurnNumber,
-    });
+    await aiWorkpool.enqueueAction(
+      ctx,
+      internal.fightMe.generateAiTurn,
+      {
+        fightThreadId: thread._id,
+        jobId,
+        expectedTurnNumber: nextTurnNumber,
+      },
+      { name: "fightMe.generateAiTurn", retry: true },
+    );
     return;
   }
 
@@ -386,6 +419,8 @@ export const createChallenge = mutation({
     if (!attacker) {
       throw new Error("Participant not found.");
     }
+
+    await rateLimiter.limit(ctx, "fightMeAction", { key: attacker._id, throws: true });
 
     if (!defenderSubmission || defenderSubmission.sessionId !== session._id) {
       throw new Error("Defender submission not found in this session.");
@@ -487,6 +522,16 @@ export const createVsAi = mutation({
       throw new Error("Participant not found.");
     }
 
+    await rateLimiter.limit(ctx, "fightMeAction", { key: participant._id, throws: true });
+    const budget = await ctx.runQuery(internal.budget.checkSessionBudget, {
+      sessionId: session._id,
+      feature: "fight_challenge",
+    });
+
+    if (!budget.allowed) {
+      throw new Error("AI budget hard stop is active for this session.");
+    }
+
     if (
       !sourceSubmission ||
       sourceSubmission.sessionId !== session._id ||
@@ -519,11 +564,16 @@ export const createVsAi = mutation({
       updatedAt: now,
     });
 
-    await ctx.scheduler.runAfter(0, internal.fightMe.generateAiTurn, {
-      fightThreadId,
-      jobId,
-      expectedTurnNumber: 1,
-    });
+    await aiWorkpool.enqueueAction(
+      ctx,
+      internal.fightMe.generateAiTurn,
+      {
+        fightThreadId,
+        jobId,
+        expectedTurnNumber: 1,
+      },
+      { name: "fightMe.generateAiTurn", retry: true },
+    );
 
     return await toPublicThread(ctx, (await ctx.db.get(fightThreadId))!);
   },
@@ -533,12 +583,15 @@ export const saveDraft = mutation({
   args: {
     sessionSlug: v.string(),
     clientKey: v.string(),
-    fightThreadId: v.id("fightThreads"),
+    fightThreadId: v.optional(v.id("fightThreads")),
+    fightSlug: v.optional(v.string()),
     body: v.string(),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
-    const thread = await ctx.db.get(args.fightThreadId);
+    const thread = session
+      ? await getFightThreadByIdOrSlug(ctx, session._id, args.fightThreadId, args.fightSlug)
+      : null;
 
     if (!session || !thread || thread.sessionId !== session._id) {
       throw new Error("Fight thread not found in this session.");
@@ -549,6 +602,8 @@ export const saveDraft = mutation({
     if (!participant) {
       throw new Error("Participant not found.");
     }
+
+    await rateLimiter.limit(ctx, "fightDraftSave", { key: participant._id, throws: true });
 
     const canDraftPending =
       thread.status === "pending_acceptance" && thread.attackerParticipantId === participant._id;
@@ -584,11 +639,14 @@ export const acceptChallenge = mutation({
   args: {
     sessionSlug: v.string(),
     clientKey: v.string(),
-    fightThreadId: v.id("fightThreads"),
+    fightThreadId: v.optional(v.id("fightThreads")),
+    fightSlug: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
-    const thread = await ctx.db.get(args.fightThreadId);
+    const thread = session
+      ? await getFightThreadByIdOrSlug(ctx, session._id, args.fightThreadId, args.fightSlug)
+      : null;
 
     if (!session || !thread || thread.sessionId !== session._id) {
       throw new Error("Fight thread not found in this session.");
@@ -599,6 +657,8 @@ export const acceptChallenge = mutation({
     if (!defender || thread.defenderParticipantId !== defender._id) {
       throw new Error("Only the defender can accept this challenge.");
     }
+
+    await rateLimiter.limit(ctx, "fightMeAction", { key: defender._id, throws: true });
 
     if (thread.status !== "pending_acceptance") {
       throw new Error("This challenge is not pending acceptance.");
@@ -663,11 +723,14 @@ export const declineChallenge = mutation({
   args: {
     sessionSlug: v.string(),
     clientKey: v.string(),
-    fightThreadId: v.id("fightThreads"),
+    fightThreadId: v.optional(v.id("fightThreads")),
+    fightSlug: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
-    const thread = await ctx.db.get(args.fightThreadId);
+    const thread = session
+      ? await getFightThreadByIdOrSlug(ctx, session._id, args.fightThreadId, args.fightSlug)
+      : null;
 
     if (!session || !thread || thread.sessionId !== session._id) {
       throw new Error("Fight thread not found in this session.");
@@ -678,6 +741,8 @@ export const declineChallenge = mutation({
     if (!defender || thread.defenderParticipantId !== defender._id) {
       throw new Error("Only the defender can decline this challenge.");
     }
+
+    await rateLimiter.limit(ctx, "fightMeAction", { key: defender._id, throws: true });
 
     if (thread.status !== "pending_acceptance") {
       throw new Error("Only pending challenges can be declined.");
@@ -697,11 +762,14 @@ export const cancelChallenge = mutation({
   args: {
     sessionSlug: v.string(),
     clientKey: v.string(),
-    fightThreadId: v.id("fightThreads"),
+    fightThreadId: v.optional(v.id("fightThreads")),
+    fightSlug: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
-    const thread = await ctx.db.get(args.fightThreadId);
+    const thread = session
+      ? await getFightThreadByIdOrSlug(ctx, session._id, args.fightThreadId, args.fightSlug)
+      : null;
 
     if (!session || !thread || thread.sessionId !== session._id) {
       throw new Error("Fight thread not found in this session.");
@@ -712,6 +780,8 @@ export const cancelChallenge = mutation({
     if (!attacker || thread.attackerParticipantId !== attacker._id) {
       throw new Error("Only the attacker can cancel this challenge.");
     }
+
+    await rateLimiter.limit(ctx, "fightMeAction", { key: attacker._id, throws: true });
 
     if (thread.status !== "pending_acceptance") {
       throw new Error("Only pending challenges can be cancelled.");
@@ -731,12 +801,15 @@ export const submitTurn = mutation({
   args: {
     sessionSlug: v.string(),
     clientKey: v.string(),
-    fightThreadId: v.id("fightThreads"),
+    fightThreadId: v.optional(v.id("fightThreads")),
+    fightSlug: v.optional(v.string()),
     body: v.string(),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
-    const thread = await ctx.db.get(args.fightThreadId);
+    const thread = session
+      ? await getFightThreadByIdOrSlug(ctx, session._id, args.fightThreadId, args.fightSlug)
+      : null;
 
     if (!session || !thread || thread.sessionId !== session._id) {
       throw new Error("Fight thread not found in this session.");
@@ -747,6 +820,8 @@ export const submitTurn = mutation({
     if (!participant) {
       throw new Error("Participant not found.");
     }
+
+    await rateLimiter.limit(ctx, "fightMeAction", { key: participant._id, throws: true });
 
     if (thread.status !== "active" || thread.currentTurnParticipantId !== participant._id) {
       throw new Error("It is not your turn in this fight.");
@@ -786,11 +861,14 @@ export const forfeit = mutation({
   args: {
     sessionSlug: v.string(),
     clientKey: v.string(),
-    fightThreadId: v.id("fightThreads"),
+    fightThreadId: v.optional(v.id("fightThreads")),
+    fightSlug: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
-    const thread = await ctx.db.get(args.fightThreadId);
+    const thread = session
+      ? await getFightThreadByIdOrSlug(ctx, session._id, args.fightThreadId, args.fightSlug)
+      : null;
 
     if (!session || !thread || thread.sessionId !== session._id) {
       throw new Error("Fight thread not found in this session.");
@@ -805,6 +883,8 @@ export const forfeit = mutation({
     ) {
       throw new Error("Only a fight participant can forfeit.");
     }
+
+    await rateLimiter.limit(ctx, "fightMeAction", { key: participant._id, throws: true });
 
     if (thread.status !== "active") {
       throw new Error("Only active fights can be forfeited.");

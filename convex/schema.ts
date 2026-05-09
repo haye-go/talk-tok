@@ -104,6 +104,42 @@ export default defineSchema({
     .index("by_parent_submission", ["parentSubmissionId"])
     .index("by_follow_up_prompt", ["followUpPromptId"]),
 
+  reactions: defineTable({
+    sessionId: v.id("sessions"),
+    submissionId: v.id("submissions"),
+    participantId: v.id("participants"),
+    kind: v.union(
+      v.literal("agree"),
+      v.literal("sharp"),
+      v.literal("question"),
+      v.literal("spark"),
+      v.literal("changed_mind"),
+    ),
+    createdAt: timestamp,
+  })
+    .index("by_session_and_created_at", ["sessionId", "createdAt"])
+    .index("by_submission", ["submissionId"])
+    .index("by_participant", ["participantId"])
+    .index("by_submission_and_participant_and_kind", [
+      "submissionId",
+      "participantId",
+      "kind",
+    ]),
+
+  positionShiftEvents: defineTable({
+    sessionId: v.id("sessions"),
+    participantId: v.id("participants"),
+    submissionId: v.optional(v.id("submissions")),
+    categoryId: v.optional(v.id("categories")),
+    reason: v.string(),
+    influencedBy: v.optional(v.string()),
+    createdAt: timestamp,
+  })
+    .index("by_session_and_created_at", ["sessionId", "createdAt"])
+    .index("by_participant", ["participantId"])
+    .index("by_submission", ["submissionId"])
+    .index("by_category", ["categoryId"]),
+
   categories: defineTable({
     sessionId: v.id("sessions"),
     slug: v.string(),
@@ -119,6 +155,49 @@ export default defineSchema({
   })
     .index("by_session", ["sessionId"])
     .index("by_session_slug", ["sessionId", "slug"]),
+
+  sessionTemplates: defineTable({
+    slug: v.string(),
+    name: v.string(),
+    description: v.optional(v.string()),
+    title: v.string(),
+    openingPrompt: v.string(),
+    modePreset: v.union(
+      v.literal("class_discussion"),
+      v.literal("conference_qna"),
+      v.literal("debate_lab"),
+      v.literal("custom"),
+    ),
+    visibilityMode: v.union(
+      v.literal("private_until_released"),
+      v.literal("category_summary_only"),
+      v.literal("raw_responses_visible"),
+    ),
+    anonymityMode: v.union(v.literal("nicknames_visible"), v.literal("anonymous_to_peers")),
+    responseSoftLimitWords: v.number(),
+    categorySoftCap: v.number(),
+    critiqueToneDefault: v.union(
+      v.literal("gentle"),
+      v.literal("direct"),
+      v.literal("spicy"),
+      v.literal("roast"),
+    ),
+    telemetryEnabled: v.boolean(),
+    fightMeEnabled: v.boolean(),
+    summaryGateEnabled: v.boolean(),
+    presetCategories: v.array(
+      v.object({
+        name: v.string(),
+        description: v.optional(v.string()),
+        color: v.optional(v.string()),
+      }),
+    ),
+    status: v.union(v.literal("active"), v.literal("archived")),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_slug", ["slug"])
+    .index("by_status", ["status"]),
 
   submissionCategories: defineTable({
     sessionId: v.id("sessions"),

@@ -10,6 +10,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { aiWorkpool, rateLimiter } from "./components";
 
 type JsonRecord = Record<string, unknown>;
 type ArtifactKind = Doc<"synthesisArtifacts">["kind"];
@@ -193,6 +194,19 @@ export const generateCategorySummary = mutation({
       throw new Error("Category not found in this session.");
     }
 
+    await rateLimiter.limit(ctx, "heavyAiAction", {
+      key: `synthesis:${session._id}`,
+      throws: true,
+    });
+    const budget = await ctx.runQuery(internal.budget.checkSessionBudget, {
+      sessionId: session._id,
+      feature: "synthesis",
+    });
+
+    if (!budget.allowed) {
+      throw new Error("AI budget hard stop is active for this session.");
+    }
+
     if (!args.forceRegenerate) {
       const existing = await ctx.db
         .query("synthesisArtifacts")
@@ -221,7 +235,12 @@ export const generateCategorySummary = mutation({
       title: `${category.name} Summary`,
     });
 
-    await ctx.scheduler.runAfter(0, internal.synthesis.generateArtifact, { artifactId, jobId });
+    await aiWorkpool.enqueueAction(
+      ctx,
+      internal.synthesis.generateArtifact,
+      { artifactId, jobId },
+      { name: "synthesis.generateArtifact", retry: true },
+    );
 
     return toArtifact((await ctx.db.get(artifactId))!);
   },
@@ -244,6 +263,19 @@ export const generateClassSynthesis = mutation({
 
     if (!session) {
       throw new Error("Session not found.");
+    }
+
+    await rateLimiter.limit(ctx, "heavyAiAction", {
+      key: `synthesis:${session._id}`,
+      throws: true,
+    });
+    const budget = await ctx.runQuery(internal.budget.checkSessionBudget, {
+      sessionId: session._id,
+      feature: "synthesis",
+    });
+
+    if (!budget.allowed) {
+      throw new Error("AI budget hard stop is active for this session.");
     }
 
     const kind = args.kind ?? "class_synthesis";
@@ -274,7 +306,12 @@ export const generateClassSynthesis = mutation({
       title,
     });
 
-    await ctx.scheduler.runAfter(0, internal.synthesis.generateArtifact, { artifactId, jobId });
+    await aiWorkpool.enqueueAction(
+      ctx,
+      internal.synthesis.generateArtifact,
+      { artifactId, jobId },
+      { name: "synthesis.generateArtifact", retry: true },
+    );
 
     return toArtifact((await ctx.db.get(artifactId))!);
   },

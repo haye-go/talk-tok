@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { rateLimiter } from "./components";
 
 const MAX_BODY_LENGTH = 8_000;
 const MIN_BODY_LENGTH = 5;
@@ -189,6 +190,32 @@ async function assertSubmissionAllowed(
   }
 }
 
+async function assertSummaryGateOpen(ctx: QueryCtx | MutationCtx, session: Doc<"sessions">) {
+  if (!session.summaryGateEnabled) {
+    return;
+  }
+
+  const published = await ctx.db
+    .query("synthesisArtifacts")
+    .withIndex("by_session_and_status", (q) =>
+      q.eq("sessionId", session._id).eq("status", "published"),
+    )
+    .take(1);
+
+  if (published.length > 0) {
+    return;
+  }
+
+  const finalArtifacts = await ctx.db
+    .query("synthesisArtifacts")
+    .withIndex("by_session_and_status", (q) => q.eq("sessionId", session._id).eq("status", "final"))
+    .take(1);
+
+  if (finalArtifacts.length === 0) {
+    throw new Error("Follow-up responses open after the instructor publishes a synthesis summary.");
+  }
+}
+
 export const create = mutation({
   args: {
     sessionSlug: v.string(),
@@ -227,6 +254,8 @@ export const create = mutation({
       throw new Error("Participant not found.");
     }
 
+    await rateLimiter.limit(ctx, "submitResponse", { key: participant._id, throws: true });
+
     const contentLimits = asRecord(
       await ctx.runQuery(internal.protection.loadSetting, {
         key: "contentLimits",
@@ -262,6 +291,8 @@ export const create = mutation({
     }
 
     if (args.followUpPromptId) {
+      await assertSummaryGateOpen(ctx, session);
+
       const followUpPrompt = await ctx.db.get(args.followUpPromptId);
 
       if (

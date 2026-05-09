@@ -10,6 +10,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { aiWorkpool, rateLimiter } from "./components";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -179,7 +180,12 @@ async function queueReport(
     await ctx.db.patch(reportId, { aiJobId: jobId });
   }
 
-  await ctx.scheduler.runAfter(0, internal.personalReports.generateReport, { reportId, jobId });
+  await aiWorkpool.enqueueAction(
+    ctx,
+    internal.personalReports.generateReport,
+    { reportId, jobId },
+    { name: "personalReports.generateReport", retry: true },
+  );
 
   return (await ctx.db.get(reportId))!;
 }
@@ -201,6 +207,19 @@ export const generateMine = mutation({
 
     if (!participant) {
       throw new Error("Participant not found.");
+    }
+
+    await rateLimiter.limit(ctx, "heavyAiAction", {
+      key: `personal_report:${session._id}:${participant._id}`,
+      throws: true,
+    });
+    const budget = await ctx.runQuery(internal.budget.checkSessionBudget, {
+      sessionId: session._id,
+      feature: "personal_report",
+    });
+
+    if (!budget.allowed) {
+      throw new Error("AI budget hard stop is active for this session.");
     }
 
     const report = await queueReport(ctx, {
@@ -234,6 +253,19 @@ export const generateForSession = mutation({
 
     if (!session) {
       throw new Error("Session not found.");
+    }
+
+    await rateLimiter.limit(ctx, "heavyAiAction", {
+      key: `personal_report_batch:${session._id}`,
+      throws: true,
+    });
+    const budget = await ctx.runQuery(internal.budget.checkSessionBudget, {
+      sessionId: session._id,
+      feature: "personal_report",
+    });
+
+    if (!budget.allowed) {
+      throw new Error("AI budget hard stop is active for this session.");
     }
 
     const participants = args.participantIds

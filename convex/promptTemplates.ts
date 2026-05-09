@@ -311,12 +311,12 @@ export const getByKey = query({
 export const update = mutation({
   args: {
     key: v.string(),
-    name: v.string(),
-    surface: v.string(),
-    systemPrompt: v.string(),
-    userTemplate: v.string(),
+    name: v.optional(v.string()),
+    surface: v.optional(v.string()),
+    systemPrompt: v.optional(v.string()),
+    userTemplate: v.optional(v.string()),
     modelOverride: v.optional(v.string()),
-    variablesJson: v.any(),
+    variablesJson: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -329,12 +329,12 @@ export const update = mutation({
     }
 
     await ctx.db.patch(existing._id, {
-      name: args.name.trim(),
-      surface: args.surface.trim(),
-      systemPrompt: args.systemPrompt,
-      userTemplate: args.userTemplate,
+      name: args.name?.trim() ?? existing.name,
+      surface: args.surface?.trim() ?? existing.surface,
+      systemPrompt: args.systemPrompt ?? existing.systemPrompt,
+      userTemplate: args.userTemplate ?? existing.userTemplate,
       modelOverride: args.modelOverride,
-      variablesJson: args.variablesJson,
+      variablesJson: args.variablesJson ?? existing.variablesJson,
       version: existing.version + 1,
       updatedAt: now(),
     });
