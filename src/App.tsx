@@ -19,10 +19,10 @@ function App() {
           is wired to activate once the local deployment writes <code>VITE_CONVEX_URL</code>.
         </p>
         <div className="action-row">
-          <a href="/sessions/demo" className="primary-link">
+          <a href="/session/demo-discussion" className="primary-link">
             Preview session route
           </a>
-          <a href="/instructor" className="secondary-link">
+          <a href="/instructor/session/demo-discussion" className="secondary-link">
             Instructor route
           </a>
         </div>
