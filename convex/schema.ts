@@ -276,6 +276,117 @@ export default defineSchema({
     .index("by_thread", ["fightThreadId"])
     .index("by_session", ["sessionId"]),
 
+  synthesisArtifacts: defineTable({
+    sessionId: v.id("sessions"),
+    categoryId: v.optional(v.id("categories")),
+    kind: v.union(
+      v.literal("category_summary"),
+      v.literal("class_synthesis"),
+      v.literal("opposing_views"),
+      v.literal("contribution_trace"),
+      v.literal("final_summary"),
+    ),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("draft"),
+      v.literal("published"),
+      v.literal("final"),
+      v.literal("error"),
+      v.literal("archived"),
+    ),
+    title: v.string(),
+    summary: v.optional(v.string()),
+    keyPoints: v.array(v.string()),
+    uniqueInsights: v.array(v.string()),
+    opposingViews: v.array(v.string()),
+    sourceCounts: v.any(),
+    promptTemplateKey: v.optional(v.string()),
+    llmCallId: v.optional(v.id("llmCalls")),
+    aiJobId: v.optional(v.id("aiJobs")),
+    error: v.optional(v.string()),
+    generatedAt: v.optional(timestamp),
+    publishedAt: v.optional(timestamp),
+    finalizedAt: v.optional(timestamp),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_and_status", ["sessionId", "status"])
+    .index("by_session_and_kind", ["sessionId", "kind"])
+    .index("by_category", ["categoryId"]),
+
+  synthesisQuotes: defineTable({
+    artifactId: v.id("synthesisArtifacts"),
+    sessionId: v.id("sessions"),
+    submissionId: v.id("submissions"),
+    participantId: v.id("participants"),
+    quote: v.string(),
+    quoteRole: v.union(
+      v.literal("representative"),
+      v.literal("unique"),
+      v.literal("opposing"),
+      v.literal("follow_up"),
+      v.literal("fight_me"),
+    ),
+    displayName: v.string(),
+    anonymizedLabel: v.string(),
+    isVisibleToParticipants: v.boolean(),
+    createdAt: timestamp,
+  })
+    .index("by_artifact", ["artifactId"])
+    .index("by_session", ["sessionId"])
+    .index("by_submission", ["submissionId"]),
+
+  personalReports: defineTable({
+    sessionId: v.id("sessions"),
+    participantId: v.id("participants"),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("success"),
+      v.literal("error"),
+    ),
+    participationBand: v.optional(
+      v.union(v.literal("quiet"), v.literal("active"), v.literal("highly_active")),
+    ),
+    reasoningBand: v.optional(
+      v.union(
+        v.literal("emerging"),
+        v.literal("solid"),
+        v.literal("strong"),
+        v.literal("exceptional"),
+      ),
+    ),
+    originalityBand: v.optional(
+      v.union(
+        v.literal("common"),
+        v.literal("above_average"),
+        v.literal("distinctive"),
+        v.literal("novel"),
+      ),
+    ),
+    responsivenessBand: v.optional(
+      v.union(v.literal("limited"), v.literal("responsive"), v.literal("highly_responsive")),
+    ),
+    summary: v.optional(v.string()),
+    contributionTrace: v.optional(v.string()),
+    argumentEvolution: v.optional(v.string()),
+    growthOpportunity: v.optional(v.string()),
+    citedArtifactIds: v.array(v.id("synthesisArtifacts")),
+    promptTemplateKey: v.optional(v.string()),
+    llmCallId: v.optional(v.id("llmCalls")),
+    aiJobId: v.optional(v.id("aiJobs")),
+    error: v.optional(v.string()),
+    generatedAt: v.optional(timestamp),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_participant", ["participantId"])
+    .index("by_session_and_status", ["sessionId", "status"])
+    .index("by_session_and_participant", ["sessionId", "participantId"]),
+
   promptTemplates: defineTable({
     key: v.string(),
     name: v.string(),
@@ -341,6 +452,7 @@ export default defineSchema({
       v.literal("synthesis"),
       v.literal("fight_challenge"),
       v.literal("fight_debrief"),
+      v.literal("personal_report"),
     ),
     status: v.union(
       v.literal("queued"),

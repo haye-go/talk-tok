@@ -23,11 +23,13 @@ import type * as llmObservability from "../llmObservability.js";
 import type * as modelSettings from "../modelSettings.js";
 import type * as participantWorkspace from "../participantWorkspace.js";
 import type * as participants from "../participants.js";
+import type * as personalReports from "../personalReports.js";
 import type * as promptTemplates from "../promptTemplates.js";
 import type * as protection from "../protection.js";
 import type * as recategorisation from "../recategorisation.js";
 import type * as sessions from "../sessions.js";
 import type * as submissions from "../submissions.js";
+import type * as synthesis from "../synthesis.js";
 
 import type {
   ApiFromModules,
@@ -51,11 +53,13 @@ declare const fullApi: ApiFromModules<{
   modelSettings: typeof modelSettings;
   participantWorkspace: typeof participantWorkspace;
   participants: typeof participants;
+  personalReports: typeof personalReports;
   promptTemplates: typeof promptTemplates;
   protection: typeof protection;
   recategorisation: typeof recategorisation;
   sessions: typeof sessions;
   submissions: typeof submissions;
+  synthesis: typeof synthesis;
 }>;
 
 /**

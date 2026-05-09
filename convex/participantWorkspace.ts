@@ -9,6 +9,7 @@ const CATEGORY_LIMIT = 100;
 const PEER_RESPONSE_LIMIT = 30;
 const JOB_LIMIT = 40;
 const FIGHT_THREAD_LIMIT = 40;
+const SYNTHESIS_ARTIFACT_LIMIT = 40;
 
 const toneValidator = v.union(
   v.literal("gentle"),
@@ -260,6 +261,9 @@ export const overview = query({
       followUpPrompts,
       attackingFightThreads,
       defendingFightThreads,
+      publishedArtifacts,
+      finalArtifacts,
+      personalReports,
     ] = await Promise.all([
       ctx.db
         .query("submissions")
@@ -305,6 +309,27 @@ export const overview = query({
         .withIndex("by_defender", (q) => q.eq("defenderParticipantId", participant._id))
         .order("desc")
         .take(FIGHT_THREAD_LIMIT),
+      ctx.db
+        .query("synthesisArtifacts")
+        .withIndex("by_session_and_status", (q) =>
+          q.eq("sessionId", session._id).eq("status", "published"),
+        )
+        .order("desc")
+        .take(SYNTHESIS_ARTIFACT_LIMIT),
+      ctx.db
+        .query("synthesisArtifacts")
+        .withIndex("by_session_and_status", (q) =>
+          q.eq("sessionId", session._id).eq("status", "final"),
+        )
+        .order("desc")
+        .take(SYNTHESIS_ARTIFACT_LIMIT),
+      ctx.db
+        .query("personalReports")
+        .withIndex("by_session_and_participant", (q) =>
+          q.eq("sessionId", session._id).eq("participantId", participant._id),
+        )
+        .order("desc")
+        .take(1),
     ]);
 
     const activeCategories = categories.filter((category) => category.status === "active");
@@ -520,6 +545,67 @@ export const overview = query({
             )
           : null,
       },
+      synthesis: {
+        publishedArtifacts:
+          session.visibilityMode === "private_until_released"
+            ? []
+            : publishedArtifacts
+                .sort((a, b) => b.updatedAt - a.updatedAt)
+                .slice(0, SYNTHESIS_ARTIFACT_LIMIT)
+                .map((artifact) => ({
+                  id: artifact._id,
+                  categoryId: artifact.categoryId,
+                  kind: artifact.kind,
+                  status: artifact.status,
+                  title: artifact.title,
+                  summary: artifact.summary,
+                  keyPoints: artifact.keyPoints,
+                  uniqueInsights: artifact.uniqueInsights,
+                  opposingViews: artifact.opposingViews,
+                  generatedAt: artifact.generatedAt,
+                  publishedAt: artifact.publishedAt,
+                  finalizedAt: artifact.finalizedAt,
+                  updatedAt: artifact.updatedAt,
+                })),
+        finalArtifacts:
+          session.visibilityMode === "private_until_released"
+            ? []
+            : finalArtifacts
+                .sort((a, b) => b.updatedAt - a.updatedAt)
+                .slice(0, SYNTHESIS_ARTIFACT_LIMIT)
+                .map((artifact) => ({
+                  id: artifact._id,
+                  categoryId: artifact.categoryId,
+                  kind: artifact.kind,
+                  status: artifact.status,
+                  title: artifact.title,
+                  summary: artifact.summary,
+                  keyPoints: artifact.keyPoints,
+                  uniqueInsights: artifact.uniqueInsights,
+                  opposingViews: artifact.opposingViews,
+                  generatedAt: artifact.generatedAt,
+                  publishedAt: artifact.publishedAt,
+                  finalizedAt: artifact.finalizedAt,
+                  updatedAt: artifact.updatedAt,
+                })),
+      },
+      personalReport: personalReports[0]
+        ? {
+            id: personalReports[0]._id,
+            status: personalReports[0].status,
+            participationBand: personalReports[0].participationBand,
+            reasoningBand: personalReports[0].reasoningBand,
+            originalityBand: personalReports[0].originalityBand,
+            responsivenessBand: personalReports[0].responsivenessBand,
+            summary: personalReports[0].summary,
+            contributionTrace: personalReports[0].contributionTrace,
+            argumentEvolution: personalReports[0].argumentEvolution,
+            growthOpportunity: personalReports[0].growthOpportunity,
+            error: personalReports[0].error,
+            generatedAt: personalReports[0].generatedAt,
+            updatedAt: personalReports[0].updatedAt,
+          }
+        : null,
       myZoneHistory: {
         initialResponses: mySubmissions
           .filter((submission) => submission.kind === "initial")

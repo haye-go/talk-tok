@@ -10,6 +10,8 @@ const AUDIT_LIMIT = 50;
 const RECENT_SUBMISSION_LIMIT = 30;
 const FOLLOW_UP_LIMIT = 30;
 const FIGHT_THREAD_LIMIT = 60;
+const SYNTHESIS_ARTIFACT_LIMIT = 80;
+const PERSONAL_REPORT_LIMIT = 220;
 const OFFLINE_AFTER_MS = 60_000;
 
 type PresenceState = "typing" | "submitted" | "idle" | "offline";
@@ -21,7 +23,16 @@ type JobType =
   | "moderation"
   | "synthesis"
   | "fight_challenge"
-  | "fight_debrief";
+  | "fight_debrief"
+  | "personal_report";
+type ArtifactStatus =
+  | "queued"
+  | "processing"
+  | "draft"
+  | "published"
+  | "final"
+  | "error"
+  | "archived";
 
 function normalizeSessionSlug(value: string) {
   return value
@@ -109,6 +120,19 @@ function emptyJobSummary(): Record<JobType, Record<JobStatus, number>> {
     synthesis: emptyStatusCounts(),
     fight_challenge: emptyStatusCounts(),
     fight_debrief: emptyStatusCounts(),
+    personal_report: emptyStatusCounts(),
+  };
+}
+
+function emptyArtifactStatusCounts(): Record<ArtifactStatus, number> {
+  return {
+    queued: 0,
+    processing: 0,
+    draft: 0,
+    published: 0,
+    final: 0,
+    error: 0,
+    archived: 0,
   };
 }
 
@@ -159,6 +183,8 @@ export const overview = query({
       pendingRequests,
       followUpPrompts,
       fightThreads,
+      synthesisArtifacts,
+      personalReports,
     ] = await Promise.all([
       ctx.db
         .query("participants")
@@ -200,6 +226,16 @@ export const overview = query({
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
         .order("desc")
         .take(FIGHT_THREAD_LIMIT),
+      ctx.db
+        .query("synthesisArtifacts")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(SYNTHESIS_ARTIFACT_LIMIT),
+      ctx.db
+        .query("personalReports")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(PERSONAL_REPORT_LIMIT),
     ]);
 
     const participantsById = new Map(
@@ -261,6 +297,16 @@ export const overview = query({
 
     for (const job of jobs) {
       jobSummary[job.type][job.status] += 1;
+    }
+
+    const synthesisCounts = emptyArtifactStatusCounts();
+    for (const artifact of synthesisArtifacts) {
+      synthesisCounts[artifact.status] += 1;
+    }
+
+    const reportCounts: Record<JobStatus, number> = emptyStatusCounts();
+    for (const report of personalReports) {
+      reportCounts[report.status] += 1;
     }
 
     return {
@@ -358,6 +404,70 @@ export const overview = query({
           completedAt: thread.completedAt,
           createdAt: thread.createdAt,
           updatedAt: thread.updatedAt,
+        })),
+      },
+      synthesis: {
+        artifactCounts: synthesisCounts,
+        recentArtifacts: synthesisArtifacts.slice(0, 8).map((artifact) => ({
+          id: artifact._id,
+          categoryId: artifact.categoryId,
+          kind: artifact.kind,
+          status: artifact.status,
+          title: artifact.title,
+          summary: artifact.summary,
+          keyPoints: artifact.keyPoints,
+          uniqueInsights: artifact.uniqueInsights,
+          opposingViews: artifact.opposingViews,
+          sourceCounts: artifact.sourceCounts,
+          error: artifact.error,
+          generatedAt: artifact.generatedAt,
+          publishedAt: artifact.publishedAt,
+          finalizedAt: artifact.finalizedAt,
+          createdAt: artifact.createdAt,
+          updatedAt: artifact.updatedAt,
+        })),
+        latestClassSynthesis: synthesisArtifacts.find(
+          (artifact) =>
+            artifact.kind === "class_synthesis" &&
+            (artifact.status === "draft" ||
+              artifact.status === "published" ||
+              artifact.status === "final"),
+        )
+          ? (() => {
+              const artifact = synthesisArtifacts.find(
+                (row) =>
+                  row.kind === "class_synthesis" &&
+                  (row.status === "draft" || row.status === "published" || row.status === "final"),
+              )!;
+
+              return {
+                id: artifact._id,
+                status: artifact.status,
+                title: artifact.title,
+                summary: artifact.summary,
+                keyPoints: artifact.keyPoints,
+                updatedAt: artifact.updatedAt,
+              };
+            })()
+          : null,
+      },
+      reports: {
+        summary: {
+          ...reportCounts,
+          total: personalReports.length,
+          capped: personalReports.length === PERSONAL_REPORT_LIMIT,
+        },
+        recent: personalReports.slice(0, 12).map((report) => ({
+          id: report._id,
+          participantId: report.participantId,
+          status: report.status,
+          participationBand: report.participationBand,
+          reasoningBand: report.reasoningBand,
+          originalityBand: report.originalityBand,
+          responsivenessBand: report.responsivenessBand,
+          error: report.error,
+          generatedAt: report.generatedAt,
+          updatedAt: report.updatedAt,
         })),
       },
       recentSubmissions: submissions
