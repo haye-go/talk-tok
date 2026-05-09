@@ -97,7 +97,10 @@ export default defineSchema({
     createdAt: timestamp,
   })
     .index("by_session", ["sessionId"])
-    .index("by_participant", ["participantId"]),
+    .index("by_participant", ["participantId"])
+    .index("by_session_and_created_at", ["sessionId", "createdAt"])
+    .index("by_participant_and_created_at", ["participantId", "createdAt"])
+    .index("by_parent_submission", ["parentSubmissionId"]),
 
   categories: defineTable({
     sessionId: v.id("sessions"),
