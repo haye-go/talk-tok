@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { BookOpen, CircleNotch, FloppyDisk, Scales, Sparkle } from "@phosphor-icons/react";
+import { BookOpen, CircleNotch, Eye, FloppyDisk, Scales, Sparkle } from "@phosphor-icons/react";
 import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -16,10 +16,12 @@ import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
+import { Switch } from "@/components/ui/switch";
 import { useInstructorOverview } from "@/hooks/use-instructor-overview";
 import { categoryColorToTone } from "@/lib/category-colors";
 import { inputPatternLabel, type InputPattern } from "@/lib/submission-telemetry";
 import { routes } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 
 const BAND_LABELS: Record<string, string> = {
   quiet: "Quiet",
@@ -190,6 +192,9 @@ function SessionControlsCard({
     }
   }
 
+  const inputClass =
+    "min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none transition focus:border-[var(--c-info-border)]";
+
   return (
     <Card
       title="Session Controls"
@@ -199,13 +204,18 @@ function SessionControlsCard({
         </Badge>
       }
     >
-      <div className="grid gap-4">
+      <div className="grid gap-5">
+        {/* -- Visibility (instant effect) -- */}
         <div>
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-xs font-medium text-[var(--c-ink)]">Visibility release</p>
-            <span className="text-[10px] text-[var(--c-muted)]">Phase: {session.phase}</span>
+          <div className="mb-2.5 flex items-center justify-between gap-3">
+            <p className="font-display text-xs font-medium text-[var(--c-ink)]">
+              Student visibility
+            </p>
+            <Badge tone="neutral" className="text-[10px]">
+              {session.phase}
+            </Badge>
           </div>
-          <div className="grid gap-2 md:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-3">
             {VISIBILITY_OPTIONS.map((option) => {
               const selected = session.visibilityMode === option.value;
               const saving = savingVisibility === option.value;
@@ -216,35 +226,46 @@ function SessionControlsCard({
                   type="button"
                   onClick={() => void handleVisibilityClick(option.value)}
                   disabled={Boolean(savingVisibility)}
-                  data-selected={selected ? "true" : "false"}
-                  className="min-h-24 cursor-pointer rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3 text-left transition hover:bg-[var(--c-surface-strong)] disabled:cursor-not-allowed disabled:opacity-60 data-[selected=true]:border-[var(--c-primary)] data-[selected=true]:bg-[var(--c-sig-cream)]"
+                  className={cn(
+                    "rounded-md border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60",
+                    selected
+                      ? "border-[var(--c-primary)] bg-[var(--c-sig-cream)]"
+                      : "border-[var(--c-hairline)] bg-[var(--c-canvas)] hover:bg-[var(--c-surface-strong)]",
+                  )}
+                  style={selected ? { borderLeftWidth: 3 } : undefined}
                 >
                   <span className="block font-display text-sm font-medium text-[var(--c-ink)]">
                     {saving ? "Saving..." : option.label}
                   </span>
-                  <span className="mt-1 block text-xs leading-5 text-[var(--c-muted)]">
+                  <span className="mt-0.5 block text-[11px] leading-4 text-[var(--c-muted)]">
                     {option.description}
                   </span>
                 </button>
               );
             })}
           </div>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2.5 flex flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
-              variant="secondary"
+              variant="primary"
+              icon={<Eye size={14} />}
               onClick={() => void handleVisibilityClick("category_summary_only")}
-              disabled={Boolean(savingVisibility)}
+              disabled={
+                Boolean(savingVisibility) || session.visibilityMode === "category_summary_only"
+              }
             >
               Release summaries
             </Button>
             <Button
               type="button"
               size="sm"
-              variant="secondary"
+              variant="primary"
+              icon={<Eye size={14} />}
               onClick={() => void handleVisibilityClick("raw_responses_visible")}
-              disabled={Boolean(savingVisibility)}
+              disabled={
+                Boolean(savingVisibility) || session.visibilityMode === "raw_responses_visible"
+              }
             >
               Release responses
             </Button>
@@ -254,29 +275,32 @@ function SessionControlsCard({
           )}
         </div>
 
+        {/* -- Settings (save-on-submit) -- */}
         <form
-          className="grid gap-3 border-t border-[var(--c-hairline)] pt-3"
+          className="grid gap-4 border-t border-[var(--c-hairline)] pt-4"
           onSubmit={handleSettingsSubmit}
         >
-          <div className="grid gap-3 md:grid-cols-2">
+          <p className="font-display text-xs font-medium text-[var(--c-ink)]">Configuration</p>
+
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+              <span className="mb-1 block text-[11px] font-medium text-[var(--c-muted)]">
                 Session title
               </span>
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+                className={inputClass}
               />
             </label>
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+            <label className="block sm:w-36">
+              <span className="mb-1 block text-[11px] font-medium text-[var(--c-muted)]">
                 Critique tone
               </span>
               <select
                 value={critiqueToneDefault}
                 onChange={(event) => setCritiqueToneDefault(event.target.value as CritiqueTone)}
-                className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+                className={inputClass}
               >
                 <option value="gentle">Gentle</option>
                 <option value="direct">Direct</option>
@@ -287,20 +311,20 @@ function SessionControlsCard({
           </div>
 
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+            <span className="mb-1 block text-[11px] font-medium text-[var(--c-muted)]">
               Opening prompt
             </span>
             <textarea
               value={openingPrompt}
               onChange={(event) => setOpeningPrompt(event.target.value)}
-              rows={3}
-              className="w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+              rows={2}
+              className="w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm leading-relaxed text-[var(--c-ink)] outline-none transition focus:border-[var(--c-info-border)]"
             />
           </label>
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+              <span className="mb-1 block text-[11px] font-medium text-[var(--c-muted)]">
                 Word limit
               </span>
               <input
@@ -309,11 +333,11 @@ function SessionControlsCard({
                 max={1000}
                 value={responseSoftLimitWords}
                 onChange={(event) => setResponseSoftLimitWords(event.target.value)}
-                className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+                className={inputClass}
               />
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+              <span className="mb-1 block text-[11px] font-medium text-[var(--c-muted)]">
                 Category cap
               </span>
               <input
@@ -322,15 +346,17 @@ function SessionControlsCard({
                 max={40}
                 value={categorySoftCap}
                 onChange={(event) => setCategorySoftCap(event.target.value)}
-                className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+                className={inputClass}
               />
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">Names</span>
+              <span className="mb-1 block text-[11px] font-medium text-[var(--c-muted)]">
+                Anonymity
+              </span>
               <select
                 value={anonymityMode}
                 onChange={(event) => setAnonymityMode(event.target.value as AnonymityMode)}
-                className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+                className={inputClass}
               >
                 <option value="nicknames_visible">Nicknames visible</option>
                 <option value="anonymous_to_peers">Anonymous to peers</option>
@@ -338,39 +364,32 @@ function SessionControlsCard({
             </label>
           </div>
 
-          <div className="grid gap-2 text-xs text-[var(--c-body)] md:grid-cols-3">
-            <label className="flex items-center gap-2 rounded-sm bg-[var(--c-surface-strong)] px-3 py-2">
-              <input
-                type="checkbox"
-                checked={fightMeEnabled}
-                onChange={(event) => setFightMeEnabled(event.target.checked)}
-              />
-              Fight Me
-            </label>
-            <label className="flex items-center gap-2 rounded-sm bg-[var(--c-surface-strong)] px-3 py-2">
-              <input
-                type="checkbox"
+          <div className="flex flex-wrap gap-x-6 gap-y-3">
+            <div className="flex items-center gap-2">
+              <Switch checked={fightMeEnabled} onCheckedChange={setFightMeEnabled} label="" />
+              <span className="text-xs text-[var(--c-ink)]">Fight Me</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
                 checked={summaryGateEnabled}
-                onChange={(event) => setSummaryGateEnabled(event.target.checked)}
+                onCheckedChange={setSummaryGateEnabled}
+                label=""
               />
-              Summary gate
-            </label>
-            <label className="flex items-center gap-2 rounded-sm bg-[var(--c-surface-strong)] px-3 py-2">
-              <input
-                type="checkbox"
-                checked={telemetryEnabled}
-                onChange={(event) => setTelemetryEnabled(event.target.checked)}
-              />
-              Telemetry
-            </label>
+              <span className="text-xs text-[var(--c-ink)]">Summary gate</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={telemetryEnabled} onCheckedChange={setTelemetryEnabled} label="" />
+              <span className="text-xs text-[var(--c-ink)]">Telemetry</span>
+            </div>
           </div>
 
           {settingsError && <p className="text-xs text-[var(--c-error)]">{settingsError}</p>}
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center justify-end gap-3">
             {settingsSaved && (
-              <span className="self-center text-xs text-[var(--c-success)]">Saved</span>
+              <span className="text-xs text-[var(--c-success)]">Saved</span>
             )}
             <Button type="submit" size="sm" disabled={savingSettings}>
+              <FloppyDisk size={14} className="mr-1.5" />
               {savingSettings ? "Saving..." : "Save settings"}
             </Button>
           </div>
