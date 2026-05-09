@@ -9,11 +9,18 @@
  */
 
 import type * as aiFeedback from "../aiFeedback.js";
+import type * as audit from "../audit.js";
+import type * as bootstrap from "../bootstrap.js";
 import type * as categorisation from "../categorisation.js";
+import type * as categoryManagement from "../categoryManagement.js";
+import type * as jobs from "../jobs.js";
 import type * as llm from "../llm.js";
+import type * as llmObservability from "../llmObservability.js";
 import type * as modelSettings from "../modelSettings.js";
 import type * as participants from "../participants.js";
 import type * as promptTemplates from "../promptTemplates.js";
+import type * as protection from "../protection.js";
+import type * as recategorisation from "../recategorisation.js";
 import type * as sessions from "../sessions.js";
 import type * as submissions from "../submissions.js";
 
@@ -25,11 +32,18 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   aiFeedback: typeof aiFeedback;
+  audit: typeof audit;
+  bootstrap: typeof bootstrap;
   categorisation: typeof categorisation;
+  categoryManagement: typeof categoryManagement;
+  jobs: typeof jobs;
   llm: typeof llm;
+  llmObservability: typeof llmObservability;
   modelSettings: typeof modelSettings;
   participants: typeof participants;
   promptTemplates: typeof promptTemplates;
+  protection: typeof protection;
+  recategorisation: typeof recategorisation;
   sessions: typeof sessions;
   submissions: typeof submissions;
 }>;

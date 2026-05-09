@@ -134,6 +134,26 @@ export default defineSchema({
     .index("by_submission", ["submissionId"])
     .index("by_category", ["categoryId"]),
 
+  recategorizationRequests: defineTable({
+    sessionId: v.id("sessions"),
+    submissionId: v.id("submissions"),
+    participantId: v.id("participants"),
+    currentCategoryId: v.optional(v.id("categories")),
+    requestedCategoryId: v.optional(v.id("categories")),
+    suggestedCategoryName: v.optional(v.string()),
+    reason: v.string(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+    instructorNote: v.optional(v.string()),
+    llmRecommendation: v.optional(v.string()),
+    decidedAt: v.optional(timestamp),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session_and_created_at", ["sessionId", "createdAt"])
+    .index("by_submission", ["submissionId"])
+    .index("by_participant", ["participantId"])
+    .index("by_session_and_status", ["sessionId", "status"]),
+
   promptTemplates: defineTable({
     key: v.string(),
     name: v.string(),
@@ -212,6 +232,8 @@ export default defineSchema({
     updatedAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_session_and_status", ["sessionId", "status"])
+    .index("by_session_and_type", ["sessionId", "type"])
     .index("by_type_and_status", ["type", "status"])
     .index("by_submission", ["submissionId"]),
 
@@ -251,5 +273,29 @@ export default defineSchema({
     createdAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_session_and_created_at", ["sessionId", "createdAt"])
+    .index("by_status", ["status"])
     .index("by_feature", ["feature"]),
+
+  protectionSettings: defineTable({
+    sessionId: v.union(v.id("sessions"), v.null()),
+    key: v.string(),
+    valueJson: v.any(),
+    updatedAt: timestamp,
+  })
+    .index("by_key", ["key"])
+    .index("by_session_and_key", ["sessionId", "key"]),
+
+  auditEvents: defineTable({
+    sessionId: v.optional(v.id("sessions")),
+    actorType: v.union(v.literal("system"), v.literal("participant"), v.literal("instructor")),
+    actorParticipantId: v.optional(v.id("participants")),
+    action: v.string(),
+    targetType: v.optional(v.string()),
+    targetId: v.optional(v.string()),
+    metadataJson: v.optional(v.any()),
+    createdAt: timestamp,
+  })
+    .index("by_session_and_created_at", ["sessionId", "createdAt"])
+    .index("by_action_and_created_at", ["action", "createdAt"]),
 });

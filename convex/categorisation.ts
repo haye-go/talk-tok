@@ -169,6 +169,13 @@ export const triggerForSession = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    await ctx.runMutation(internal.audit.record, {
+      sessionId: session._id,
+      actorType: "instructor",
+      action: "categorisation.triggered",
+      targetType: "aiJob",
+      targetId: jobId,
+    });
 
     await ctx.scheduler.runAfter(0, internal.categorisation.runForSession, {
       sessionId: session._id,

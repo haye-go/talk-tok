@@ -160,6 +160,7 @@ export const enqueueForSubmission = mutation({
     }
 
     const now = Date.now();
+    const isRetry = Boolean(existing && existing.status === "error");
     const tone = args.tone ?? session.critiqueToneDefault;
     const feedbackId =
       existing?._id ??
@@ -191,6 +192,15 @@ export const enqueueForSubmission = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    await ctx.runMutation(internal.audit.record, {
+      sessionId: session._id,
+      actorType: "participant",
+      actorParticipantId: participant._id,
+      action: isRetry ? "feedback.retry_queued" : "feedback.queued",
+      targetType: "submissionFeedback",
+      targetId: feedbackId,
+      metadataJson: { submissionId: submission._id, jobId, tone },
+    });
 
     await ctx.scheduler.runAfter(0, internal.aiFeedback.generateForFeedback, {
       feedbackId,
@@ -204,6 +214,72 @@ export const enqueueForSubmission = mutation({
     }
 
     return toPublicFeedback(feedback);
+  },
+});
+
+export const retryFailed = mutation({
+  args: {
+    sessionSlug: v.string(),
+    clientKey: v.string(),
+    submissionId: v.id("submissions"),
+    tone: v.optional(toneValidator),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      throw new Error("Session not found.");
+    }
+
+    const participant = await getParticipantByClientKey(ctx, session._id, args.clientKey);
+
+    if (!participant) {
+      throw new Error("Participant not found.");
+    }
+
+    const feedback = await ctx.db
+      .query("submissionFeedback")
+      .withIndex("by_submission", (q) => q.eq("submissionId", args.submissionId))
+      .order("desc")
+      .take(1)
+      .then((rows) => rows[0]);
+
+    if (!feedback || feedback.participantId !== participant._id || feedback.status !== "error") {
+      throw new Error("No failed feedback was found for this submission.");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(feedback._id, {
+      status: "queued",
+      tone: args.tone ?? feedback.tone,
+      error: undefined,
+      updatedAt: now,
+    });
+
+    const jobId = await ctx.db.insert("aiJobs", {
+      sessionId: session._id,
+      submissionId: args.submissionId,
+      type: "feedback",
+      status: "queued",
+      requestedBy: "participant",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.runMutation(internal.audit.record, {
+      sessionId: session._id,
+      actorType: "participant",
+      actorParticipantId: participant._id,
+      action: "feedback.retry_queued",
+      targetType: "submissionFeedback",
+      targetId: feedback._id,
+      metadataJson: { submissionId: args.submissionId, jobId },
+    });
+    await ctx.scheduler.runAfter(0, internal.aiFeedback.generateForFeedback, {
+      feedbackId: feedback._id,
+      jobId,
+    });
+
+    return toPublicFeedback((await ctx.db.get(feedback._id))!);
   },
 });
 

@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -15,6 +16,15 @@ const LARGE_PASTE_CHARACTER_COUNT = 120;
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu;
 
 type InputPattern = "composed_gradually" | "likely_pasted" | "mixed" | "unknown";
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+function numberFrom(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
 
 function normalizeSessionSlug(value: string) {
   return value
@@ -150,17 +160,18 @@ async function assertSubmissionAllowed(
   participantId: Id<"participants">,
   body: string,
   now: number,
+  limits: { maxSubmissions: number; windowMs: number },
 ) {
   const recentSubmissions = await getRecentParticipantSubmissions(
     ctx,
     participantId,
-    RATE_LIMIT_MAX_SUBMISSIONS + 5,
+    limits.maxSubmissions + 5,
   );
   const recentInWindow = recentSubmissions.filter(
-    (submission) => now - submission.createdAt <= RATE_LIMIT_WINDOW_MS,
+    (submission) => now - submission.createdAt <= limits.windowMs,
   );
 
-  if (recentInWindow.length >= RATE_LIMIT_MAX_SUBMISSIONS) {
+  if (recentInWindow.length >= limits.maxSubmissions) {
     throw new Error(
       "You are submitting too quickly. Wait a moment before adding another response.",
     );
@@ -214,14 +225,30 @@ export const create = mutation({
       throw new Error("Participant not found.");
     }
 
+    const contentLimits = asRecord(
+      await ctx.runQuery(internal.protection.loadSetting, {
+        key: "contentLimits",
+        sessionId: session._id,
+      }),
+    );
+    const rateLimits = asRecord(
+      await ctx.runQuery(internal.protection.loadSetting, {
+        key: "rateLimits",
+        sessionId: session._id,
+      }),
+    );
+    const minBodyLength = numberFrom(contentLimits.minSubmissionCharacters, MIN_BODY_LENGTH);
+    const maxBodyLength = numberFrom(contentLimits.maxSubmissionCharacters, MAX_BODY_LENGTH);
+    const maxSubmissions = numberFrom(rateLimits.submissionsPerWindow, RATE_LIMIT_MAX_SUBMISSIONS);
+    const submissionWindowMs = numberFrom(rateLimits.submissionWindowMs, RATE_LIMIT_WINDOW_MS);
     const body = normalizeBody(args.body);
 
-    if (body.length < MIN_BODY_LENGTH) {
+    if (body.length < minBodyLength) {
       throw new Error("Response is too short.");
     }
 
-    if (body.length > MAX_BODY_LENGTH) {
-      throw new Error(`Response must be ${MAX_BODY_LENGTH} characters or fewer.`);
+    if (body.length > maxBodyLength) {
+      throw new Error(`Response must be ${maxBodyLength} characters or fewer.`);
     }
 
     if (args.kind === "initial" && args.parentSubmissionId) {
@@ -237,7 +264,10 @@ export const create = mutation({
     }
 
     const now = Date.now();
-    await assertSubmissionAllowed(ctx, participant._id, body, now);
+    await assertSubmissionAllowed(ctx, participant._id, body, now, {
+      maxSubmissions,
+      windowMs: submissionWindowMs,
+    });
 
     const compositionMs =
       typeof args.telemetry.compositionMs === "number"
