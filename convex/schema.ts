@@ -190,6 +190,92 @@ export default defineSchema({
     .index("by_prompt", ["followUpPromptId"])
     .index("by_category", ["categoryId"]),
 
+  fightThreads: defineTable({
+    sessionId: v.id("sessions"),
+    slug: v.string(),
+    mode: v.union(v.literal("vs_ai"), v.literal("real_1v1")),
+    status: v.union(
+      v.literal("pending_acceptance"),
+      v.literal("active"),
+      v.literal("declined"),
+      v.literal("expired"),
+      v.literal("completed"),
+      v.literal("timed_out"),
+      v.literal("cancelled"),
+      v.literal("forfeited"),
+    ),
+    attackerParticipantId: v.id("participants"),
+    defenderParticipantId: v.optional(v.id("participants")),
+    attackerSubmissionId: v.optional(v.id("submissions")),
+    defenderSubmissionId: v.optional(v.id("submissions")),
+    currentTurnParticipantId: v.optional(v.id("participants")),
+    currentTurnRole: v.optional(
+      v.union(v.literal("attacker"), v.literal("defender"), v.literal("ai")),
+    ),
+    nextTurnNumber: v.number(),
+    maxTurns: v.number(),
+    acceptanceDeadlineAt: v.optional(timestamp),
+    turnDeadlineAt: v.optional(timestamp),
+    acceptedAt: v.optional(timestamp),
+    completedAt: v.optional(timestamp),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_slug", ["sessionId", "slug"])
+    .index("by_session_and_status", ["sessionId", "status"])
+    .index("by_attacker", ["attackerParticipantId"])
+    .index("by_defender", ["defenderParticipantId"])
+    .index("by_attacker_and_status", ["attackerParticipantId", "status"])
+    .index("by_defender_and_status", ["defenderParticipantId", "status"]),
+
+  fightTurns: defineTable({
+    sessionId: v.id("sessions"),
+    fightThreadId: v.id("fightThreads"),
+    participantId: v.optional(v.id("participants")),
+    role: v.union(v.literal("attacker"), v.literal("defender"), v.literal("ai")),
+    turnNumber: v.number(),
+    body: v.string(),
+    status: v.union(v.literal("submitted"), v.literal("missed")),
+    source: v.union(v.literal("manual"), v.literal("draft_timeout"), v.literal("ai")),
+    createdAt: timestamp,
+  })
+    .index("by_thread", ["fightThreadId"])
+    .index("by_thread_and_turn", ["fightThreadId", "turnNumber"])
+    .index("by_participant", ["participantId"]),
+
+  fightDrafts: defineTable({
+    sessionId: v.id("sessions"),
+    fightThreadId: v.id("fightThreads"),
+    participantId: v.id("participants"),
+    body: v.string(),
+    updatedAt: timestamp,
+  })
+    .index("by_thread", ["fightThreadId"])
+    .index("by_thread_and_participant", ["fightThreadId", "participantId"]),
+
+  fightDebriefs: defineTable({
+    sessionId: v.id("sessions"),
+    fightThreadId: v.id("fightThreads"),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("success"),
+      v.literal("error"),
+    ),
+    summary: v.optional(v.string()),
+    attackerStrength: v.optional(v.string()),
+    defenderStrength: v.optional(v.string()),
+    strongerRebuttal: v.optional(v.string()),
+    nextPractice: v.optional(v.string()),
+    llmCallId: v.optional(v.id("llmCalls")),
+    error: v.optional(v.string()),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_thread", ["fightThreadId"])
+    .index("by_session", ["sessionId"]),
+
   promptTemplates: defineTable({
     key: v.string(),
     name: v.string(),
@@ -253,6 +339,8 @@ export default defineSchema({
       v.literal("categorisation"),
       v.literal("moderation"),
       v.literal("synthesis"),
+      v.literal("fight_challenge"),
+      v.literal("fight_debrief"),
     ),
     status: v.union(
       v.literal("queued"),

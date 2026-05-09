@@ -13,6 +13,7 @@ import type * as audit from "../audit.js";
 import type * as bootstrap from "../bootstrap.js";
 import type * as categorisation from "../categorisation.js";
 import type * as categoryManagement from "../categoryManagement.js";
+import type * as fightMe from "../fightMe.js";
 import type * as followUps from "../followUps.js";
 import type * as instructorCommandCenter from "../instructorCommandCenter.js";
 import type * as instructorControls from "../instructorControls.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   bootstrap: typeof bootstrap;
   categorisation: typeof categorisation;
   categoryManagement: typeof categoryManagement;
+  fightMe: typeof fightMe;
   followUps: typeof followUps;
   instructorCommandCenter: typeof instructorCommandCenter;
   instructorControls: typeof instructorControls;

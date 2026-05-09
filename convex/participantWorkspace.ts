@@ -8,6 +8,7 @@ const SESSION_SUBMISSION_LIMIT = 180;
 const CATEGORY_LIMIT = 100;
 const PEER_RESPONSE_LIMIT = 30;
 const JOB_LIMIT = 40;
+const FIGHT_THREAD_LIMIT = 40;
 
 const toneValidator = v.union(
   v.literal("gentle"),
@@ -208,6 +209,29 @@ function toJob(job: Doc<"aiJobs">) {
   };
 }
 
+function toFightThread(thread: Doc<"fightThreads">) {
+  return {
+    id: thread._id,
+    slug: thread.slug,
+    mode: thread.mode,
+    status: thread.status,
+    attackerParticipantId: thread.attackerParticipantId,
+    defenderParticipantId: thread.defenderParticipantId,
+    attackerSubmissionId: thread.attackerSubmissionId,
+    defenderSubmissionId: thread.defenderSubmissionId,
+    currentTurnParticipantId: thread.currentTurnParticipantId,
+    currentTurnRole: thread.currentTurnRole,
+    nextTurnNumber: thread.nextTurnNumber,
+    maxTurns: thread.maxTurns,
+    acceptanceDeadlineAt: thread.acceptanceDeadlineAt,
+    turnDeadlineAt: thread.turnDeadlineAt,
+    acceptedAt: thread.acceptedAt,
+    completedAt: thread.completedAt,
+    createdAt: thread.createdAt,
+    updatedAt: thread.updatedAt,
+  };
+}
+
 export const overview = query({
   args: {
     sessionSlug: v.string(),
@@ -234,6 +258,8 @@ export const overview = query({
       requests,
       jobs,
       followUpPrompts,
+      attackingFightThreads,
+      defendingFightThreads,
     ] = await Promise.all([
       ctx.db
         .query("submissions")
@@ -269,6 +295,16 @@ export const overview = query({
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
         .order("desc")
         .take(80),
+      ctx.db
+        .query("fightThreads")
+        .withIndex("by_attacker", (q) => q.eq("attackerParticipantId", participant._id))
+        .order("desc")
+        .take(FIGHT_THREAD_LIMIT),
+      ctx.db
+        .query("fightThreads")
+        .withIndex("by_defender", (q) => q.eq("defenderParticipantId", participant._id))
+        .order("desc")
+        .take(FIGHT_THREAD_LIMIT),
     ]);
 
     const activeCategories = categories.filter((category) => category.status === "active");
@@ -406,6 +442,14 @@ export const overview = query({
               ),
             )
         : [];
+    const fightThreadsById = new Map(
+      [...attackingFightThreads, ...defendingFightThreads]
+        .filter((thread) => thread.sessionId === session._id)
+        .map((thread) => [thread._id, thread]),
+    );
+    const fightThreads = [...fightThreadsById.values()]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, FIGHT_THREAD_LIMIT);
 
     return {
       session: toSessionSnapshot(session),
@@ -457,6 +501,25 @@ export const overview = query({
         .filter((job) => !job.submissionId || mySubmissionIds.has(job.submissionId))
         .slice(0, 20)
         .map(toJob),
+      fightMe: {
+        mine: fightThreads.map(toFightThread),
+        pendingIncoming: fightThreads
+          .filter(
+            (thread) =>
+              thread.status === "pending_acceptance" &&
+              thread.defenderParticipantId === participant._id,
+          )
+          .map(toFightThread),
+        current: fightThreads.find(
+          (thread) => thread.status === "active" || thread.status === "pending_acceptance",
+        )
+          ? toFightThread(
+              fightThreads.find(
+                (thread) => thread.status === "active" || thread.status === "pending_acceptance",
+              )!,
+            )
+          : null,
+      },
       myZoneHistory: {
         initialResponses: mySubmissions
           .filter((submission) => submission.kind === "initial")

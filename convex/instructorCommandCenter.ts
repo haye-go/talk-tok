@@ -9,12 +9,19 @@ const JOB_LIMIT = 80;
 const AUDIT_LIMIT = 50;
 const RECENT_SUBMISSION_LIMIT = 30;
 const FOLLOW_UP_LIMIT = 30;
+const FIGHT_THREAD_LIMIT = 60;
 const OFFLINE_AFTER_MS = 60_000;
 
 type PresenceState = "typing" | "submitted" | "idle" | "offline";
 type InputPattern = "composed_gradually" | "likely_pasted" | "mixed" | "unknown";
 type JobStatus = "queued" | "processing" | "success" | "error";
-type JobType = "feedback" | "categorisation" | "moderation" | "synthesis";
+type JobType =
+  | "feedback"
+  | "categorisation"
+  | "moderation"
+  | "synthesis"
+  | "fight_challenge"
+  | "fight_debrief";
 
 function normalizeSessionSlug(value: string) {
   return value
@@ -100,6 +107,8 @@ function emptyJobSummary(): Record<JobType, Record<JobStatus, number>> {
     categorisation: emptyStatusCounts(),
     moderation: emptyStatusCounts(),
     synthesis: emptyStatusCounts(),
+    fight_challenge: emptyStatusCounts(),
+    fight_debrief: emptyStatusCounts(),
   };
 }
 
@@ -149,6 +158,7 @@ export const overview = query({
       auditEvents,
       pendingRequests,
       followUpPrompts,
+      fightThreads,
     ] = await Promise.all([
       ctx.db
         .query("participants")
@@ -185,6 +195,11 @@ export const overview = query({
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
         .order("desc")
         .take(FOLLOW_UP_LIMIT),
+      ctx.db
+        .query("fightThreads")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(FIGHT_THREAD_LIMIT),
     ]);
 
     const participantsById = new Map(
@@ -322,6 +337,28 @@ export const overview = query({
       jobs: {
         latest: jobs.slice(0, 12).map(toJob),
         summary: jobSummary,
+      },
+      fightMe: {
+        activeCount: fightThreads.filter((thread) => thread.status === "active").length,
+        pendingCount: fightThreads.filter((thread) => thread.status === "pending_acceptance")
+          .length,
+        completedCount: fightThreads.filter((thread) => thread.status === "completed").length,
+        timedOutCount: fightThreads.filter((thread) => thread.status === "timed_out").length,
+        recent: fightThreads.slice(0, 12).map((thread) => ({
+          id: thread._id,
+          slug: thread.slug,
+          mode: thread.mode,
+          status: thread.status,
+          attackerParticipantId: thread.attackerParticipantId,
+          defenderParticipantId: thread.defenderParticipantId,
+          nextTurnNumber: thread.nextTurnNumber,
+          maxTurns: thread.maxTurns,
+          acceptanceDeadlineAt: thread.acceptanceDeadlineAt,
+          turnDeadlineAt: thread.turnDeadlineAt,
+          completedAt: thread.completedAt,
+          createdAt: thread.createdAt,
+          updatedAt: thread.updatedAt,
+        })),
       },
       recentSubmissions: submissions
         .slice(0, RECENT_SUBMISSION_LIMIT)

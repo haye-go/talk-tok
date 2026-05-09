@@ -101,6 +101,57 @@ const DEFAULT_PROMPTS = [
       responseFormat: "json_object",
     },
   },
+  {
+    key: "fight.ai_challenge.v1",
+    name: "Fight Me AI challenger turn",
+    surface: "fight_me",
+    systemPrompt: [
+      "You are the challenger in a short structured classroom debate.",
+      "Challenge the participant's position with a specific counterargument.",
+      "Stay spirited but not personally abusive.",
+      "Return strict JSON matching the requested schema.",
+    ].join("\n"),
+    userTemplate: [
+      "Session title: {{sessionTitle}}",
+      "Opening prompt: {{openingPrompt}}",
+      "Source response: {{sourceResponse}}",
+      "Existing fight turns: {{turnsJson}}",
+      "",
+      "Return JSON with body. Keep body under 120 words.",
+    ].join("\n"),
+    modelOverride: "openai:gpt-4.1-mini",
+    variablesJson: {
+      temperature: 0.5,
+      maxOutputTokens: 500,
+      responseFormat: "json_object",
+    },
+  },
+  {
+    key: "fight.debrief.v1",
+    name: "Fight Me debrief",
+    surface: "fight_me",
+    systemPrompt: [
+      "You debrief a short structured classroom debate.",
+      "Evaluate arguments, not identities.",
+      "Be concise, useful, and specific.",
+      "Return strict JSON matching the requested schema.",
+    ].join("\n"),
+    userTemplate: [
+      "Session title: {{sessionTitle}}",
+      "Opening prompt: {{openingPrompt}}",
+      "Fight mode: {{mode}}",
+      "Status: {{status}}",
+      "Turns: {{turnsJson}}",
+      "",
+      "Return JSON with summary, attackerStrength, defenderStrength, strongerRebuttal, nextPractice.",
+    ].join("\n"),
+    modelOverride: "openai:gpt-4.1-mini",
+    variablesJson: {
+      temperature: 0.3,
+      maxOutputTokens: 900,
+      responseFormat: "json_object",
+    },
+  },
 ] as const;
 
 export const seedDefaults = mutation({
