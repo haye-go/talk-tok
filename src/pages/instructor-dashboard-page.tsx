@@ -1,10 +1,11 @@
+import { Plus } from "@phosphor-icons/react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { EmptyState } from "@/components/state/empty-state";
 import { LoadingState } from "@/components/state/loading-state";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { routes } from "@/lib/routes";
 
 export function InstructorDashboardPage() {
@@ -23,7 +24,7 @@ export function InstructorDashboardPage() {
           <div className="flex items-center gap-3">
             <Button
               type="button"
-              variant="secondary"
+              icon={<Plus size={16} />}
               onClick={() => (window.location.href = routes.instructorSessionNew())}
             >
               New session
@@ -49,24 +50,34 @@ export function InstructorDashboardPage() {
         {sessions && sessions.length > 0 ? (
           <div className="grid gap-4">
             {sessions.map((session) => (
-              <Card
+              <div
                 key={session.slug}
-                title={session.title}
-                eyebrow={`${session.joinCode} - ${session.currentAct}`}
-                action={
-                  <Button
-                    type="button"
-                    onClick={() => (window.location.href = routes.instructorSession(session.slug))}
-                  >
-                    Open
-                  </Button>
-                }
+                className="flex items-start justify-between gap-4 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-4"
               >
-                <p className="line-clamp-2 text-sm text-[var(--c-body)]">{session.openingPrompt}</p>
-                <p className="mt-3 text-xs text-[var(--c-muted)]">
-                  {session.participantCount ?? 0} participants - /session/{session.slug}
-                </p>
-              </Card>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="truncate font-display text-base font-medium text-[var(--c-ink)]">
+                      {session.title}
+                    </h2>
+                    <Badge tone="sky">{session.currentAct}</Badge>
+                    <Badge tone="slate">{session.joinCode}</Badge>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-sm text-[var(--c-body)]">
+                    {session.openingPrompt}
+                  </p>
+                  <p className="mt-2 text-xs text-[var(--c-muted)]">
+                    {session.participantCount ?? 0} participants
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    (window.location.href = routes.instructorSession(session.slug))
+                  }
+                >
+                  Open
+                </Button>
+              </div>
             ))}
           </div>
         ) : null}
