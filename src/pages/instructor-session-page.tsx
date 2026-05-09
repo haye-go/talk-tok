@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { BookOpen, CircleNotch, FloppyDisk, Scales, Sparkle } from "@phosphor-icons/react";
 import { useParams } from "@tanstack/react-router";
@@ -38,11 +38,334 @@ const BAND_LABELS: Record<string, string> = {
   highly_responsive: "Highly Responsive",
 };
 
+type VisibilityMode = "private_until_released" | "category_summary_only" | "raw_responses_visible";
+type AnonymityMode = "nicknames_visible" | "anonymous_to_peers";
+type CritiqueTone = "gentle" | "direct" | "spicy" | "roast";
+
+interface SessionControlSnapshot {
+  title: string;
+  openingPrompt: string;
+  phase: string;
+  visibilityMode: VisibilityMode;
+  anonymityMode: AnonymityMode;
+  responseSoftLimitWords: number;
+  categorySoftCap: number;
+  critiqueToneDefault: CritiqueTone;
+  telemetryEnabled: boolean;
+  fightMeEnabled: boolean;
+  summaryGateEnabled: boolean;
+}
+
+interface SessionSettingsUpdate {
+  title: string;
+  openingPrompt: string;
+  anonymityMode: AnonymityMode;
+  responseSoftLimitWords: number;
+  categorySoftCap: number;
+  critiqueToneDefault: CritiqueTone;
+  telemetryEnabled: boolean;
+  fightMeEnabled: boolean;
+  summaryGateEnabled: boolean;
+}
+
+const VISIBILITY_OPTIONS: Array<{
+  value: VisibilityMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "private_until_released",
+    label: "Private",
+    description: "Students see only their own work.",
+  },
+  {
+    value: "category_summary_only",
+    label: "Summaries",
+    description: "Release themes and synthesis, but keep peer responses hidden.",
+  },
+  {
+    value: "raw_responses_visible",
+    label: "Responses",
+    description: "Release peer responses and category summaries.",
+  },
+];
+
+function SessionControlsCard({
+  session,
+  onVisibilityChange,
+  onSettingsSave,
+}: {
+  session: SessionControlSnapshot;
+  onVisibilityChange: (visibilityMode: VisibilityMode) => Promise<void>;
+  onSettingsSave: (settings: SessionSettingsUpdate) => Promise<void>;
+}) {
+  const [title, setTitle] = useState(session.title);
+  const [openingPrompt, setOpeningPrompt] = useState(session.openingPrompt);
+  const [anonymityMode, setAnonymityMode] = useState<AnonymityMode>(session.anonymityMode);
+  const [responseSoftLimitWords, setResponseSoftLimitWords] = useState(
+    String(session.responseSoftLimitWords),
+  );
+  const [categorySoftCap, setCategorySoftCap] = useState(String(session.categorySoftCap));
+  const [critiqueToneDefault, setCritiqueToneDefault] = useState<CritiqueTone>(
+    session.critiqueToneDefault,
+  );
+  const [telemetryEnabled, setTelemetryEnabled] = useState(session.telemetryEnabled);
+  const [fightMeEnabled, setFightMeEnabled] = useState(session.fightMeEnabled);
+  const [summaryGateEnabled, setSummaryGateEnabled] = useState(session.summaryGateEnabled);
+  const [savingVisibility, setSavingVisibility] = useState<VisibilityMode | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [visibilityError, setVisibilityError] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  useEffect(() => {
+    setTitle(session.title);
+    setOpeningPrompt(session.openingPrompt);
+    setAnonymityMode(session.anonymityMode);
+    setResponseSoftLimitWords(String(session.responseSoftLimitWords));
+    setCategorySoftCap(String(session.categorySoftCap));
+    setCritiqueToneDefault(session.critiqueToneDefault);
+    setTelemetryEnabled(session.telemetryEnabled);
+    setFightMeEnabled(session.fightMeEnabled);
+    setSummaryGateEnabled(session.summaryGateEnabled);
+  }, [session]);
+
+  async function handleVisibilityClick(visibilityMode: VisibilityMode) {
+    setVisibilityError(null);
+    setSavingVisibility(visibilityMode);
+    try {
+      await onVisibilityChange(visibilityMode);
+    } catch (cause) {
+      setVisibilityError(cause instanceof Error ? cause.message : "Could not update visibility.");
+    } finally {
+      setSavingVisibility(null);
+    }
+  }
+
+  async function handleSettingsSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSettingsError(null);
+    setSettingsSaved(false);
+    setSavingSettings(true);
+
+    try {
+      await onSettingsSave({
+        title,
+        openingPrompt,
+        anonymityMode,
+        responseSoftLimitWords: Number(responseSoftLimitWords),
+        categorySoftCap: Number(categorySoftCap),
+        critiqueToneDefault,
+        telemetryEnabled,
+        fightMeEnabled,
+        summaryGateEnabled,
+      });
+      setSettingsSaved(true);
+      window.setTimeout(() => setSettingsSaved(false), 2500);
+    } catch (cause) {
+      setSettingsError(cause instanceof Error ? cause.message : "Could not update settings.");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  return (
+    <Card
+      title="Session Controls"
+      action={
+        <Badge tone={session.visibilityMode === "private_until_released" ? "warning" : "success"}>
+          {session.visibilityMode.replace(/_/g, " ")}
+        </Badge>
+      }
+    >
+      <div className="grid gap-4">
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="text-xs font-medium text-[var(--c-ink)]">Visibility release</p>
+            <span className="text-[10px] text-[var(--c-muted)]">Phase: {session.phase}</span>
+          </div>
+          <div className="grid gap-2 md:grid-cols-3">
+            {VISIBILITY_OPTIONS.map((option) => {
+              const selected = session.visibilityMode === option.value;
+              const saving = savingVisibility === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => void handleVisibilityClick(option.value)}
+                  disabled={Boolean(savingVisibility)}
+                  data-selected={selected ? "true" : "false"}
+                  className="min-h-24 cursor-pointer rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3 text-left transition hover:bg-[var(--c-surface-strong)] disabled:cursor-not-allowed disabled:opacity-60 data-[selected=true]:border-[var(--c-primary)] data-[selected=true]:bg-[var(--c-sig-cream)]"
+                >
+                  <span className="block font-display text-sm font-medium text-[var(--c-ink)]">
+                    {saving ? "Saving..." : option.label}
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-[var(--c-muted)]">
+                    {option.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void handleVisibilityClick("category_summary_only")}
+              disabled={Boolean(savingVisibility)}
+            >
+              Release summaries
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void handleVisibilityClick("raw_responses_visible")}
+              disabled={Boolean(savingVisibility)}
+            >
+              Release responses
+            </Button>
+          </div>
+          {visibilityError && (
+            <p className="mt-2 text-xs text-[var(--c-error)]">{visibilityError}</p>
+          )}
+        </div>
+
+        <form
+          className="grid gap-3 border-t border-[var(--c-hairline)] pt-3"
+          onSubmit={handleSettingsSubmit}
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+                Session title
+              </span>
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+                Critique tone
+              </span>
+              <select
+                value={critiqueToneDefault}
+                onChange={(event) => setCritiqueToneDefault(event.target.value as CritiqueTone)}
+                className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+              >
+                <option value="gentle">Gentle</option>
+                <option value="direct">Direct</option>
+                <option value="spicy">Spicy</option>
+                <option value="roast">Roast</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+              Opening prompt
+            </span>
+            <textarea
+              value={openingPrompt}
+              onChange={(event) => setOpeningPrompt(event.target.value)}
+              rows={3}
+              className="w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+            />
+          </label>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+                Word limit
+              </span>
+              <input
+                type="number"
+                min={20}
+                max={1000}
+                value={responseSoftLimitWords}
+                onChange={(event) => setResponseSoftLimitWords(event.target.value)}
+                className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+                Category cap
+              </span>
+              <input
+                type="number"
+                min={2}
+                max={40}
+                value={categorySoftCap}
+                onChange={(event) => setCategorySoftCap(event.target.value)}
+                className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">Names</span>
+              <select
+                value={anonymityMode}
+                onChange={(event) => setAnonymityMode(event.target.value as AnonymityMode)}
+                className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none focus:border-[var(--c-info-border)]"
+              >
+                <option value="nicknames_visible">Nicknames visible</option>
+                <option value="anonymous_to_peers">Anonymous to peers</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="grid gap-2 text-xs text-[var(--c-body)] md:grid-cols-3">
+            <label className="flex items-center gap-2 rounded-sm bg-[var(--c-surface-strong)] px-3 py-2">
+              <input
+                type="checkbox"
+                checked={fightMeEnabled}
+                onChange={(event) => setFightMeEnabled(event.target.checked)}
+              />
+              Fight Me
+            </label>
+            <label className="flex items-center gap-2 rounded-sm bg-[var(--c-surface-strong)] px-3 py-2">
+              <input
+                type="checkbox"
+                checked={summaryGateEnabled}
+                onChange={(event) => setSummaryGateEnabled(event.target.checked)}
+              />
+              Summary gate
+            </label>
+            <label className="flex items-center gap-2 rounded-sm bg-[var(--c-surface-strong)] px-3 py-2">
+              <input
+                type="checkbox"
+                checked={telemetryEnabled}
+                onChange={(event) => setTelemetryEnabled(event.target.checked)}
+              />
+              Telemetry
+            </label>
+          </div>
+
+          {settingsError && <p className="text-xs text-[var(--c-error)]">{settingsError}</p>}
+          <div className="flex justify-end gap-2">
+            {settingsSaved && (
+              <span className="self-center text-xs text-[var(--c-success)]">Saved</span>
+            )}
+            <Button type="submit" size="sm" disabled={savingSettings}>
+              {savingSettings ? "Saving..." : "Save settings"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </Card>
+  );
+}
+
 export function InstructorSessionPage() {
   const { sessionSlug } = useParams({ from: "/instructor/session/$sessionSlug" });
   const overview = useInstructorOverview(sessionSlug);
   const triggerCategorisation = useMutation(api.categorisation.triggerForSession);
   const updatePhase = useMutation(api.instructorControls.updatePhase);
+  const updateVisibility = useMutation(api.instructorControls.updateVisibility);
+  const updateSettings = useMutation(api.instructorControls.updateSettings);
   const generateCategorySummary = useMutation(api.synthesis.generateCategorySummary);
   const generateClassSynthesis = useMutation(api.synthesis.generateClassSynthesis);
   const generateReports = useMutation(api.personalReports.generateForSession);
@@ -149,6 +472,17 @@ export function InstructorSessionPage() {
     const idx = PHASE_ORDER.indexOf(session.phase as Phase);
     const prev = PHASE_ORDER[Math.max(idx - 1, 0)];
     void updatePhase({ sessionSlug, phase: prev, currentAct: ACT_FOR_PHASE[prev] });
+  }
+
+  async function handleVisibilityChange(visibilityMode: VisibilityMode) {
+    await updateVisibility({ sessionSlug, visibilityMode });
+  }
+
+  async function handleSettingsSave(settings: SessionSettingsUpdate) {
+    await updateSettings({
+      sessionSlug,
+      ...settings,
+    });
   }
 
   async function handleRecategorisationDecision(args: {
@@ -566,6 +900,12 @@ export function InstructorSessionPage() {
       }
       center={
         <div className="grid gap-3">
+          <SessionControlsCard
+            session={session}
+            onVisibilityChange={handleVisibilityChange}
+            onSettingsSave={handleSettingsSave}
+          />
+
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <MetricTile label="Submitted" value={String(responses.total)} />
             <MetricTile label="Categories" value={String(activeCategories.length)} />

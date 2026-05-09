@@ -288,7 +288,11 @@ export function ParticipantSessionPage() {
                     </p>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button type="button" variant="secondary" onClick={() => handleActChange("discover")}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => handleActChange("discover")}
+                    >
                       Go to Discover
                     </Button>
                     <Button
