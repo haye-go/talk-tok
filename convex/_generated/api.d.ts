@@ -36,6 +36,7 @@ import type * as recategorisation from "../recategorisation.js";
 import type * as semantic from "../semantic.js";
 import type * as sessionTemplates from "../sessionTemplates.js";
 import type * as sessions from "../sessions.js";
+import type * as stageDemo from "../stageDemo.js";
 import type * as submissions from "../submissions.js";
 import type * as synthesis from "../synthesis.js";
 
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   semantic: typeof semantic;
   sessionTemplates: typeof sessionTemplates;
   sessions: typeof sessions;
+  stageDemo: typeof stageDemo;
   submissions: typeof submissions;
   synthesis: typeof synthesis;
 }>;

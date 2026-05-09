@@ -1,159 +1,261 @@
-# Phase 11C: University Demo Seed Refresh
+# Phase 11C: Judge Demo Seed and Persona Switching
 
 ## Purpose
 
-Refresh the seeded demo session around a more social, accessible prompt:
+Create a reliable hackathon judge demo that is already populated with realistic discussion data, while still allowing judges to interact with the live Convex deployment.
 
-> What's the most useless thing you learned in university?
+Demo question:
 
-The goal is to make the demo feel immediately relatable while still exercising the product's core flows: submission, categorisation, instructor overview, synthesis, feedback, and participant discussion surfaces.
+> If you had to teach a university course on any topic, what would it be?
 
-## Current State
+The demo should let judges do two things quickly:
 
-The demo backend already exists in `convex/demo.ts`.
+- Join as a normal participant and contribute their own answer.
+- Switch into seeded demo personas to inspect a richer participant experience, including prior responses, feedback, Fight Me history, and personal review state.
 
-Current seed content:
+## Core Demo Contract
 
-- slug: `ethics-ai-healthcare-demo`
-- join code: `SPARK`
-- title: `[Demo] Ethics of AI in Healthcare`
-- prompt: AI medical diagnosis without human oversight
-- categories: liability, autonomy, cost/access, trust/accuracy
-- seeded participants, submissions, assignments, feedback, synthesis, and audit event
-
-Current deployment note: the demo session is not seeded yet. `api.demo.getDemoSession` returns `null`.
-
-## Proposed Demo Identity
-
-Keep the join code stable for demos:
+Keep the demo simple and stable:
 
 - join code: `SPARK`
+- slug: `teach-anything-university-demo`
+- title: `[Demo] Teach Any University Course`
+- opening prompt: `If you had to teach a university course on any topic, what would it be, and why should people take it?`
+- starting phase: `discover`
+- anonymity: `nicknames_visible`
+- Fight Me: enabled
+- telemetry: enabled
 
-Use a new readable slug:
+All seeded data should use normal production tables. This means the demo is live:
 
-- slug: `useless-university-lessons-demo`
+- If one judge acts as a participant, the action is written to Convex.
+- If another judge has the instructor dashboard open, they should see the new submission, reaction, follow-up, Fight Me action, or report state through normal subscriptions.
+- Demo persona switching must not create fake local-only state.
 
-Use a clear title:
+## Homepage Demo Entry Points
 
-- title: `[Demo] Useless Things We Learned in University`
+Frontend can wire these later, but the backend seed must support them:
 
-Opening prompt:
+- `Try demo as yourself` -> `/join/SPARK`
+- `Explore demo personas` -> `/join/SPARK` or `/session/teach-anything-university-demo` with a demo persona switcher
+- `Open instructor demo` -> `/instructor/session/teach-anything-university-demo`
 
-- `What's the most useless thing you learned in university, and did it become useful later in an unexpected way?`
+Recommended UI behavior:
 
-Starting phase:
+- A normal judge participant enters a nickname and receives a fresh participant record.
+- A seeded persona switcher lets judges pick `Maya`, `Sam`, `Priya`, `Jake`, `Rina`, `Alex`, `Noah`, or `Leah`.
+- Switching persona changes the active browser `clientKey` to the seeded key, such as `demo-maya`.
+- The app then loads the real Convex participant tied to that client key.
 
-- `discover`, matching the current demo pattern so instructors immediately see seeded responses and categories.
+Strict rule:
 
-## Category Model
+- Persona switching is demo-only and must be gated to `teach-anything-university-demo`.
+- It should never appear in normal live sessions.
 
-Seed categories should support funny answers without losing analytical shape.
+## Seeded Participants
 
-Recommended categories:
+Seed 6-8 participants with varied response styles and telemetry:
 
-1. **Memorized and Forgotten**
-   - Facts, formulas, definitions, or exam content retained only long enough to pass.
-2. **Bureaucracy and Admin**
-   - Registration systems, citation rules, formatting requirements, paperwork rituals.
-3. **Theory With No Obvious Use**
-   - Abstract frameworks that felt detached from practical work.
-4. **Accidentally Useful**
-   - Things that seemed useless at the time but later helped unexpectedly.
-5. **Social Survival Skills**
-   - Group projects, presentations, networking, conflict management, office-hours etiquette.
+1. `Maya`
+   - Course: reading contracts and real-world small print.
+   - Category: Life Skills.
+   - Telemetry: composed gradually.
+2. `Sam`
+   - Course: arguing with algorithms and AI literacy.
+   - Category: Technology and AI.
+   - Telemetry: fast draft with revisions.
+3. `Priya`
+   - Course: why people do not change their minds.
+   - Category: Human Behaviour.
+   - Telemetry: composed gradually.
+4. `Jake`
+   - Course: office politics for basically decent people.
+   - Category: Work and Money.
+   - Telemetry: mixed.
+5. `Rina`
+   - Course: memes as modern literature.
+   - Category: Creativity and Culture.
+   - Telemetry: likely pasted or fast entry.
+6. `Alex`
+   - Course: the history of bad ideas.
+   - Category: Playful but Serious.
+   - Telemetry: composed gradually.
+7. `Noah`
+   - Course: cooking when tired and broke.
+   - Category: Life Skills.
+   - Telemetry: mixed.
+8. `Leah`
+   - Course: explaining boring things beautifully.
+   - Category: Creativity and Culture.
+   - Telemetry: composed gradually.
 
-## Seeded Responses
+Each participant should have:
 
-Create 8-10 participant responses with varied tone, specificity, and telemetry.
+- readable `participantSlug`
+- deterministic demo `clientKeyHash` from `demo-{nickname}`
+- one top-level seeded submission
+- seeded AI feedback
+- category assignment
+- at least one activity event visible to instructor surfaces
 
-Response requirements:
+## Categories
 
-- Each response should be plausible for a university student or recent graduate.
-- Responses should include enough detail for categorisation and synthesis.
-- Include light humor but avoid punching down at specific identities, institutions, or protected groups.
-- Use varied input patterns:
-  - `composed_gradually`
-  - `mixed`
-  - `likely_pasted`
-- Keep response lengths similar to real participant submissions, roughly 25-60 words.
+Recommended seeded categories:
 
-Example response directions:
+1. **Life Skills**
+   - Practical courses for adulthood, survival, household systems, documents, food, and everyday decisions.
+2. **Technology and AI**
+   - Courses about AI literacy, algorithms, tools, data, and digital judgment.
+3. **Human Behaviour**
+   - Courses about persuasion, psychology, disagreement, relationships, and communication.
+4. **Creativity and Culture**
+   - Courses about storytelling, media, taste, design, memes, and cultural analysis.
+5. **Work and Money**
+   - Courses about careers, negotiation, workplace dynamics, productivity, and finances.
+6. **Playful but Serious**
+   - Courses that sound funny or strange but reveal deeper intellectual value.
 
-- Memorizing the Krebs cycle and never using it again.
-- Learning a citation style more deeply than the actual topic.
-- A very abstract theory module that only became useful for spotting bad arguments.
-- Group projects teaching conflict management more than the course did.
-- Learning to sound confident in presentations with incomplete information.
-- A statistics formula that felt useless until reading workplace dashboards.
-- Formatting lab reports with more precision than the experiment.
-- A required elective that unexpectedly helped with explaining ideas to non-specialists.
+Keep the category count around 5-6 so the demo dashboard feels readable.
 
-## Feedback Seed Updates
+## Seeded Feedback
 
-The existing generic feedback can work, but demo quality improves if seeded feedback references the new prompt.
+Seed feedback should demonstrate the product's tone controls without being abusive.
 
-Recommended feedback style:
+For each response, include:
 
-- Keep the current `spicy` tone.
-- Mention whether the response is just a joke or has a sharper insight.
-- Encourage the participant to explain why the lesson felt useless and whether it later transferred.
+- originality band
+- reasoning quality band
+- genericness or AI-likeness warning where appropriate
+- one concrete suggestion for strengthening the idea
+- composition signal summary, such as `composed gradually`, `revised actively`, or `possibly pasted`
 
-## Synthesis Seed Updates
+Example direction:
 
-Replace the class synthesis text with university-theme output.
+- Maya's contract course: praise practical specificity, suggest adding a final project.
+- Sam's algorithm course: praise relevance, challenge him to define what students can do after the course.
+- Rina's meme course: note that it sounds playful but can be rigorous if tied to culture, platforms, and context collapse.
 
-Recommended synthesis themes:
+## Seeded Fight Me Data
 
-- Many "useless" lessons were really about memorization for exams.
-- Admin and formatting tasks felt pointless but taught institutional fluency.
-- Group work and presentations were disliked but often transferred into workplace skills.
-- Some abstract theory became useful later as a way to frame problems or spot weak reasoning.
-- The class splits between "truly useless content" and "useful but badly taught content."
+Seed pseudo Fight Me activity using real production tables.
 
-## Optional Mock Data Updates
+Recommended completed real 1v1:
 
-`src/lib/mock-data.ts` still contains AI-healthcare mock data. If any mock-only surfaces remain visible, update it to the new university demo theme.
+- slug: `sam-vs-rina-algorithms-vs-memes`
+- attacker: `Sam`
+- defender: `Rina`
+- attacker position: algorithms shape what people see, so AI literacy is more urgent.
+- defender position: memes reveal how culture travels through platforms, so content and distribution must be studied together.
+- status: `completed`
+- mode: `real_1v1`
+- turn count: 4 submitted turns
+- debrief: include strengths for both sides, missed opportunity, and stronger rebuttal suggestion.
 
-This is optional for the seeded Convex demo, because the live app should use data from `convex/demo.ts`.
+Recommended second completed real 1v1:
 
-## Route and Constant Alignment
+- slug: `priya-vs-jake-minds-vs-office-politics`
+- attacker: `Priya`
+- defender: `Jake`
+- theme: whether teaching office politics normalizes manipulation or helps decent people survive power structures.
+- status: `completed`
+- mode: `real_1v1`
+- turn count: 4 submitted turns
+- debrief: note values clash and practical implications.
 
-Current frontend constants still include:
+Optional seeded vs AI:
 
-- `DEMO_SESSION_CODE = "SPARK"`
-- `DEMO_SESSION_SLUG = "demo-discussion"`
+- slug: `alex-vs-ai-history-of-bad-ideas`
+- participant: `Alex`
+- theme: whether "bad ideas" is just trivia or a method for studying incentives, evidence, and overconfidence.
+- status: `completed`
+- mode: `vs_ai`
+- turn count: 4 turns
+- debrief: emphasize how the participant defended the course design.
 
-Because homepage navigation now uses `/join` and `/instructor`, this is not blocking. If direct demo shortcuts are reintroduced later, either:
+Important:
 
-- update `DEMO_SESSION_SLUG` to `useless-university-lessons-demo`, or
-- fetch `api.demo.getDemoSession` instead of hard-coding the slug.
+- Seeded fights are live records. If a judge switches into `Sam`, they are acting as the real seeded `Sam` participant.
+- This is acceptable for demo mode because the demo can be reset.
+
+## Seeded Synthesis and Semantic Data
+
+Seed enough backend artifacts so dashboards are meaningful before new judge activity arrives:
+
+- class synthesis artifact
+- category summaries
+- representative quotes
+- contribution trace hints
+- novelty signals for selected submissions
+- argument links between related or opposing submissions
+- optional follow-up prompt targeting one category
+- optional follow-up response from one seeded participant
+
+The goal is not to fake every future feature. The goal is to make the demo feel populated and coherent immediately.
+
+## Demo Reset and Safety
+
+The demo must remain resettable:
+
+- Keep using `api.demo.seed` with `resetExisting: true`.
+- `api.demo.resetSession` should delete only the seeded demo session and its related rows.
+- Reset must include fights, turns, debriefs, drafts, semantic signals, argument links, synthesis artifacts, quotes, reports, follow-ups, reactions, position shifts, telemetry, and audit rows.
+- Do not create global destructive reset tools.
+
+Because persona switching lets judges mutate seeded personas, reset is important before a formal presentation.
 
 ## Implementation Steps
 
-1. Update constants in `convex/demo.ts`:
+1. Update `convex/demo.ts` constants:
    - `DEMO_SLUG`
    - title
    - opening prompt
-2. Replace `DEMO_CATEGORIES`.
-3. Replace `DEMO_RESPONSES` with 8-10 university-themed responses.
-4. Update seeded `submissionFeedback` text to fit the new prompt.
-5. Update seeded `synthesisArtifacts` content.
-6. Run targeted validation:
-   - `pnpm exec convex codegen`
-   - `pnpm exec convex run demo:seed -- '{ "resetExisting": true }'` only when ready to seed the deployment
-   - `pnpm exec convex run demo:getDemoSession`
-   - `pnpm exec convex run demo:health`
+   - seeded category list
+   - seeded response list
+2. Add seeded participant response content for the new question.
+3. Seed feedback with topic-specific analysis.
+4. Seed class/category synthesis and representative quotes.
+5. Seed semantic signals and argument links for novelty radar and argument map contracts.
+6. Seed completed Fight Me threads, turns, and debriefs.
+7. Ensure demo reset covers all newly seeded tables.
+8. Optionally expose a backend query returning demo personas:
+   - nickname
+   - participant slug
+   - demo client key label, for frontend mapping
+   - short description of what the persona has already done
+9. Keep frontend persona-switching implementation separate from backend seed work.
+
+## Verification
+
+Run:
+
+```bash
+pnpm exec convex codegen
+pnpm exec convex run demo:seed -- '{ "resetExisting": true }'
+pnpm exec convex run demo:getDemoSession
+pnpm exec convex run demo:health
+pnpm run build
+```
+
+Manual checks:
+
+- `/join/SPARK` opens the seeded demo session.
+- `/instructor/session/teach-anything-university-demo` shows seeded categories, responses, synthesis, Fight Me records, and activity.
+- A newly joined judge participant can submit a response and it appears in instructor views.
+- Switching to a seeded persona loads that participant's real seeded state.
+- Actions taken as a seeded persona appear live in the instructor dashboard.
 
 ## Risks
 
-- Existing generated Convex types may be out of date while other backend work is active.
-- `convex/demo.ts` currently references newer semantic/argument tables, so schema and generated API state must stay aligned.
-- If an old demo session exists under the previous slug, `resetExisting` will only affect the current `DEMO_SLUG`; manual cleanup may be needed for abandoned demo sessions.
+- If multiple judges use the same seeded persona at the same time, they share that identity. This is acceptable for demo mode but should be clearly labeled.
+- Direct persona switching requires frontend access to deterministic demo client keys. This must be gated to the demo slug.
+- If direct homepage shortcuts use constants, update `DEMO_SESSION_SLUG` to `teach-anything-university-demo`; otherwise prefer `api.demo.getDemoSession`.
+- Seeded data should not rely on live LLM calls during the presentation. Any expensive AI generation should be pre-seeded or manually triggered.
 
 ## Acceptance Criteria
 
-- `api.demo.seed` creates a demo session with the university prompt.
-- The seeded session appears in the instructor dashboard.
-- Participants can enter `SPARK` from `/join` and reach the demo session.
-- Instructor overview shows populated categories, submissions, activity, and synthesis.
-- No hard-coded homepage demo route is required for the demo to be usable.
+- The seeded demo uses the "teach a university course" question.
+- The seeded demo includes 6-8 participants with realistic responses.
+- The seeded demo includes completed pseudo 1v1 Fight Me records and at least one debrief.
+- Judges can join as themselves and create live data.
+- Judges can switch into seeded personas for a richer participant view.
+- Instructor dashboard sees seeded and judge-created activity through normal live Convex data.
