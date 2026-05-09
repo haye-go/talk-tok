@@ -1,7 +1,7 @@
+import { PretextDisplay } from "@/components/text/pretext-display";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PretextDisplay } from "@/components/text/pretext-display";
 import { inputPatternLabel, type InputPattern } from "@/lib/submission-telemetry";
 import type { Id } from "../../../convex/_generated/dataModel";
 

@@ -49,7 +49,9 @@ export function ResponseStreamItem({
       </p>
       <div className="mt-1.5 flex items-center justify-between text-[10px]">
         {telemetryLabel && (
-          <span className={telemetryWarning ? "text-[var(--c-sig-coral)]" : "text-[var(--c-muted)]"}>
+          <span
+            className={telemetryWarning ? "text-[var(--c-sig-coral)]" : "text-[var(--c-muted)]"}
+          >
             {telemetryWarning ? (
               <Lightning size={10} className="mr-0.5 inline" />
             ) : (

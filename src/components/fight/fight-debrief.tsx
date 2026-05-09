@@ -1,4 +1,4 @@
-import { Crosshair, Muscle, Wrench } from "@phosphor-icons/react";
+import { Crosshair, HandFist, Wrench } from "@phosphor-icons/react";
 
 interface FightDebriefProps {
   defended: string;
@@ -11,7 +11,7 @@ export function FightDebrief({ defended, weaker, stronger }: FightDebriefProps) 
     <div className="space-y-2.5">
       <div className="rounded-md p-3" style={{ background: "oklch(0.93 0.025 145)" }}>
         <p className="mb-1 font-display text-xs font-semibold text-[var(--c-success)]">
-          <Muscle size={12} className="mr-0.5 inline" /> What you defended well
+          <HandFist size={12} className="mr-0.5 inline" /> What you defended well
         </p>
         <p className="text-xs leading-relaxed" style={{ color: "oklch(0.25 0.02 145)" }}>
           {defended}

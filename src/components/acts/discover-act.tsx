@@ -1,11 +1,7 @@
 import { FeedbackCard } from "@/components/feedback/feedback-card";
 import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
-import {
-  MOCK_CATEGORIES,
-  MOCK_FEEDBACK,
-  MOCK_SUBMISSION,
-} from "@/lib/mock-data";
+import { MOCK_CATEGORIES, MOCK_FEEDBACK, MOCK_SUBMISSION } from "@/lib/mock-data";
 
 interface DiscoverActProps {
   feedback?: typeof MOCK_FEEDBACK;
@@ -17,7 +13,10 @@ interface DiscoverActProps {
 export function DiscoverAct({
   feedback = MOCK_FEEDBACK,
   categories = MOCK_CATEGORIES,
-  placement = { categoryName: MOCK_SUBMISSION.categoryName, categoryColor: MOCK_SUBMISSION.categoryColor },
+  placement = {
+    categoryName: MOCK_SUBMISSION.categoryName,
+    categoryColor: MOCK_SUBMISSION.categoryColor,
+  },
   telemetryLabel = `${MOCK_SUBMISSION.telemetry.label} · ${Math.round(MOCK_SUBMISSION.telemetry.durationMs / 1000)}s`,
 }: DiscoverActProps) {
   return (

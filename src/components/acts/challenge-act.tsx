@@ -10,7 +10,10 @@ export function ChallengeAct() {
           <Megaphone size={12} className="mr-1 inline" />
           Follow-up from instructor
         </p>
-        <p className="text-sm font-medium leading-relaxed" style={{ color: "var(--c-on-sig-dark)" }}>
+        <p
+          className="text-sm font-medium leading-relaxed"
+          style={{ color: "var(--c-on-sig-dark)" }}
+        >
           &ldquo;Those in Liability &amp; Law — how would you respond to the Patient Autonomy
           group&rsquo;s claim that informed consent solves the liability problem?&rdquo;
         </p>
@@ -22,7 +25,9 @@ export function ChallengeAct() {
         style={{ border: "1px solid var(--c-sig-coral)" }}
       >
         <Lightning size={28} weight="fill" className="mx-auto mb-1 text-[var(--c-sig-coral)]" />
-        <p className="font-display text-base font-medium text-[var(--c-sig-coral)]">Fight Me Mode</p>
+        <p className="font-display text-base font-medium text-[var(--c-sig-coral)]">
+          Fight Me Mode
+        </p>
         <p className="mt-1 text-xs text-[var(--c-muted)]">
           Challenge AI or an opposing view to a 1v1 debate
         </p>

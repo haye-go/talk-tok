@@ -6,12 +6,60 @@ import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
 
 const MOCK_RECENT_CALLS = [
-  { time: "12:04:32", feature: "Private Feedback", model: "sonnet-4-5", tokens: "820 / 340", latency: "1.2s", cost: "$0.008", status: "success" as const },
-  { time: "12:04:28", feature: "Categorization", model: "sonnet-4-5", tokens: "1,200 / 180", latency: "0.9s", cost: "$0.006", status: "success" as const },
-  { time: "12:04:15", feature: "Moderation", model: "haiku-4-5", tokens: "420 / 45", latency: "0.3s", cost: "$0.001", status: "success" as const },
-  { time: "12:03:58", feature: "Fight Me", model: "sonnet-4-5", tokens: "1,800 / 520", latency: "2.1s", cost: "$0.013", status: "success" as const },
-  { time: "12:03:41", feature: "Private Feedback", model: "sonnet-4-5", tokens: "780 / 0", latency: "4.8s", cost: "—", status: "error" as const },
-  { time: "12:03:22", feature: "Overlap Detection", model: "haiku-4-5", tokens: "2,100 / 120", latency: "0.6s", cost: "$0.002", status: "success" as const },
+  {
+    time: "12:04:32",
+    feature: "Private Feedback",
+    model: "sonnet-4-5",
+    tokens: "820 / 340",
+    latency: "1.2s",
+    cost: "$0.008",
+    status: "success" as const,
+  },
+  {
+    time: "12:04:28",
+    feature: "Categorization",
+    model: "sonnet-4-5",
+    tokens: "1,200 / 180",
+    latency: "0.9s",
+    cost: "$0.006",
+    status: "success" as const,
+  },
+  {
+    time: "12:04:15",
+    feature: "Moderation",
+    model: "haiku-4-5",
+    tokens: "420 / 45",
+    latency: "0.3s",
+    cost: "$0.001",
+    status: "success" as const,
+  },
+  {
+    time: "12:03:58",
+    feature: "Fight Me",
+    model: "sonnet-4-5",
+    tokens: "1,800 / 520",
+    latency: "2.1s",
+    cost: "$0.013",
+    status: "success" as const,
+  },
+  {
+    time: "12:03:41",
+    feature: "Private Feedback",
+    model: "sonnet-4-5",
+    tokens: "780 / 0",
+    latency: "4.8s",
+    cost: "—",
+    status: "error" as const,
+  },
+  {
+    time: "12:03:22",
+    feature: "Overlap Detection",
+    model: "haiku-4-5",
+    tokens: "2,100 / 120",
+    latency: "0.6s",
+    cost: "$0.002",
+    status: "success" as const,
+  },
 ];
 
 const MOCK_BY_FEATURE = [
@@ -92,7 +140,9 @@ export function AdminObservabilityPage() {
                     <td className="py-2 pr-3 font-mono">{call.time}</td>
                     <td className="py-2 pr-3">{call.feature}</td>
                     <td className="py-2 pr-3">
-                      <Badge tone="slate" className="text-[9px]">{call.model}</Badge>
+                      <Badge tone="slate" className="text-[9px]">
+                        {call.model}
+                      </Badge>
                     </td>
                     <td className="py-2 pr-3 font-mono">{call.tokens}</td>
                     <td className="py-2 pr-3">{call.latency}</td>

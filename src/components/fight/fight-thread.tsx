@@ -1,4 +1,4 @@
-import { Fire, Swords } from "@phosphor-icons/react";
+import { Fire, Sword } from "@phosphor-icons/react";
 import { FightBubble } from "@/components/fight/fight-bubble";
 import { FightDebrief } from "@/components/fight/fight-debrief";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ export function FightThread({
       <div>
         <div className="mb-3 border-b border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3 text-center">
           <p className="font-display text-base font-medium text-[var(--c-ink)]">
-            <Swords size={16} className="mr-1 inline" /> Fight Complete!
+            <Sword size={16} className="mr-1 inline" /> Fight Complete!
           </p>
         </div>
         <div className="px-1">
@@ -38,7 +38,7 @@ export function FightThread({
     <div>
       <div className="flex items-center justify-between bg-[var(--c-sig-coral)] px-4 py-2.5 text-[var(--c-on-sig-dark)]">
         <span className="font-display text-sm font-semibold">
-          <Swords size={14} className="mr-1 inline" /> FIGHT ME — vs AI
+          <Sword size={14} className="mr-1 inline" /> FIGHT ME - vs AI
         </span>
         <span className="text-[11px]" style={{ opacity: 0.8 }}>
           {roundLabel}

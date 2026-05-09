@@ -8,7 +8,7 @@ import { LoadingState } from "@/components/state/loading-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
-import { SubmissionCard } from "@/components/session/submission-card";
+import { SubmissionCard } from "@/components/submission/submission-card";
 import { inputPatternLabel, type InputPattern } from "@/lib/submission-telemetry";
 import { routes } from "@/lib/routes";
 

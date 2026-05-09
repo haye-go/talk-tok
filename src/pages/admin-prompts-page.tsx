@@ -1,4 +1,9 @@
-import { ArrowCounterClockwise, CheckCircle, FloppyDisk, WarningCircle } from "@phosphor-icons/react";
+import {
+  ArrowCounterClockwise,
+  CheckCircle,
+  FloppyDisk,
+  WarningCircle,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +47,10 @@ export function AdminPromptsPage() {
   const [selected, setSelected] = useState("private-feedback");
 
   return (
-    <AdminShell title="Prompt Templates" description="Edit and version prompts for each AI feature.">
+    <AdminShell
+      title="Prompt Templates"
+      description="Edit and version prompts for each AI feature."
+    >
       <div className="flex gap-4">
         <div className="w-52 shrink-0 space-y-1">
           {PROMPT_FEATURES.map((pf) => (
@@ -86,14 +94,26 @@ export function AdminPromptsPage() {
             />
             <p className="mt-3 text-xs text-[var(--c-muted)]">
               Available variables:{" "}
-              <code className="rounded bg-[var(--c-surface-strong)] px-1 font-mono text-[10px]">{"{{topic}}"}</code>{" "}
-              <code className="rounded bg-[var(--c-surface-strong)] px-1 font-mono text-[10px]">{"{{response}}"}</code>{" "}
-              <code className="rounded bg-[var(--c-surface-strong)] px-1 font-mono text-[10px]">{"{{reference}}"}</code>{" "}
-              <code className="rounded bg-[var(--c-surface-strong)] px-1 font-mono text-[10px]">{"{{tone}}"}</code>
+              <code className="rounded bg-[var(--c-surface-strong)] px-1 font-mono text-[10px]">
+                {"{{topic}}"}
+              </code>{" "}
+              <code className="rounded bg-[var(--c-surface-strong)] px-1 font-mono text-[10px]">
+                {"{{response}}"}
+              </code>{" "}
+              <code className="rounded bg-[var(--c-surface-strong)] px-1 font-mono text-[10px]">
+                {"{{reference}}"}
+              </code>{" "}
+              <code className="rounded bg-[var(--c-surface-strong)] px-1 font-mono text-[10px]">
+                {"{{tone}}"}
+              </code>
             </p>
             <div className="mt-3 flex justify-end gap-2">
-              <Button variant="secondary" size="sm">Test Prompt</Button>
-              <Button size="sm" icon={<FloppyDisk size={14} />}>Save</Button>
+              <Button variant="secondary" size="sm">
+                Test Prompt
+              </Button>
+              <Button size="sm" icon={<FloppyDisk size={14} />}>
+                Save
+              </Button>
             </div>
           </Card>
         </div>

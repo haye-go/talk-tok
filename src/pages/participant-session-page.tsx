@@ -7,8 +7,8 @@ import { ParticipantShell } from "@/components/layout/participant-shell";
 import {
   ResponseComposer,
   type ResponseComposerSubmit,
-} from "@/components/session/response-composer";
-import { SubmissionCard } from "@/components/session/submission-card";
+} from "@/components/submission/response-composer";
+import { SubmissionCard } from "@/components/submission/submission-card";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
 import { PretextDisplay } from "@/components/text/pretext-display";
@@ -178,7 +178,7 @@ export function ParticipantSessionPage() {
             <ResponseComposer
               softWordLimit={session.responseSoftLimitWords}
               submitLabel="Submit response"
-              onSubmit={(submission) => handleCreateSubmission(submission)}
+              onSubmit={(_text, _tone, submission) => handleCreateSubmission(submission)}
             />
             <div className="mt-3">
               <Badge tone="warning">{session.critiqueToneDefault} tone</Badge>
@@ -267,7 +267,7 @@ export function ParticipantSessionPage() {
                 softWordLimit={session.responseSoftLimitWords}
                 submitLabel="Add follow-up"
                 placeholder="Add a clarification or extra point..."
-                onSubmit={(submission) =>
+                onSubmit={(_text, _tone, submission) =>
                   handleCreateSubmission(submission, "additional_point", followUpParentId)
                 }
               />
