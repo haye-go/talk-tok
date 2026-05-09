@@ -1,24 +1,29 @@
+import { useState } from "react";
 import { ParticipantShell } from "@/components/layout/participant-shell";
-import { Card } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { FightThread } from "@/components/fight/fight-thread";
+import { MOCK_DEBRIEF, MOCK_FIGHT_ME_TURNS } from "@/lib/mock-data";
 
 export function FightPage() {
+  const [showDebrief, setShowDebrief] = useState(false);
+
   return (
     <ParticipantShell
       fightMe={
-        <div className="grid gap-4">
-          <Card title="Fight Me — vs AI" className="border-[var(--c-sig-coral)]">
-            <p className="text-sm text-[var(--c-body)]">
-              Turn-based argument placeholder. AI counterargument will appear here.
-            </p>
-          </Card>
-          <Card title="Your rebuttal">
-            <Textarea placeholder="Fire back..." />
-            <Button type="button" variant="danger" className="mt-3">
-              Fire Back
-            </Button>
-          </Card>
+        <div>
+          <FightThread
+            turns={MOCK_FIGHT_ME_TURNS}
+            debrief={showDebrief ? MOCK_DEBRIEF : null}
+            roundLabel="Round 2/3"
+          />
+          {!showDebrief && (
+            <button
+              type="button"
+              onClick={() => setShowDebrief(true)}
+              className="mt-3 w-full text-center text-xs text-[var(--c-link)] underline"
+            >
+              (demo: show debrief)
+            </button>
+          )}
         </div>
       }
     />
