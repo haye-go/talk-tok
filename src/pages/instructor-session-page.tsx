@@ -12,7 +12,7 @@ import { SubmissionCard } from "@/components/submission/submission-card";
 import { ErrorState } from "@/components/state/error-state";
 import { ArgumentMapGraph } from "@/components/instructor/argument-map-graph";
 import { LoadingState } from "@/components/state/loading-state";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
@@ -37,6 +37,27 @@ const BAND_LABELS: Record<string, string> = {
   responsive: "Responsive",
   highly_responsive: "Highly Responsive",
 };
+
+function previewText(value?: string | null, maxLength = 150) {
+  const text = value?.trim();
+
+  if (!text) {
+    return null;
+  }
+
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function formatReportTime(value?: number | null) {
+  if (!value) {
+    return "Not generated yet";
+  }
+
+  return new Date(value).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 type VisibilityMode = "private_until_released" | "category_summary_only" | "raw_responses_visible";
 type AnonymityMode = "nicknames_visible" | "anonymous_to_peers";
@@ -391,6 +412,7 @@ export function InstructorSessionPage() {
   const [generatingClass, setGeneratingClass] = useState(false);
   const [generatingOpposing, setGeneratingOpposing] = useState(false);
   const [generatingReports, setGeneratingReports] = useState(false);
+  const [reportGenerationError, setReportGenerationError] = useState<string | null>(null);
   const [triggeringCategorisation, setTriggeringCategorisation] = useState(false);
   const [categorisationMessage, setCategorisationMessage] = useState<string | null>(null);
   const [categorisationError, setCategorisationError] = useState<string | null>(null);
@@ -534,9 +556,14 @@ export function InstructorSessionPage() {
   }
 
   async function handleGenerateReports() {
+    setReportGenerationError(null);
     setGeneratingReports(true);
     try {
       await generateReports({ sessionSlug });
+    } catch (cause) {
+      setReportGenerationError(
+        cause instanceof Error ? cause.message : "Could not generate reports.",
+      );
     } finally {
       setGeneratingReports(false);
     }
@@ -1177,42 +1204,88 @@ export function InstructorSessionPage() {
               )}
             </Button>
 
-            {recentReports.length > 0 && (
-              <div className="mt-3 space-y-1.5">
-                <p className="text-[10px] text-[var(--c-muted)]">Recent reports</p>
-                {recentReports.slice(0, 6).map((report) => (
-                  <div
-                    key={report.id}
-                    className="flex items-center justify-between rounded-sm bg-[var(--c-surface-strong)] px-2 py-1.5"
-                  >
-                    <div className="flex gap-1">
-                      {report.participationBand && (
-                        <Badge tone="sky" className="text-[8px]">
-                          {BAND_LABELS[report.participationBand] ?? report.participationBand}
+            {reportGenerationError && (
+              <p className="mt-2 text-xs text-[var(--c-error)]">{reportGenerationError}</p>
+            )}
+
+            <div className="mt-3 space-y-2">
+              <p className="text-[10px] text-[var(--c-muted)]">Recent reports</p>
+              {recentReports.length === 0 && (
+                <p className="rounded-sm bg-[var(--c-surface-strong)] px-3 py-2 text-xs text-[var(--c-muted)]">
+                  No personal reports generated yet.
+                </p>
+              )}
+              {recentReports.length > 0 && (
+                <>
+                  {recentReports.slice(0, 6).map((report) => (
+                    <div
+                      key={report.id}
+                      className="rounded-sm bg-[var(--c-surface-strong)] px-3 py-2"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-display text-sm font-medium text-[var(--c-ink)]">
+                            {report.nickname ?? "Unknown participant"}
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-[var(--c-muted)]">
+                            {report.submissionCount ?? 0} responses · {report.followUpCount ?? 0}{" "}
+                            follow-ups · {report.fightCount ?? 0} fights ·{" "}
+                            {formatReportTime(report.generatedAt ?? report.updatedAt)}
+                          </p>
+                        </div>
+                        <Badge
+                          tone={
+                            report.status === "success"
+                              ? "success"
+                              : report.status === "error"
+                                ? "error"
+                                : "warning"
+                          }
+                          className="text-[8px]"
+                        >
+                          {report.status}
                         </Badge>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {(
+                          [
+                            ["sky", report.participationBand],
+                            ["peach", report.reasoningBand],
+                            ["mustard", report.originalityBand],
+                            ["cream", report.responsivenessBand],
+                          ] satisfies Array<[NonNullable<BadgeProps["tone"]>, string | undefined]>
+                        ).map(([tone, band], index) =>
+                          band ? (
+                            <Badge
+                              key={`${report.id}-${index}`}
+                              tone={tone}
+                              className="text-[8px]"
+                            >
+                              {BAND_LABELS[band] ?? band}
+                            </Badge>
+                          ) : null,
+                        )}
+                      </div>
+                      {previewText(report.summary) && (
+                        <p className="mt-2 text-xs leading-relaxed text-[var(--c-body)]">
+                          {previewText(report.summary)}
+                        </p>
                       )}
-                      {report.reasoningBand && (
-                        <Badge tone="peach" className="text-[8px]">
-                          {BAND_LABELS[report.reasoningBand] ?? report.reasoningBand}
-                        </Badge>
+                      {previewText(report.contributionTrace, 130) && (
+                        <p className="mt-1 text-[10px] leading-relaxed text-[var(--c-muted)]">
+                          Trace: {previewText(report.contributionTrace, 130)}
+                        </p>
+                      )}
+                      {report.status === "error" && report.error && (
+                        <p className="mt-1 text-[10px] leading-relaxed text-[var(--c-error)]">
+                          Error: {report.error}
+                        </p>
                       )}
                     </div>
-                    <Badge
-                      tone={
-                        report.status === "success"
-                          ? "success"
-                          : report.status === "error"
-                            ? "error"
-                            : "warning"
-                      }
-                      className="text-[8px]"
-                    >
-                      {report.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </>
+              )}
+            </div>
           </Card>
 
           <Card title="Recent Submissions">

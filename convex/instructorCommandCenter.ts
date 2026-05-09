@@ -310,6 +310,38 @@ export const overview = query({
     for (const report of personalReports) {
       reportCounts[report.status] += 1;
     }
+    const submissionCountsByParticipant = new Map<Id<"participants">, number>();
+    const followUpCountsByParticipant = new Map<Id<"participants">, number>();
+
+    for (const submission of submissions) {
+      submissionCountsByParticipant.set(
+        submission.participantId,
+        (submissionCountsByParticipant.get(submission.participantId) ?? 0) + 1,
+      );
+
+      if (submission.kind !== "initial") {
+        followUpCountsByParticipant.set(
+          submission.participantId,
+          (followUpCountsByParticipant.get(submission.participantId) ?? 0) + 1,
+        );
+      }
+    }
+
+    const fightCountsByParticipant = new Map<Id<"participants">, number>();
+
+    for (const thread of fightThreads) {
+      fightCountsByParticipant.set(
+        thread.attackerParticipantId,
+        (fightCountsByParticipant.get(thread.attackerParticipantId) ?? 0) + 1,
+      );
+
+      if (thread.defenderParticipantId) {
+        fightCountsByParticipant.set(
+          thread.defenderParticipantId,
+          (fightCountsByParticipant.get(thread.defenderParticipantId) ?? 0) + 1,
+        );
+      }
+    }
 
     return {
       session: toSessionSnapshot(session, participants.length),
@@ -481,11 +513,23 @@ export const overview = query({
         recent: personalReports.slice(0, 12).map((report) => ({
           id: report._id,
           participantId: report.participantId,
+          nickname: participantsById.get(report.participantId)?.nickname ?? "Unknown",
+          participantSlug: participantsById.get(report.participantId)?.participantSlug ?? "unknown",
           status: report.status,
           participationBand: report.participationBand,
           reasoningBand: report.reasoningBand,
           originalityBand: report.originalityBand,
           responsivenessBand: report.responsivenessBand,
+          summary: report.summary,
+          contributionTrace: report.contributionTrace,
+          argumentEvolution: report.argumentEvolution,
+          growthOpportunity: report.growthOpportunity,
+          submissionCount: submissionCountsByParticipant.get(report.participantId) ?? 0,
+          followUpCount: followUpCountsByParticipant.get(report.participantId) ?? 0,
+          fightCount: fightCountsByParticipant.get(report.participantId) ?? 0,
+          hasReportableActivity:
+            (submissionCountsByParticipant.get(report.participantId) ?? 0) > 0 ||
+            (fightCountsByParticipant.get(report.participantId) ?? 0) > 0,
           error: report.error,
           generatedAt: report.generatedAt,
           updatedAt: report.updatedAt,
