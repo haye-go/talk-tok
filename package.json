@@ -37,6 +37,7 @@
     "convex-helpers": "^0.1.116",
     "convex-mq": "^0.2.1",
     "convex-smart-tags": "^0.1.1",
+    "d3-force": "^3.0.0",
     "pretext": "^0.3.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.5",
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/d3-force": "^3.0.10",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

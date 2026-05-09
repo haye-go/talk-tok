@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { BookOpen, CircleNotch, FloppyDisk, PushPin, Scales, Sparkle } from "@phosphor-icons/react";
+import { BookOpen, CircleNotch, FloppyDisk, Scales, Sparkle } from "@phosphor-icons/react";
 import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -10,6 +10,7 @@ import { SynthesisArtifactCard } from "@/components/synthesis/synthesis-artifact
 import { PresenceBar } from "@/components/stream/presence-bar";
 import { SubmissionCard } from "@/components/submission/submission-card";
 import { ErrorState } from "@/components/state/error-state";
+import { ArgumentMapGraph } from "@/components/instructor/argument-map-graph";
 import { LoadingState } from "@/components/state/loading-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,9 @@ export function InstructorSessionPage() {
   const generateClassSynthesis = useMutation(api.synthesis.generateClassSynthesis);
   const generateReports = useMutation(api.personalReports.generateForSession);
   const saveAsTemplate = useMutation(api.sessionTemplates.createFromSession);
+  const createCategory = useMutation(api.categoryManagement.create);
+  const updateCategory = useMutation(api.categoryManagement.update);
+  const createFollowUp = useMutation(api.followUps.create);
   const pendingRecatRequests = useQuery(api.recategorisation.listForSession, {
     sessionSlug,
     status: "pending",
@@ -70,6 +74,18 @@ export function InstructorSessionPage() {
   const [embeddingQueued, setEmbeddingQueued] = useState(false);
   const [argMapQueued, setArgMapQueued] = useState(false);
   const [decidingRecatId, setDecidingRecatId] = useState<string | null>(null);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [addCategoryName, setAddCategoryName] = useState("");
+  const [addCategoryDescription, setAddCategoryDescription] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [editingCategoryDescription, setEditingCategoryDescription] = useState("");
+  const [followUpCategoryId, setFollowUpCategoryId] = useState<string | null>(null);
+  const [followUpPrompt, setFollowUpPrompt] = useState("");
+  const [savingFollowUp, setSavingFollowUp] = useState(false);
+  const [followUpError, setFollowUpError] = useState<string | null>(null);
 
   if (overview === undefined) {
     return (
@@ -200,6 +216,81 @@ export function InstructorSessionPage() {
     }
   }
 
+  async function handleCreateCategory() {
+    setCategoryError(null);
+    setSavingCategory(true);
+    try {
+      await createCategory({
+        sessionSlug,
+        name: addCategoryName,
+        description: addCategoryDescription || undefined,
+      });
+      setAddCategoryName("");
+      setAddCategoryDescription("");
+      setShowAddCategory(false);
+    } catch (cause) {
+      setCategoryError(cause instanceof Error ? cause.message : "Could not create category.");
+    } finally {
+      setSavingCategory(false);
+    }
+  }
+
+  function startRenameCategory(category: (typeof activeCategories)[number]) {
+    setCategoryError(null);
+    setEditingCategoryId(category.id);
+    setEditingCategoryName(category.name);
+    setEditingCategoryDescription(category.description ?? "");
+  }
+
+  async function handleRenameCategory(categoryId: string) {
+    setCategoryError(null);
+    setSavingCategory(true);
+    try {
+      await updateCategory({
+        sessionSlug,
+        categoryId: categoryId as Id<"categories">,
+        name: editingCategoryName,
+        description: editingCategoryDescription || undefined,
+      });
+      setEditingCategoryId(null);
+      setEditingCategoryName("");
+      setEditingCategoryDescription("");
+    } catch (cause) {
+      setCategoryError(cause instanceof Error ? cause.message : "Could not rename category.");
+    } finally {
+      setSavingCategory(false);
+    }
+  }
+
+  function startCategoryFollowUp(category: (typeof activeCategories)[number]) {
+    setFollowUpError(null);
+    setFollowUpCategoryId(category.id);
+    setFollowUpPrompt(
+      `What is one strong counterpoint or extension to the "${category.name}" view?`,
+    );
+  }
+
+  async function handleCreateCategoryFollowUp(categoryId: string) {
+    setFollowUpError(null);
+    setSavingFollowUp(true);
+    try {
+      await createFollowUp({
+        sessionSlug,
+        title: `Follow-up: ${activeCategories.find((category) => category.id === categoryId)?.name ?? "Category"}`,
+        prompt: followUpPrompt,
+        targetMode: "categories",
+        categoryIds: [categoryId as Id<"categories">],
+        activateNow: true,
+      });
+      setFollowUpCategoryId(null);
+      setFollowUpPrompt("");
+    } catch (cause) {
+      setFollowUpError(cause instanceof Error ? cause.message : "Could not create follow-up.");
+    } finally {
+      setSavingFollowUp(false);
+    }
+  }
+
   async function handleQueueEmbeddings() {
     setEmbeddingQueued(true);
     try {
@@ -223,6 +314,7 @@ export function InstructorSessionPage() {
   const latestClassSynthesis = synthesis?.latestClassSynthesis;
   const reportsSummary = reports?.summary;
   const recentReports = reports?.recent ?? [];
+  const studentActivity = activity.filter((event) => event.actorType === "participant");
 
   return (
     <InstructorShell
@@ -239,10 +331,61 @@ export function InstructorSessionPage() {
             <span className="text-xs text-[var(--c-muted)]">
               Categories ({activeCategories.length})
             </span>
-            <a href="#" className="text-xs text-[var(--c-link)]">
+            <button
+              type="button"
+              onClick={() => {
+                setCategoryError(null);
+                setShowAddCategory((value) => !value);
+              }}
+              className="text-xs text-[var(--c-link)] underline"
+            >
               + Add
-            </a>
+            </button>
           </div>
+          {showAddCategory && (
+            <form
+              className="grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-2.5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleCreateCategory();
+              }}
+            >
+              <input
+                value={addCategoryName}
+                onChange={(event) => setAddCategoryName(event.target.value)}
+                placeholder="Category name"
+                className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-2 py-1 text-xs text-[var(--c-ink)]"
+              />
+              <textarea
+                value={addCategoryDescription}
+                onChange={(event) => setAddCategoryDescription(event.target.value)}
+                placeholder="Short description"
+                rows={2}
+                className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-2 py-1 text-xs text-[var(--c-ink)]"
+              />
+              {categoryError && (
+                <p className="text-[10px] text-[var(--c-error)]">{categoryError}</p>
+              )}
+              <div className="flex gap-1.5">
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="flex-1"
+                  disabled={savingCategory || addCategoryName.trim().length < 2}
+                >
+                  {savingCategory ? "Saving..." : "Create"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowAddCategory(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
           {activeCategories.map((cat, i) => (
             <div
               key={cat.id}
@@ -259,19 +402,99 @@ export function InstructorSessionPage() {
                   {cat.description.length > 60 ? "..." : ""}
                 </p>
               )}
+              {editingCategoryId === cat.id && (
+                <form
+                  className="mt-2 grid gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleRenameCategory(cat.id);
+                  }}
+                >
+                  <input
+                    value={editingCategoryName}
+                    onChange={(event) => setEditingCategoryName(event.target.value)}
+                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-2 py-1 text-xs text-[var(--c-ink)]"
+                  />
+                  <textarea
+                    value={editingCategoryDescription}
+                    onChange={(event) => setEditingCategoryDescription(event.target.value)}
+                    rows={2}
+                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-2 py-1 text-xs text-[var(--c-ink)]"
+                  />
+                  {categoryError && (
+                    <p className="text-[10px] text-[var(--c-error)]">{categoryError}</p>
+                  )}
+                  <div className="flex gap-1.5">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={savingCategory || editingCategoryName.trim().length < 2}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditingCategoryId(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
+              {followUpCategoryId === cat.id && (
+                <form
+                  className="mt-2 grid gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleCreateCategoryFollowUp(cat.id);
+                  }}
+                >
+                  <textarea
+                    value={followUpPrompt}
+                    onChange={(event) => setFollowUpPrompt(event.target.value)}
+                    rows={3}
+                    placeholder="Follow-up question for this category"
+                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-2 py-1 text-xs text-[var(--c-ink)]"
+                  />
+                  {followUpError && (
+                    <p className="text-[10px] text-[var(--c-error)]">{followUpError}</p>
+                  )}
+                  <div className="flex gap-1.5">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={savingFollowUp || followUpPrompt.trim().length < 5}
+                    >
+                      {savingFollowUp ? "Sending..." : "Send"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setFollowUpCategoryId(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
               <div className="mt-1.5 flex flex-wrap gap-1">
-                <span className="cursor-pointer rounded bg-[var(--c-surface-strong)] px-1.5 py-0.5 text-[9px]">
+                <button
+                  type="button"
+                  onClick={() => startRenameCategory(cat)}
+                  className="rounded bg-[var(--c-surface-strong)] px-1.5 py-0.5 text-[9px]"
+                >
                   Rename
-                </span>
-                <span className="cursor-pointer rounded bg-[var(--c-surface-strong)] px-1.5 py-0.5 text-[9px]">
-                  Split
-                </span>
-                <span className="cursor-pointer rounded bg-[var(--c-surface-strong)] px-1.5 py-0.5 text-[9px]">
-                  <PushPin size={9} className="inline" />
-                </span>
-                <span className="cursor-pointer rounded bg-[var(--c-sig-slate)] px-1.5 py-0.5 text-[9px] text-white">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startCategoryFollowUp(cat)}
+                  className="rounded bg-[var(--c-sig-slate)] px-1.5 py-0.5 text-[9px] text-white"
+                >
                   Follow-up
-                </span>
+                </button>
                 <button
                   type="button"
                   onClick={() => handleGenerateCategorySummary(cat.id)}
@@ -797,59 +1020,14 @@ export function InstructorSessionPage() {
             </Card>
           )}
 
-          {/* Argument Map (card-based MVP) */}
+          {/* Argument Map */}
           {semanticStatus?.readiness.canShowArgumentMap && argumentGraph && (
             <Card title="Argument Map">
-              <div className="mb-2 flex gap-2 text-[10px] text-[var(--c-muted)]">
-                <span>{argumentGraph.nodes.length} nodes</span>
-                <span>{argumentGraph.edges.length} edges</span>
-                {argumentGraph.layout?.suggestedRenderer && (
-                  <Badge tone="neutral" className="text-[8px]">
-                    {argumentGraph.layout.suggestedRenderer}
-                  </Badge>
-                )}
-              </div>
-
-              {argumentGraph.edges.slice(0, 10).map((edge: any) => {
-                const src = argumentGraph.nodes.find((n: any) => n.nodeKey === edge.sourceKey);
-                const tgt = argumentGraph.nodes.find((n: any) => n.nodeKey === edge.targetKey);
-                return (
-                  <div key={edge.id} className="mb-1.5 rounded-sm bg-[var(--c-surface-strong)] p-2">
-                    <div className="flex items-center gap-1 text-[10px]">
-                      <span className="font-medium text-[var(--c-ink)]">
-                        {src?.label?.slice(0, 30) ?? edge.sourceKey}
-                      </span>
-                      <Badge
-                        tone={
-                          edge.linkType === "supports"
-                            ? "success"
-                            : edge.linkType === "contradicts"
-                              ? "error"
-                              : edge.linkType === "extends"
-                                ? "sky"
-                                : edge.linkType === "bridges"
-                                  ? "mustard"
-                                  : "neutral"
-                        }
-                        className="text-[8px]"
-                      >
-                        {edge.linkType}
-                      </Badge>
-                      <span className="font-medium text-[var(--c-ink)]">
-                        {tgt?.label?.slice(0, 30) ?? edge.targetKey}
-                      </span>
-                    </div>
-                    {edge.rationale && (
-                      <p className="mt-0.5 text-[10px] text-[var(--c-muted)]">{edge.rationale}</p>
-                    )}
-                  </div>
-                );
-              })}
-              {argumentGraph.edges.length > 10 && (
-                <p className="mt-1 text-[10px] text-[var(--c-muted)]">
-                  + {argumentGraph.edges.length - 10} more edges
-                </p>
-              )}
+              <ArgumentMapGraph
+                nodes={argumentGraph.nodes}
+                edges={argumentGraph.edges}
+                rendererLabel={argumentGraph.layout?.suggestedRenderer}
+              />
             </Card>
           )}
         </div>
@@ -857,10 +1035,10 @@ export function InstructorSessionPage() {
       right={
         <div className="grid gap-3">
           <p className="text-xs text-[var(--c-muted)]">Live Activity</p>
-          {activity.length === 0 && (
-            <p className="text-sm text-[var(--c-muted)]">No activity yet.</p>
+          {studentActivity.length === 0 && (
+            <p className="text-sm text-[var(--c-muted)]">No student activity yet.</p>
           )}
-          {activity.map((event) => (
+          {studentActivity.map((event) => (
             <div
               key={event.id}
               className="border-b border-[var(--c-hairline)] pb-2 text-xs text-[var(--c-body)]"
