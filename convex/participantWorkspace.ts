@@ -621,7 +621,7 @@ export const overview = query({
           .filter((submission) => submission.kind === "initial")
           .map((submission) => toSubmission(submission, participant, session)),
         followUpResponses: mySubmissions
-          .filter((submission) => Boolean(submission.followUpPromptId))
+          .filter((submission) => submission.kind !== "initial")
           .map((submission) => {
             const followUpPrompt = followUpPrompts.find(
               (prompt) => prompt._id === submission.followUpPromptId,
@@ -629,13 +629,13 @@ export const overview = query({
 
             return {
               ...toSubmission(submission, participant, session),
-              followUpTitle: followUpPrompt?.title,
+              followUpTitle: followUpPrompt?.title ?? "Additional point",
               followUpSlug: followUpPrompt?.slug,
               followUpRoundNumber: followUpPrompt?.roundNumber,
             };
           }),
         timeline: mySubmissions.map((submission) => ({
-          type: submission.followUpPromptId ? "follow_up_response" : "response",
+          type: submission.kind !== "initial" ? "follow_up_response" : "response",
           submission: toSubmission(submission, participant, session),
         })),
       },
