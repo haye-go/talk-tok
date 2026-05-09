@@ -65,9 +65,10 @@ export function ParticipantSessionPage() {
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("main");
-  const [demoActOverride, setDemoActOverride] = useState<ActId | null>(null);
+  const [actOverride, setActOverride] = useState<ActId | null>(null);
   const touchedPresenceKey = useRef<string | null>(null);
   const isDemoParticipant = sessionSlug === DEMO_SESSION_SLUG && clientKey?.startsWith("demo-");
+  const liveActForReset = workspace?.session.currentAct ?? session?.currentAct;
 
   useEffect(() => {
     const demoClientKey = new URLSearchParams(window.location.search).get("demoClientKey");
@@ -97,10 +98,8 @@ export function ParticipantSessionPage() {
   }, [clientKey, participant, sessionSlug, touchPresence]);
 
   useEffect(() => {
-    if (!isDemoParticipant) {
-      setDemoActOverride(null);
-    }
-  }, [isDemoParticipant]);
+    setActOverride(null);
+  }, [liveActForReset]);
 
   async function handleNicknameSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -219,7 +218,7 @@ export function ParticipantSessionPage() {
   // Workspace data (may still be loading after join gate passes)
   const ws = workspace;
   const currentAct = ws?.session.currentAct ?? session.currentAct;
-  const visibleAct = isDemoParticipant && demoActOverride ? demoActOverride : currentAct;
+  const visibleAct = actOverride ?? currentAct;
   const firstFeedback = ws?.feedbackBySubmission?.[0] ?? null;
   const firstAssignment = ws?.assignmentsBySubmission?.[0] ?? null;
   const firstInitialResponse = ws?.myZoneHistory.initialResponses?.[0] ?? null;
@@ -230,8 +229,9 @@ export function ParticipantSessionPage() {
         ) ?? null)
       : null;
   const canUseFightMe = Boolean(clientKey && firstInitialResponse);
-  function handleDemoActChange(actId: ActId) {
-    setDemoActOverride(actId);
+
+  function handleActChange(actId: ActId) {
+    setActOverride(actId);
     setActiveTab("main");
   }
 
@@ -261,8 +261,8 @@ export function ParticipantSessionPage() {
       activeTab={activeTab}
       onActiveTabChange={setActiveTab}
       unlockAllTabs={Boolean(isDemoParticipant)}
-      canSelectActs={Boolean(isDemoParticipant)}
-      onActChange={isDemoParticipant ? handleDemoActChange : undefined}
+      canSelectActs
+      onActChange={handleActChange}
       main={
         <div className="grid gap-4">
           <div className="rounded-md bg-[var(--c-sig-cream)] p-3.5">
@@ -276,11 +276,40 @@ export function ParticipantSessionPage() {
           {visibleAct === "submit" && (
             <>
               {submissionError && <InlineAlert tone="error">{submissionError}</InlineAlert>}
-              <ResponseComposer
-                softWordLimit={session.responseSoftLimitWords}
-                submitLabel="Submit response"
-                onSubmit={(_text, _tone, submission) => handleSubmit(submission)}
-              />
+              {firstInitialResponse ? (
+                <Card title="Your submitted response">
+                  <p className="text-sm leading-relaxed text-[var(--c-body)]">
+                    {firstInitialResponse.body}
+                  </p>
+                  <div className="mt-3 rounded-sm border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
+                    <p className="text-xs text-[var(--c-muted)]">
+                      Initial responses are locked after submission. Use Discover or My Zone to add
+                      a follow-up instead of editing the original response.
+                    </p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button type="button" variant="secondary" onClick={() => handleActChange("discover")}>
+                      Go to Discover
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setFollowUpParentId(firstInitialResponse.id as Id<"submissions">);
+                        handleActChange("discover");
+                      }}
+                    >
+                      Add follow-up
+                    </Button>
+                  </div>
+                </Card>
+              ) : (
+                <ResponseComposer
+                  softWordLimit={session.responseSoftLimitWords}
+                  submitLabel="Submit response"
+                  onSubmit={(_text, _tone, submission) => handleSubmit(submission)}
+                />
+              )}
               <p className="text-xs text-[var(--c-muted)]">Signed in as {participant.nickname}</p>
             </>
           )}
