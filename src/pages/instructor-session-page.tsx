@@ -391,6 +391,9 @@ export function InstructorSessionPage() {
   const [generatingClass, setGeneratingClass] = useState(false);
   const [generatingOpposing, setGeneratingOpposing] = useState(false);
   const [generatingReports, setGeneratingReports] = useState(false);
+  const [triggeringCategorisation, setTriggeringCategorisation] = useState(false);
+  const [categorisationMessage, setCategorisationMessage] = useState<string | null>(null);
+  const [categorisationError, setCategorisationError] = useState<string | null>(null);
   const [generatingCategoryId, setGeneratingCategoryId] = useState<string | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
@@ -539,6 +542,22 @@ export function InstructorSessionPage() {
     }
   }
 
+  async function handleTriggerCategorisation() {
+    setCategorisationError(null);
+    setCategorisationMessage(null);
+    setTriggeringCategorisation(true);
+    try {
+      const job = await triggerCategorisation({ sessionSlug });
+      setCategorisationMessage(`Categorisation ${job?.status ?? "queued"}.`);
+    } catch (cause) {
+      setCategorisationError(
+        cause instanceof Error ? cause.message : "Could not start categorisation.",
+      );
+    } finally {
+      setTriggeringCategorisation(false);
+    }
+  }
+
   async function handleSaveTemplate() {
     setSavingTemplate(true);
     try {
@@ -648,6 +667,11 @@ export function InstructorSessionPage() {
   const latestClassSynthesis = synthesis?.latestClassSynthesis;
   const reportsSummary = reports?.summary;
   const recentReports = reports?.recent ?? [];
+  const latestCategorisationJob = overview.jobs.latest.find((job) => job.type === "categorisation");
+  const categorisationBusy =
+    triggeringCategorisation ||
+    latestCategorisationJob?.status === "queued" ||
+    latestCategorisationJob?.status === "processing";
   const studentActivity = activity.filter((event) => event.actorType === "participant");
 
   return (
@@ -859,11 +883,36 @@ export function InstructorSessionPage() {
               </div>
               <button
                 type="button"
-                onClick={() => void triggerCategorisation({ sessionSlug })}
-                className="mt-1.5 rounded bg-[var(--c-sig-yellow)] px-2 py-0.5 text-[10px] font-medium text-[var(--c-on-sig-light)]"
+                onClick={() => void handleTriggerCategorisation()}
+                disabled={categorisationBusy}
+                className="mt-1.5 rounded bg-[var(--c-sig-yellow)] px-2 py-0.5 text-[10px] font-medium text-[var(--c-on-sig-light)] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Run categorisation
+                {triggeringCategorisation
+                  ? "Queueing..."
+                  : categorisationBusy
+                    ? "Categorising..."
+                    : "Run categorisation"}
               </button>
+              {latestCategorisationJob && (
+                <p className="mt-1 text-[10px] text-[var(--c-muted)]">
+                  Latest job: {latestCategorisationJob.status}
+                  {typeof latestCategorisationJob.progressDone === "number" &&
+                  typeof latestCategorisationJob.progressTotal === "number"
+                    ? ` (${latestCategorisationJob.progressDone}/${latestCategorisationJob.progressTotal})`
+                    : ""}
+                </p>
+              )}
+              {categorisationMessage && (
+                <p className="mt-1 text-[10px] text-[var(--c-success)]">
+                  {categorisationMessage}
+                </p>
+              )}
+              {(categorisationError ||
+                (latestCategorisationJob?.status === "error" && latestCategorisationJob.error)) && (
+                <p className="mt-1 text-[10px] text-[var(--c-error)]">
+                  {categorisationError ?? latestCategorisationJob?.error}
+                </p>
+              )}
             </div>
           )}
 
