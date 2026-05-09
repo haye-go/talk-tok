@@ -1,5 +1,13 @@
 import { createRoute, createRootRoute, createRouter, Outlet } from "@tanstack/react-router";
 import App from "./App";
+import { AdminPage } from "@/pages/admin-page";
+import { FightPage } from "@/pages/fight-page";
+import { InstructorDashboardPage } from "@/pages/instructor-dashboard-page";
+import { InstructorSessionPage } from "@/pages/instructor-session-page";
+import { JoinPage } from "@/pages/join-page";
+import { ParticipantSessionPage } from "@/pages/participant-session-page";
+import { ProjectorPage } from "@/pages/projector-page";
+import { ReviewPage } from "@/pages/review-page";
 
 function RootLayout() {
   return <Outlet />;
@@ -18,67 +26,117 @@ const indexRoute = createRoute({
 const joinRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/join/$sessionCode",
-  component: App,
+  component: JoinPage,
 });
 
 const sessionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/session/$sessionSlug",
-  component: App,
+  component: ParticipantSessionPage,
 });
 
 const sessionFightRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/session/$sessionSlug/fight/$fightSlug",
-  component: App,
+  component: FightPage,
 });
 
 const sessionReviewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/session/$sessionSlug/review",
-  component: App,
+  component: ReviewPage,
 });
 
 const instructorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor",
-  component: App,
+  component: InstructorDashboardPage,
+});
+
+const instructorSessionNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/instructor/session/new",
+  component: () => (
+    <AdminPage
+      title="Create Session"
+      description="Session setup placeholder with templates and defaults."
+    />
+  ),
 });
 
 const instructorSessionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/session/$sessionSlug",
-  component: App,
+  component: InstructorSessionPage,
 });
 
 const instructorProjectorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/session/$sessionSlug/projector",
-  component: App,
+  component: ProjectorPage,
+});
+
+const instructorTemplatesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/instructor/templates",
+  component: () => (
+    <AdminPage title="Templates" description="Reusable session template placeholder." />
+  ),
 });
 
 const instructorAdminModelsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/models",
-  component: App,
+  component: () => (
+    <AdminPage
+      title="Providers & Models"
+      description="Model registry and feature assignment placeholder."
+    />
+  ),
 });
 
 const instructorAdminPromptsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/prompts",
-  component: App,
+  component: () => (
+    <AdminPage
+      title="Prompt Templates"
+      description="Editable prompt defaults and versioning placeholder."
+    />
+  ),
+});
+
+const instructorAdminRetrievalRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/instructor/admin/retrieval",
+  component: () => (
+    <AdminPage
+      title="Retrieval / Context"
+      description="Embedding and context assembly placeholder."
+    />
+  ),
 });
 
 const instructorAdminProtectionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/protection",
-  component: App,
+  component: () => (
+    <AdminPage
+      title="Protection"
+      description="Rate limits, moderation, telemetry disclosure, and budgets."
+    />
+  ),
 });
 
 const instructorAdminObservabilityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/observability",
-  component: App,
+  component: () => (
+    <AdminPage
+      title="Observability"
+      description="LLM calls, costs, latency, errors, and debug traces."
+    />
+  ),
 });
 
 const routeTree = rootRoute.addChildren([
@@ -88,10 +146,13 @@ const routeTree = rootRoute.addChildren([
   sessionFightRoute,
   sessionReviewRoute,
   instructorRoute,
+  instructorSessionNewRoute,
   instructorSessionRoute,
   instructorProjectorRoute,
+  instructorTemplatesRoute,
   instructorAdminModelsRoute,
   instructorAdminPromptsRoute,
+  instructorAdminRetrievalRoute,
   instructorAdminProtectionRoute,
   instructorAdminObservabilityRoute,
 ]);

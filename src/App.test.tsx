@@ -7,6 +7,6 @@ describe("App", () => {
     const html = renderToString(<App />);
 
     expect(html).toContain("Live discussion intelligence foundation");
-    expect(html).toContain("Convex client dependency installed");
+    expect(html).toContain("Design-system shell ready");
   });
 });

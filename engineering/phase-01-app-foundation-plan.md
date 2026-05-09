@@ -67,7 +67,7 @@ Install the design-system dependencies:
 
 - `tailwindcss`
 - `@tailwindcss/vite`
-- `@base-ui-components/react`
+- `@base-ui/react`
 - `class-variance-authority`
 - `clsx`
 - `tailwind-merge`
