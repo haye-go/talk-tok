@@ -5,7 +5,6 @@ import { PresenceBar } from "@/components/stream/presence-bar";
 import { ResponseStreamItem } from "@/components/stream/response-stream-item";
 import { categoryColorToTone } from "@/lib/category-colors";
 import { DEMO_SESSION_SLUG } from "@/lib/constants";
-import { MOCK_CATEGORIES, MOCK_STREAM_RESPONSES } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 interface PeerResponse {
@@ -43,32 +42,16 @@ export function StreamTab({
   categories,
   canSeeRawPeerResponses = true,
   canSeeCategorySummary = true,
-  presenceTyping = 6,
-  presenceSubmitted = 24,
-  presenceIdle = 4,
+  presenceTyping = 0,
+  presenceSubmitted = 0,
+  presenceIdle = 0,
   sessionSlug,
   clientKey,
 }: StreamTabProps) {
   const [filter, setFilter] = useState<string | null>(null);
 
-  const cats =
-    categories ??
-    MOCK_CATEGORIES.map((c) => ({
-      id: c.id,
-      name: c.name,
-      color: c.color,
-      assignmentCount: c.count,
-    }));
-
-  const responses: PeerResponse[] =
-    peerResponses ??
-    MOCK_STREAM_RESPONSES.map((r) => ({
-      id: r.id,
-      nickname: r.nickname,
-      body: r.text,
-      inputPattern: r.telemetry.pasteEvents > 0 ? "likely_pasted" : "composed_gradually",
-      createdAt: Date.now(),
-    }));
+  const cats = categories ?? [];
+  const responses: PeerResponse[] = peerResponses ?? [];
 
   const isDemoMode = sessionSlug === DEMO_SESSION_SLUG && clientKey?.startsWith("demo-");
 
@@ -118,14 +101,15 @@ export function StreamTab({
       {!canSeeRawPeerResponses ? (
         <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-4 text-center">
           <p className="text-sm text-[var(--c-muted)]">
-            {responses.length} responses collected. Peer responses remain private until the
-            instructor releases them.
+            Peer responses remain private until the instructor releases them.
           </p>
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.length === 0 && (
-            <p className="py-4 text-center text-sm text-[var(--c-muted)]">No responses yet.</p>
+            <p className="py-4 text-center text-sm text-[var(--c-muted)]">
+              No peer responses visible yet.
+            </p>
           )}
           {filtered.map((r) => (
             <div key={r.id} className="space-y-1">

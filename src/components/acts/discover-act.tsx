@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { categoryColorToTone } from "@/lib/category-colors";
-import { MOCK_CATEGORIES, MOCK_FEEDBACK, MOCK_SUBMISSION } from "@/lib/mock-data";
 
 interface CategorySummary {
   id: string;
@@ -79,35 +78,14 @@ export function DiscoverAct({
   const [recatError, setRecatError] = useState<string | null>(null);
   const [recatSubmitting, setRecatSubmitting] = useState(false);
   const [recatSubmitted, setRecatSubmitted] = useState(false);
-  const cats =
-    categories ??
-    MOCK_CATEGORIES.map((c) => ({
-      id: c.id,
-      name: c.name,
-      color: c.color,
-      assignmentCount: c.count,
-    }));
-
-  const fb: FeedbackData = feedback ?? {
-    status: "success" as const,
-    tone: MOCK_FEEDBACK.tone,
-    originalityBand: "above_average",
-    reasoningBand: "solid",
-    specificityBand: "clear",
-    summary: MOCK_FEEDBACK.text,
-    strengths: null,
-    improvement: null,
-    nextQuestion: null,
-    error: null,
-  };
-
-  const placementName = assignment?.categoryName ?? MOCK_SUBMISSION.categoryName;
+  const cats = categories ?? [];
+  const placementName = assignment?.categoryName ?? null;
   const alternateCategories = cats.filter((cat) => cat.id !== assignment?.categoryId);
   const selectedCategoryId = requestedCategoryId || alternateCategories[0]?.id || "__new";
 
   const totalResponses = cats.reduce((sum, c) => sum + c.assignmentCount, 0);
 
-  const submissionBody = mySubmissionBody ?? MOCK_SUBMISSION.text;
+  const submissionBody = mySubmissionBody?.trim() ? mySubmissionBody : null;
 
   async function handleRecatSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,7 +125,7 @@ export function DiscoverAct({
 
   return (
     <div className="space-y-3">
-      {submissionBody && (
+      {submissionBody ? (
         <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
           <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--c-muted)]">
             Your response
@@ -164,22 +142,38 @@ export function DiscoverAct({
             </div>
           )}
         </div>
+      ) : (
+        <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-[var(--c-muted)]">
+            Your response
+          </p>
+          <p className="text-sm text-[var(--c-muted)]">No response submitted yet.</p>
+        </div>
       )}
-      <FeedbackCard
-        status={fb.status}
-        tone={fb.tone}
-        reasoningBand={fb.reasoningBand}
-        originalityBand={fb.originalityBand}
-        specificityBand={fb.specificityBand}
-        summary={fb.summary}
-        strengths={fb.strengths}
-        improvement={fb.improvement}
-        nextQuestion={fb.nextQuestion}
-        error={fb.error}
-        telemetryLabel={telemetryLabel}
-      />
+      {feedback ? (
+        <FeedbackCard
+          status={feedback.status}
+          tone={feedback.tone}
+          reasoningBand={feedback.reasoningBand}
+          originalityBand={feedback.originalityBand}
+          specificityBand={feedback.specificityBand}
+          summary={feedback.summary}
+          strengths={feedback.strengths}
+          improvement={feedback.improvement}
+          nextQuestion={feedback.nextQuestion}
+          error={feedback.error}
+          telemetryLabel={telemetryLabel}
+        />
+      ) : (
+        <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
+          <p className="font-display text-sm font-medium text-[var(--c-ink)]">AI feedback</p>
+          <p className="mt-1 text-xs text-[var(--c-muted)]">
+            Feedback will appear after you submit a response.
+          </p>
+        </div>
+      )}
 
-      {cats.length > 0 && (
+      {cats.length > 0 ? (
         <div>
           <p className="mb-1.5 text-xs text-[var(--c-muted)]">
             Emerging themes from {totalResponses} responses:
@@ -191,6 +185,12 @@ export function DiscoverAct({
               </Badge>
             ))}
           </div>
+        </div>
+      ) : (
+        <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
+          <p className="text-xs text-[var(--c-muted)]">
+            Categories will appear after the instructor releases them.
+          </p>
         </div>
       )}
 

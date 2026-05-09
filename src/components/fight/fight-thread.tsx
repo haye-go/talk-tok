@@ -5,10 +5,9 @@ import { FightBubble } from "@/components/fight/fight-bubble";
 import { FightCountdown } from "@/components/fight/fight-countdown";
 import { FightDebrief } from "@/components/fight/fight-debrief";
 import { FightDraftComposer } from "@/components/fight/fight-draft-composer";
-import { Badge } from "@/components/ui/badge";
-import { LoadingState } from "@/components/state/loading-state";
 import { ErrorState } from "@/components/state/error-state";
-import { MOCK_FIGHT_ME_TURNS } from "@/lib/mock-data";
+import { LoadingState } from "@/components/state/loading-state";
+import { Badge } from "@/components/ui/badge";
 
 interface FightThreadProps {
   sessionSlug?: string;
@@ -31,7 +30,17 @@ export function FightThread({
   );
 
   if (!sessionSlug || !fightSlug) {
-    return <MockFightThread />;
+    return (
+      <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-4 text-center">
+        <Sword size={24} className="mx-auto text-[var(--c-sig-coral)]" />
+        <p className="mt-2 font-display text-sm font-medium text-[var(--c-ink)]">
+          Select or start a Fight Me thread
+        </p>
+        <p className="mt-1 text-xs text-[var(--c-muted)]">
+          Challenge AI or another participant to begin a structured debate.
+        </p>
+      </div>
+    );
   }
 
   if (thread === undefined) {
@@ -51,10 +60,9 @@ export function FightThread({
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-center justify-between bg-[var(--c-sig-coral)] px-4 py-2.5 text-[var(--c-on-sig-dark)]">
         <span className="font-display text-sm font-semibold">
-          <Sword size={14} className="mr-1 inline" /> FIGHT ME — {modeLabel}
+          <Sword size={14} className="mr-1 inline" /> FIGHT ME - {modeLabel}
         </span>
         <div className="flex items-center gap-2">
           <Badge tone={isPending ? "warning" : isActive ? "sky" : "success"} className="text-[9px]">
@@ -66,7 +74,6 @@ export function FightThread({
         </div>
       </div>
 
-      {/* Pending acceptance */}
       {isPending && thread.acceptanceDeadlineAt && (
         <div className="border-b border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3 text-center">
           <p className="text-xs text-[var(--c-muted)]">Waiting for opponent to accept...</p>
@@ -78,7 +85,6 @@ export function FightThread({
         </div>
       )}
 
-      {/* Context: attacker/defender submissions */}
       {(thread.attackerSubmission || thread.defenderSubmission) && (
         <div className="border-b border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
           {thread.attackerSubmission && (
@@ -108,7 +114,6 @@ export function FightThread({
         </div>
       )}
 
-      {/* Turns */}
       <div className="space-y-2.5 p-3">
         {thread.turns.map((turn) => (
           <FightBubble
@@ -130,7 +135,6 @@ export function FightThread({
         ))}
       </div>
 
-      {/* Composer for active turns */}
       {isActive && clientKey && sessionSlug && fightSlug && (
         <div className="p-3">
           <FightDraftComposer
@@ -145,7 +149,6 @@ export function FightThread({
         </div>
       )}
 
-      {/* Pending with draft area */}
       {isPending && clientKey && sessionSlug && fightSlug && (
         <div className="p-3">
           <FightDraftComposer
@@ -159,7 +162,6 @@ export function FightThread({
         </div>
       )}
 
-      {/* Debrief */}
       {isCompleted && thread.debrief && (
         <div className="p-3">
           <div className="mb-3 text-center">
@@ -178,32 +180,6 @@ export function FightThread({
           />
         </div>
       )}
-    </div>
-  );
-}
-
-function MockFightThread() {
-  return (
-    <div>
-      <div className="flex items-center justify-between bg-[var(--c-sig-coral)] px-4 py-2.5 text-[var(--c-on-sig-dark)]">
-        <span className="font-display text-sm font-semibold">
-          <Sword size={14} className="mr-1 inline" /> FIGHT ME — vs AI
-        </span>
-        <span className="text-[11px]" style={{ opacity: 0.8 }}>
-          Preview
-        </span>
-      </div>
-      <div className="space-y-2.5 p-3">
-        {MOCK_FIGHT_ME_TURNS.map((turn, i) => (
-          <FightBubble
-            key={i}
-            role={turn.role === "student" ? "attacker" : "ai"}
-            body={turn.text}
-            turnNumber={i + 1}
-            isMe={turn.role === "student"}
-          />
-        ))}
-      </div>
     </div>
   );
 }

@@ -2,7 +2,6 @@ import { ArrowsClockwise, ChartBar, CircleNotch, Sword, Timer } from "@phosphor-
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/state/loading-state";
 import { categoryColorToTone } from "@/lib/category-colors";
-import { MOCK_SUBMISSION } from "@/lib/mock-data";
 
 interface Submission {
   id: string;
@@ -113,17 +112,7 @@ export function MyZoneTab({
   const assignmentMap = new Map((assignmentsBySubmission ?? []).map((a) => [a.submissionId, a]));
   const recatMap = new Map((recategorisationRequests ?? []).map((r) => [r.submissionId, r]));
 
-  const initials = initialResponses ?? [
-    {
-      id: MOCK_SUBMISSION.id,
-      body: MOCK_SUBMISSION.text,
-      kind: "initial",
-      wordCount: 30,
-      compositionMs: MOCK_SUBMISSION.telemetry.durationMs,
-      inputPattern: "composed_gradually",
-      createdAt: MOCK_SUBMISSION.createdAt,
-    },
-  ];
+  const initials = initialResponses ?? [];
 
   return (
     <div className="space-y-3">
