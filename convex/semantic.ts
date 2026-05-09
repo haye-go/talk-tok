@@ -367,9 +367,12 @@ export const runEmbeddingJob = internalAction({
   },
   handler: async (ctx, args) => {
     try {
-      const { job, session, targets } = await ctx.runQuery(internal.semantic.loadEmbeddingJobContext, {
-        jobId: args.jobId,
-      });
+      const { job, session, targets } = await ctx.runQuery(
+        internal.semantic.loadEmbeddingJobContext,
+        {
+          jobId: args.jobId,
+        },
+      );
       await ctx.runMutation(internal.semantic.markEmbeddingJobProcessing, {
         jobId: job._id,
         progressTotal: targets.length,
@@ -445,7 +448,10 @@ export const refreshNoveltySignals = internalMutation({
           continue;
         }
 
-        maxSimilarity = Math.max(maxSimilarity, cosineSimilarity(embedding.embedding, other.embedding));
+        maxSimilarity = Math.max(
+          maxSimilarity,
+          cosineSimilarity(embedding.embedding, other.embedding),
+        );
       }
 
       const noveltyScore = Math.max(0, Math.min(1, 1 - maxSimilarity));
@@ -543,8 +549,7 @@ export const getSemanticStatus = query({
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
         .take(ENTITY_LIMIT),
     ]);
-    const latestArgumentMapJob =
-      aiJobs.find((job) => job.type === "argument_map") ?? null;
+    const latestArgumentMapJob = aiJobs.find((job) => job.type === "argument_map") ?? null;
     const missingPrerequisites = [
       embeddings.length === 0 ? "embeddings" : null,
       signals.filter((signal) => signal.signalType === "novelty").length === 0
@@ -563,7 +568,8 @@ export const getSemanticStatus = query({
       latestArgumentMapJob,
       submissionCount: submissions.length,
       readiness: {
-        canShowNoveltyRadar: embeddings.length > 0 && missingPrerequisites.includes("novelty_signals") === false,
+        canShowNoveltyRadar:
+          embeddings.length > 0 && missingPrerequisites.includes("novelty_signals") === false,
         canShowArgumentMap: argumentLinks.length > 0,
         missingPrerequisites,
       },
@@ -636,10 +642,9 @@ export const getNoveltyRadar = query({
         .order("desc")
         .take(ENTITY_LIMIT * 2),
     ]);
-    const participantsById = new Map(participants.map((participant, index) => [
-      participant._id,
-      { participant, index },
-    ]));
+    const participantsById = new Map(
+      participants.map((participant, index) => [participant._id, { participant, index }]),
+    );
     const submissionsById = new Map(submissions.map((submission) => [submission._id, submission]));
     const categoriesById = new Map(categories.map((category) => [category._id, category]));
     const categoryBySubmission = new Map<Id<"submissions">, Id<"categories">>();
@@ -655,8 +660,12 @@ export const getNoveltyRadar = query({
     const examples = signals
       .filter((signal) => signal.submissionId)
       .map((signal) => {
-        const submission = signal.submissionId ? submissionsById.get(signal.submissionId) : undefined;
-        const participantInfo = submission ? participantsById.get(submission.participantId) : undefined;
+        const submission = signal.submissionId
+          ? submissionsById.get(signal.submissionId)
+          : undefined;
+        const participantInfo = submission
+          ? participantsById.get(submission.participantId)
+          : undefined;
         const categoryId = signal.submissionId
           ? categoryBySubmission.get(signal.submissionId)
           : undefined;
@@ -802,10 +811,7 @@ export const getCategoryDrift = query({
 
     const countsBySlice = new Map<string, Map<Id<"categories">, number>>();
     const uncategorizedBySlice = new Map<string, number>();
-    const participantSliceCategory = new Map<
-      Id<"participants">,
-      Map<string, Id<"categories">>
-    >();
+    const participantSliceCategory = new Map<Id<"participants">, Map<string, Id<"categories">>>();
 
     for (const submission of submissions) {
       const sliceKey = submission.followUpPromptId
@@ -919,9 +925,7 @@ export const getCategoryDrift = query({
 export const listSignalsForSession = query({
   args: {
     sessionSlug: v.string(),
-    signalType: v.optional(
-      signalTypeValidator,
-    ),
+    signalType: v.optional(signalTypeValidator),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);

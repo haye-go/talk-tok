@@ -44,9 +44,7 @@ export function ResponseStreamItem({
           </Badge>
         )}
       </div>
-      <p className="mt-1 text-xs leading-relaxed text-[var(--c-body)]">
-        {text.length > 160 ? `${text.slice(0, 160)}...` : text}
-      </p>
+      <p className="mt-1 text-xs leading-relaxed text-[var(--c-body)]">{text}</p>
       <div className="mt-1.5 flex items-center justify-between text-[10px]">
         {telemetryLabel && (
           <span

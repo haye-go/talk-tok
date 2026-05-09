@@ -5,8 +5,11 @@ import {
   Eye,
   GearSix,
   Lightning,
+  MagnifyingGlass,
   Megaphone,
+  Play,
   ShieldCheck,
+  Textbox,
   User,
   type Icon,
 } from "@phosphor-icons/react";
@@ -28,7 +31,7 @@ export interface TabDefinition {
 }
 
 export const DEMO_SESSION_CODE = "SPARK";
-export const DEMO_SESSION_SLUG = "demo-discussion";
+export const DEMO_SESSION_SLUG = "teach-anything-university-demo";
 
 export const ACTS: ActDefinition[] = [
   {
@@ -68,6 +71,9 @@ export const INSTRUCTOR_NAV = [
   { label: "Sessions", path: "/instructor", icon: ChartBar },
   { label: "Templates", path: "/instructor/templates", icon: Megaphone },
   { label: "Models", path: "/instructor/admin/models", icon: GearSix },
+  { label: "Prompts", path: "/instructor/admin/prompts", icon: Textbox },
+  { label: "Retrieval", path: "/instructor/admin/retrieval", icon: MagnifyingGlass },
   { label: "Protection", path: "/instructor/admin/protection", icon: ShieldCheck },
   { label: "Observability", path: "/instructor/admin/observability", icon: Eye },
+  { label: "Demo", path: "/instructor/admin/demo", icon: Play },
 ] as const;

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Badge } from "@/components/ui/badge";
+import { InstructorBrandBar } from "@/components/layout/instructor-brand-bar";
 import { INSTRUCTOR_NAV } from "@/lib/constants";
 
 export interface AdminShellProps {
@@ -12,13 +11,12 @@ export interface AdminShellProps {
 export function AdminShell({ title, description, children }: AdminShellProps) {
   return (
     <div className="min-h-dvh bg-[var(--c-canvas)]">
-      <header className="flex min-h-16 items-center justify-between border-b border-[var(--c-hairline)] px-6">
+      <InstructorBrandBar />
+      <header className="flex min-h-16 items-center border-b border-[var(--c-hairline)] px-6">
         <div>
-          <Badge>Instructor Admin</Badge>
-          <h1 className="mt-1 font-display text-xl font-medium text-[var(--c-ink)]">{title}</h1>
+          <h1 className="font-display text-xl font-medium text-[var(--c-ink)]">{title}</h1>
           <p className="text-sm text-[var(--c-muted)]">{description}</p>
         </div>
-        <ThemeToggle />
       </header>
       <div className="grid gap-6 p-6 lg:grid-cols-[240px_minmax(0,1fr)]">
         <nav

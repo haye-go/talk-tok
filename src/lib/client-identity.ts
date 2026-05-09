@@ -1,4 +1,5 @@
 export const CLIENT_KEY_STORAGE_KEY = "talktok-client-key";
+const ORIGINAL_KEY_STORAGE_KEY = "talktok-original-client-key";
 
 export interface StoredParticipant {
   sessionSlug: string;
@@ -81,4 +82,40 @@ export function storeParticipant(value: Omit<StoredParticipant, "savedAt">) {
       savedAt: Date.now(),
     }),
   );
+}
+
+export function isDemoClientKey(): boolean {
+  const storage = getStorage();
+  if (!storage) return false;
+  const key = storage.getItem(CLIENT_KEY_STORAGE_KEY);
+  return key != null && key.startsWith("demo-");
+}
+
+export function getDemoNickname(): string | null {
+  const storage = getStorage();
+  if (!storage) return null;
+  const key = storage.getItem(CLIENT_KEY_STORAGE_KEY);
+  if (!key || !key.startsWith("demo-")) return null;
+  const raw = key.slice("demo-".length);
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+export function setDemoClientKey(demoKey: string) {
+  const storage = getStorage();
+  if (!storage) return;
+  const current = storage.getItem(CLIENT_KEY_STORAGE_KEY);
+  if (current && !current.startsWith("demo-")) {
+    storage.setItem(ORIGINAL_KEY_STORAGE_KEY, current);
+  }
+  storage.setItem(CLIENT_KEY_STORAGE_KEY, demoKey);
+}
+
+export function restoreOriginalClientKey(): boolean {
+  const storage = getStorage();
+  if (!storage) return false;
+  const original = storage.getItem(ORIGINAL_KEY_STORAGE_KEY);
+  if (!original) return false;
+  storage.setItem(CLIENT_KEY_STORAGE_KEY, original);
+  storage.removeItem(ORIGINAL_KEY_STORAGE_KEY);
+  return true;
 }

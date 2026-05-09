@@ -43,7 +43,8 @@ const DEMO_CATEGORIES = [
   {
     slug: "life-skills",
     name: "Life Skills",
-    description: "Practical courses for adulthood, survival, household systems, documents, food, and everyday decisions.",
+    description:
+      "Practical courses for adulthood, survival, household systems, documents, food, and everyday decisions.",
     color: "green",
   },
   {
@@ -55,7 +56,8 @@ const DEMO_CATEGORIES = [
   {
     slug: "human-behaviour",
     name: "Human Behaviour",
-    description: "Courses about persuasion, psychology, disagreement, relationships, and communication.",
+    description:
+      "Courses about persuasion, psychology, disagreement, relationships, and communication.",
     color: "violet",
   },
   {
@@ -67,7 +69,8 @@ const DEMO_CATEGORIES = [
   {
     slug: "work-money",
     name: "Work and Money",
-    description: "Courses about careers, negotiation, workplace dynamics, productivity, and finances.",
+    description:
+      "Courses about careers, negotiation, workplace dynamics, productivity, and finances.",
     color: "amber",
   },
   {
@@ -264,7 +267,7 @@ export const seed = mutation({
       modePreset: "class_discussion",
       phase: "discover",
       currentAct: "discover",
-      visibilityMode: "category_summary_only",
+      visibilityMode: "raw_responses_visible",
       anonymityMode: "nicknames_visible",
       responseSoftLimitWords: 200,
       categorySoftCap: 8,
@@ -350,9 +353,9 @@ export const seed = mutation({
             ? "distinctive"
             : "above_average",
         specificityBand: "clear",
-        summary:
-          `This works because the course idea has a recognizable hook and a clear category: ${categoryNamesBySlug.get(response.categorySlug) ?? "the class theme"}.`,
-        strengths: "Specific title, concrete audience value, and enough personality to stand apart from generic course ideas.",
+        summary: `This works because the course idea has a recognizable hook and a clear category: ${categoryNamesBySlug.get(response.categorySlug) ?? "the class theme"}.`,
+        strengths:
+          "Specific title, concrete audience value, and enough personality to stand apart from generic course ideas.",
         improvement:
           "Push one step further: name one assessment or class activity that would prove students actually learned the skill.",
         nextQuestion: "What would the final project look like for this course?",
@@ -512,19 +515,22 @@ export const seed = mutation({
         source: "Rina",
         target: "Sam",
         linkType: "bridges" as const,
-        rationale: "Rina's meme course can bridge content analysis back to algorithmic distribution.",
+        rationale:
+          "Rina's meme course can bridge content analysis back to algorithmic distribution.",
       },
       {
         source: "Priya",
         target: "Jake",
         linkType: "questions" as const,
-        rationale: "Priya's disagreement course challenges whether office politics can be taught ethically.",
+        rationale:
+          "Priya's disagreement course challenges whether office politics can be taught ethically.",
       },
       {
         source: "Leah",
         target: "Maya",
         linkType: "supports" as const,
-        rationale: "Both responses turn intimidating adult systems into teachable communication tasks.",
+        rationale:
+          "Both responses turn intimidating adult systems into teachable communication tasks.",
       },
     ];
 
@@ -554,7 +560,8 @@ export const seed = mutation({
       sessionId,
       slug: "make-it-teachable",
       title: "Make the course teachable",
-      prompt: "Choose one activity, assignment, or debate that would make your course genuinely teachable rather than just a fun title.",
+      prompt:
+        "Choose one activity, assignment, or debate that would make your course genuinely teachable rather than just a fun title.",
       instructions: "Keep it short and concrete.",
       targetMode: "all",
       status: "active",
@@ -755,8 +762,7 @@ async function seedFightData(
           "The fight usefully separates manipulation from power literacy. Both sides converge on the need for ethical constraints.",
         attackerStrength:
           "Priya identified the ethical risk in teaching workplace tactics without naming values.",
-        defenderStrength:
-          "Jake defended the practical need without celebrating manipulation.",
+        defenderStrength: "Jake defended the practical need without celebrating manipulation.",
         strongerRebuttal:
           "Priya could have proposed a direct alternative module so the critique becomes constructive.",
         nextPractice:
@@ -790,14 +796,11 @@ async function seedFightData(
       debrief: {
         summary:
           "Alex successfully defended the playful title by turning it into a method for studying confidence, evidence, and revision.",
-        attackerStrength:
-          "Alex moved from a witty course idea to a clear assessment design.",
-        defenderStrength:
-          "The AI challenger forced the course to justify its intellectual method.",
+        attackerStrength: "Alex moved from a witty course idea to a clear assessment design.",
+        defenderStrength: "The AI challenger forced the course to justify its intellectual method.",
         strongerRebuttal:
           "Alex could add safeguards against cherry-picking only obviously foolish historical examples.",
-        nextPractice:
-          "For playful course ideas, always show the serious method behind the joke.",
+        nextPractice: "For playful course ideas, always show the serious method behind the joke.",
       },
     },
   ];
@@ -906,7 +909,11 @@ async function resetDemoSessionData(ctx: MutationCtx, sessionId: Id<"sessions">)
     deleted += count;
   }
 
-  return { deleted, perTable, capped: Object.values(perTable).some((count) => count === MAX_RESET_BATCH) };
+  return {
+    deleted,
+    perTable,
+    capped: Object.values(perTable).some((count) => count === MAX_RESET_BATCH),
+  };
 }
 
 export const resetSession = mutation({

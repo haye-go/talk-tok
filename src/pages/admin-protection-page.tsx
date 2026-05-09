@@ -8,7 +8,10 @@ export function AdminProtectionPage() {
   const settings = useQuery(api.protection.list, {});
 
   return (
-    <AdminShell title="Protection" description="Rate limits, moderation, telemetry, and budget guardrails.">
+    <AdminShell
+      title="Protection"
+      description="Rate limits, moderation, telemetry, and budget guardrails."
+    >
       <div className="grid gap-4">
         {settings === undefined && <LoadingState label="Loading protection settings..." />}
 
@@ -26,7 +29,9 @@ export function AdminProtectionPage() {
               {settings.map((setting) => (
                 <div key={setting._id} className="flex items-start justify-between gap-4 py-3">
                   <div className="min-w-0">
-                    <p className="font-display text-sm font-medium text-[var(--c-ink)]">{setting.key}</p>
+                    <p className="font-display text-sm font-medium text-[var(--c-ink)]">
+                      {setting.key}
+                    </p>
                     <pre className="mt-1 overflow-x-auto rounded-sm bg-[var(--c-surface-strong)] p-2 font-mono text-[10px] text-[var(--c-body)]">
                       {JSON.stringify(setting.valueJson, null, 2)}
                     </pre>

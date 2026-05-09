@@ -59,11 +59,16 @@ export function FeedbackCard({
 
   if (status === "error") {
     return (
-      <div className="flex items-center gap-3 rounded-md bg-[var(--c-surface-soft)] p-4" style={{ borderLeft: "3px solid var(--c-error)" }}>
+      <div
+        className="flex items-center gap-3 rounded-md bg-[var(--c-surface-soft)] p-4"
+        style={{ borderLeft: "3px solid var(--c-error)" }}
+      >
         <WarningCircle size={18} className="text-[var(--c-error)]" />
         <div>
           <p className="font-display text-xs font-medium text-[var(--c-ink)]">Feedback failed</p>
-          <p className="text-[10px] text-[var(--c-muted)]">{error ?? "An error occurred. Try again later."}</p>
+          <p className="text-[10px] text-[var(--c-muted)]">
+            {error ?? "An error occurred. Try again later."}
+          </p>
         </div>
       </div>
     );
@@ -89,13 +94,19 @@ export function FeedbackCard({
       {(reasoningBand || specificityBand) && (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {reasoningBand && (
-            <Badge tone="sky" className="text-[9px]">Reasoning: {bandLabel(reasoningBand)}</Badge>
+            <Badge tone="sky" className="text-[9px]">
+              Reasoning: {bandLabel(reasoningBand)}
+            </Badge>
           )}
           {specificityBand && (
-            <Badge tone="mustard" className="text-[9px]">Specificity: {bandLabel(specificityBand)}</Badge>
+            <Badge tone="mustard" className="text-[9px]">
+              Specificity: {bandLabel(specificityBand)}
+            </Badge>
           )}
           {originalityBand && (
-            <Badge tone="peach" className="text-[9px]">Originality: {bandLabel(originalityBand)}</Badge>
+            <Badge tone="peach" className="text-[9px]">
+              Originality: {bandLabel(originalityBand)}
+            </Badge>
           )}
         </div>
       )}
@@ -123,12 +134,17 @@ export function FeedbackCard({
       {nextQuestion && (
         <div className="mt-2">
           <p className="text-[10px] font-medium text-[var(--c-sig-sky)]">Think about</p>
-          <p className="text-xs leading-relaxed text-[var(--c-on-sig-light-body)]">{nextQuestion}</p>
+          <p className="text-xs leading-relaxed text-[var(--c-on-sig-light-body)]">
+            {nextQuestion}
+          </p>
         </div>
       )}
 
       {telemetryLabel && (
-        <p className="mt-1.5 text-[10px] text-[var(--c-on-sig-light-body)]" style={{ opacity: 0.6 }}>
+        <p
+          className="mt-1.5 text-[10px] text-[var(--c-on-sig-light-body)]"
+          style={{ opacity: 0.6 }}
+        >
           <Timer size={10} className="mr-0.5 inline" />
           {telemetryLabel}
         </p>

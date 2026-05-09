@@ -3,6 +3,7 @@ import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { DemoIdentityBar } from "@/components/demo/demo-identity-bar";
 import { ParticipantShell } from "@/components/layout/participant-shell";
 import {
   ResponseComposer,
@@ -13,6 +14,7 @@ import { ChallengeAct } from "@/components/acts/challenge-act";
 import { SynthesizeAct } from "@/components/acts/synthesize-act";
 import { StreamTab } from "@/components/stream/stream-tab";
 import { MyZoneTab } from "@/components/myzone/my-zone-tab";
+import { FightHome } from "@/components/fight/fight-home";
 import { FightThread } from "@/components/fight/fight-thread";
 import { PresenceBar } from "@/components/stream/presence-bar";
 import { ErrorState } from "@/components/state/error-state";
@@ -22,7 +24,15 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { useParticipantWorkspace } from "@/hooks/use-participant-workspace";
-import { getOrCreateClientKey, storeParticipant } from "@/lib/client-identity";
+import {
+  getOrCreateClientKey,
+  isDemoClientKey,
+  restoreOriginalClientKey,
+  setDemoClientKey,
+  storeParticipant,
+} from "@/lib/client-identity";
+import { DEMO_SESSION_SLUG } from "@/lib/constants";
+import type { TabId } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 
 export function ParticipantSessionPage() {
@@ -39,21 +49,35 @@ export function ParticipantSessionPage() {
     clientKey ? { sessionSlug, clientKey } : "skip",
   );
   const lobby = useQuery(api.participants.listLobby, { sessionSlug });
+  const positionShifts = useQuery(
+    api.positionShifts.listMine,
+    clientKey ? { sessionSlug, clientKey } : "skip",
+  );
 
   const updateNickname = useMutation(api.participants.updateNickname);
   const touchPresence = useMutation(api.participants.touchPresence);
   const submitAndQueue = useMutation(api.participantWorkspace.submitAndQueueFeedback);
   const createSubmission = useMutation(api.submissions.create);
+  const requestRecategorisation = useMutation(api.recategorisation.request);
 
   const [nickname, setNickname] = useState("");
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>("main");
   const touchedPresenceKey = useRef<string | null>(null);
 
   useEffect(() => {
+    const demoClientKey = new URLSearchParams(window.location.search).get("demoClientKey");
+    if (sessionSlug === DEMO_SESSION_SLUG && demoClientKey?.startsWith("demo-")) {
+      setDemoClientKey(demoClientKey);
+      window.history.replaceState(null, "", routes.session(sessionSlug));
+    }
+    if (sessionSlug !== DEMO_SESSION_SLUG && isDemoClientKey()) {
+      restoreOriginalClientKey();
+    }
     setClientKey(getOrCreateClientKey());
-  }, []);
+  }, [sessionSlug]);
 
   useEffect(() => {
     if (!participant || !clientKey) return;
@@ -128,6 +152,25 @@ export function ParticipantSessionPage() {
     }
   }
 
+  async function handleRequestRecategorisation(request: {
+    requestedCategoryId?: string;
+    suggestedCategoryName?: string;
+    reason: string;
+  }) {
+    if (!clientKey || !firstInitialResponse) {
+      throw new Error("No submitted response is available for recategorisation.");
+    }
+
+    await requestRecategorisation({
+      sessionSlug,
+      clientKey,
+      submissionId: firstInitialResponse.id as Id<"submissions">,
+      requestedCategoryId: request.requestedCategoryId as Id<"categories"> | undefined,
+      suggestedCategoryName: request.suggestedCategoryName,
+      reason: request.reason,
+    });
+  }
+
   // Loading / error / join-gate states (unchanged)
   if (session === undefined || participant === undefined) {
     return (
@@ -170,18 +213,53 @@ export function ParticipantSessionPage() {
   const currentAct = ws?.session.currentAct ?? session.currentAct;
   const firstFeedback = ws?.feedbackBySubmission?.[0] ?? null;
   const firstAssignment = ws?.assignmentsBySubmission?.[0] ?? null;
+  const firstInitialResponse = ws?.myZoneHistory.initialResponses?.[0] ?? null;
+  const firstRecategorisationRequest =
+    firstInitialResponse && ws?.recategorisationRequests
+      ? (ws.recategorisationRequests.find(
+          (request) => request.submissionId === firstInitialResponse.id,
+        ) ?? null)
+      : null;
+  const isDemoParticipant = sessionSlug === DEMO_SESSION_SLUG && clientKey?.startsWith("demo-");
+  const canUseFightMe = Boolean(clientKey && firstInitialResponse);
+  const followUpComposer = followUpParentId ? (
+    <Card
+      title="Add follow-up"
+      action={
+        <Button type="button" variant="ghost" size="sm" onClick={() => setFollowUpParentId(null)}>
+          Cancel
+        </Button>
+      }
+    >
+      {submissionError && <InlineAlert tone="error">{submissionError}</InlineAlert>}
+      <ResponseComposer
+        softWordLimit={session.responseSoftLimitWords}
+        submitLabel="Add follow-up"
+        placeholder="Add a clarification or extra point..."
+        onSubmit={(_text, _tone, submission) => handleFollowUp(submission, followUpParentId)}
+      />
+    </Card>
+  ) : null;
 
   return (
     <ParticipantShell
+      topBar={<DemoIdentityBar sessionSlug={sessionSlug} />}
+      currentActId={currentAct}
+      activeTab={activeTab}
+      onActiveTabChange={setActiveTab}
+      unlockAllTabs={Boolean(isDemoParticipant)}
       main={
         <div className="grid gap-4">
+          <div className="rounded-md bg-[var(--c-sig-cream)] p-3.5">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--c-on-sig-light-body)]">
+              Discussion prompt
+            </p>
+            <p className="mt-1 text-sm font-medium leading-relaxed text-[var(--c-on-sig-light)]">
+              &ldquo;{session.openingPrompt}&rdquo;
+            </p>
+          </div>
           {currentAct === "submit" && (
             <>
-              <div className="rounded-md bg-[var(--c-sig-cream)] p-3.5">
-                <p className="text-sm font-medium leading-relaxed text-[var(--c-on-sig-light)]">
-                  &ldquo;{session.openingPrompt}&rdquo;
-                </p>
-              </div>
               {submissionError && <InlineAlert tone="error">{submissionError}</InlineAlert>}
               <ResponseComposer
                 softWordLimit={session.responseSoftLimitWords}
@@ -192,16 +270,39 @@ export function ParticipantSessionPage() {
             </>
           )}
           {currentAct === "discover" && (
-            <DiscoverAct
-              feedback={firstFeedback}
-              categories={ws?.categorySummary}
-              assignment={firstAssignment}
-            />
+            <>
+              <DiscoverAct
+                mySubmissionBody={firstInitialResponse?.body}
+                followUpResponses={ws?.myZoneHistory.followUpResponses}
+                feedback={firstFeedback}
+                categories={ws?.categorySummary}
+                assignment={firstAssignment}
+                recategorisationRequest={firstRecategorisationRequest}
+                onRequestRecategorisation={
+                  firstInitialResponse ? handleRequestRecategorisation : undefined
+                }
+                onAddFollowUp={
+                  firstInitialResponse
+                    ? () => setFollowUpParentId(firstInitialResponse.id as Id<"submissions">)
+                    : undefined
+                }
+              />
+              {followUpComposer}
+            </>
           )}
           {currentAct === "challenge" && (
             <ChallengeAct
               activeFollowUps={ws?.activeFollowUps}
               fightMeEnabled={ws?.session.fightMeEnabled ?? session.fightMeEnabled}
+              summaryGateEnabled={ws?.session.summaryGateEnabled ?? false}
+              hasSynthesisArtifacts={
+                (ws?.synthesis?.publishedArtifacts?.length ?? 0) +
+                  (ws?.synthesis?.finalArtifacts?.length ?? 0) >
+                0
+              }
+              sessionSlug={sessionSlug}
+              clientKey={clientKey ?? undefined}
+              onNavigateToFightMe={() => setActiveTab("fight-me")}
             />
           )}
           {currentAct === "synthesize" && clientKey && (
@@ -230,10 +331,29 @@ export function ParticipantSessionPage() {
             categories={ws?.categorySummary}
             canSeeRawPeerResponses={ws?.visibility.canSeeRawPeerResponses}
             canSeeCategorySummary={ws?.visibility.canSeeCategorySummary}
+            sessionSlug={sessionSlug}
+            clientKey={clientKey ?? undefined}
           />
         </div>
       }
-      fightMe={<FightThread />}
+      fightMe={
+        canUseFightMe && clientKey ? (
+          <FightHome
+            myFights={ws?.fightMe.mine ?? []}
+            pendingIncoming={ws?.fightMe.pendingIncoming ?? []}
+            currentFight={ws?.fightMe.current ?? null}
+            fightMeEnabled={ws?.session.fightMeEnabled ?? session.fightMeEnabled}
+            sessionSlug={sessionSlug}
+            clientKey={clientKey}
+            mySubmissionId={firstInitialResponse?.id}
+            onNavigateToThread={(fightSlug) =>
+              (window.location.href = routes.sessionFight(sessionSlug, fightSlug))
+            }
+          />
+        ) : (
+          <FightThread />
+        )
+      }
       myZone={
         <div className="grid gap-4">
           <MyZoneTab
@@ -243,34 +363,12 @@ export function ParticipantSessionPage() {
             assignmentsBySubmission={ws?.assignmentsBySubmission}
             recategorisationRequests={ws?.recategorisationRequests}
             fightThreads={ws?.fightMe.mine}
+            positionShifts={positionShifts ?? undefined}
             personalReport={ws?.personalReport}
             loading={ws === undefined}
             onViewReport={() => (window.location.href = routes.sessionReview(sessionSlug))}
           />
-          {followUpParentId && (
-            <Card
-              title="Add follow-up"
-              action={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setFollowUpParentId(null)}
-                >
-                  Cancel
-                </Button>
-              }
-            >
-              <ResponseComposer
-                softWordLimit={session.responseSoftLimitWords}
-                submitLabel="Add follow-up"
-                placeholder="Add a clarification or extra point..."
-                onSubmit={(_text, _tone, submission) =>
-                  handleFollowUp(submission, followUpParentId)
-                }
-              />
-            </Card>
-          )}
+          {followUpComposer}
           <Card title="Nickname">
             <form className="grid gap-3" onSubmit={handleNicknameSubmit}>
               <Input

@@ -25,7 +25,7 @@ Register:
 - `@convex-dev/rate-limiter` as `components.rateLimiter`
 - `@convex-dev/workpool` as `components.aiWorkpool`
 - `@convex-dev/action-cache` as `components.actionCache`
-Do not register:
+  Do not register:
 
 - `convex-smart-tags`
 

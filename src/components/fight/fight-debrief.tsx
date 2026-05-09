@@ -24,7 +24,9 @@ export function FightDebrief({
       <div className="flex items-center gap-3 rounded-md bg-[var(--c-surface-soft)] p-4">
         <CircleNotch size={18} className="animate-spin text-[var(--c-sig-peach)]" />
         <div>
-          <p className="font-display text-xs font-medium text-[var(--c-ink)]">Generating debrief...</p>
+          <p className="font-display text-xs font-medium text-[var(--c-ink)]">
+            Generating debrief...
+          </p>
           <p className="text-[10px] text-[var(--c-muted)]">AI is analyzing the debate</p>
         </div>
       </div>
@@ -33,7 +35,10 @@ export function FightDebrief({
 
   if (status === "error") {
     return (
-      <div className="rounded-md bg-[var(--c-surface-soft)] p-4" style={{ borderLeft: "3px solid var(--c-error)" }}>
+      <div
+        className="rounded-md bg-[var(--c-surface-soft)] p-4"
+        style={{ borderLeft: "3px solid var(--c-error)" }}
+      >
         <p className="font-display text-xs font-medium text-[var(--c-ink)]">Debrief failed</p>
         <p className="text-[10px] text-[var(--c-muted)]">{error ?? "An error occurred."}</p>
       </div>
@@ -67,7 +72,9 @@ export function FightDebrief({
           <p className="mb-1 font-display text-xs font-semibold text-[var(--c-sig-mustard)]">
             <Wrench size={12} className="mr-0.5 inline" /> Defender strength
           </p>
-          <p className="text-xs leading-relaxed text-[var(--c-on-sig-light-body)]">{defenderStrength}</p>
+          <p className="text-xs leading-relaxed text-[var(--c-on-sig-light-body)]">
+            {defenderStrength}
+          </p>
         </div>
       )}
 
@@ -76,7 +83,9 @@ export function FightDebrief({
           <p className="mb-1 font-display text-xs font-semibold text-[var(--c-sig-slate)]">
             <Crosshair size={12} className="mr-0.5 inline" /> Stronger rebuttal
           </p>
-          <p className="text-xs leading-relaxed text-[var(--c-on-sig-light-body)]">{strongerRebuttal}</p>
+          <p className="text-xs leading-relaxed text-[var(--c-on-sig-light-body)]">
+            {strongerRebuttal}
+          </p>
         </div>
       )}
 

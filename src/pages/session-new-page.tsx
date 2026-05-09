@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ArrowsClockwise, Rocket } from "@phosphor-icons/react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { ToneSelector } from "@/components/submission/tone-selector";
@@ -19,8 +19,18 @@ const MODE_PRESETS = [
   { id: "debate_lab", label: "Workshop" },
 ] as const;
 
+const MODE_LABELS: Record<string, string> = {
+  class_discussion: "Class Discussion",
+  conference_qna: "Conference Q&A",
+  debate_lab: "Workshop",
+  custom: "Custom",
+};
+
 export function SessionNewPage() {
   const createSession = useMutation(api.sessions.create);
+  const templates = useQuery(api.sessionTemplates.list, {});
+  const createFromTemplate = useMutation(api.sessionTemplates.createSessionFromTemplate);
+  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [openingPrompt, setOpeningPrompt] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -62,6 +72,46 @@ export function SessionNewPage() {
       title="Create Session"
       description="Configure a new discussion session with all settings."
     >
+      {templates && templates.length > 0 && (
+        <div className="mb-6 max-w-2xl">
+          <p className="mb-2 text-xs font-medium text-[var(--c-muted)]">Start from Template</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {templates.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center justify-between rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
+              >
+                <div>
+                  <p className="text-xs font-medium text-[var(--c-ink)]">{t.name}</p>
+                  <p className="text-[10px] text-[var(--c-muted)]">
+                    {MODE_LABELS[t.modePreset] ?? t.modePreset}
+                    {t.presetCategories.length > 0 && ` · ${t.presetCategories.length} categories`}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={creatingTemplateId === t.id}
+                  onClick={async () => {
+                    setCreatingTemplateId(t.id);
+                    try {
+                      const s = await createFromTemplate({ templateId: t.id as any });
+                      window.location.href = routes.instructorSession(s.slug);
+                    } finally {
+                      setCreatingTemplateId(null);
+                    }
+                  }}
+                >
+                  {creatingTemplateId === t.id ? "Creating..." : "Use"}
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="my-4 border-t border-[var(--c-hairline)]" />
+          <p className="text-xs text-[var(--c-muted)]">Or create from scratch:</p>
+        </div>
+      )}
+
       <form className="grid max-w-2xl gap-4" onSubmit={handleSubmit}>
         {/* Mode presets */}
         <div>

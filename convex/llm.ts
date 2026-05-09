@@ -390,7 +390,12 @@ export const embedText = internalAction({
   handler: async (
     ctx,
     args,
-  ): Promise<{ embedding: number[]; llmCallId: Id<"llmCalls">; model: string; dimensions: number }> => {
+  ): Promise<{
+    embedding: number[];
+    llmCallId: Id<"llmCalls">;
+    model: string;
+    dimensions: number;
+  }> => {
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -495,7 +500,9 @@ export const embedText = internalAction({
       });
 
       if (embedding.length !== dimensions) {
-        throw new Error(`Embedding dimension mismatch: expected ${dimensions}, got ${embedding.length}.`);
+        throw new Error(
+          `Embedding dimension mismatch: expected ${dimensions}, got ${embedding.length}.`,
+        );
       }
 
       await ctx.runMutation(internal.llm.markCallSuccess, {

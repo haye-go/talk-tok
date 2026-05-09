@@ -1,8 +1,9 @@
-import { ArrowLeft, ArrowRight } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, GearSix } from "@phosphor-icons/react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ACTS, DEMO_SESSION_CODE } from "@/lib/constants";
+import { routes } from "@/lib/routes";
 
 export interface InstructorTopBarProps {
   sessionTitle?: string;
@@ -59,6 +60,14 @@ export function InstructorTopBar({
         <Button type="button" size="sm" onClick={onNextAct} icon={<ArrowRight size={14} />}>
           Next
         </Button>
+        <button
+          type="button"
+          className="flex h-8 w-8 items-center justify-center rounded-sm text-[var(--c-muted)] transition-colors hover:bg-[var(--c-surface-soft)] hover:text-[var(--c-ink)]"
+          onClick={() => (window.location.href = routes.instructorAdminModels())}
+          aria-label="LLM model settings"
+        >
+          <GearSix size={16} />
+        </button>
         <ThemeToggle />
       </div>
     </header>

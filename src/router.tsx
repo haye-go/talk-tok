@@ -4,6 +4,7 @@ import { AdminModelsPage } from "@/pages/admin-models-page";
 import { AdminObservabilityPage } from "@/pages/admin-observability-page";
 import { AdminPromptsPage } from "@/pages/admin-prompts-page";
 import { AdminProtectionPage } from "@/pages/admin-protection-page";
+import { AdminDemoPage } from "@/pages/admin-demo-page";
 import { AdminRetrievalPage } from "@/pages/admin-retrieval-page";
 import { FightPage } from "@/pages/fight-page";
 import { InstructorDashboardPage } from "@/pages/instructor-dashboard-page";
@@ -14,6 +15,7 @@ import { ParticipantSessionPage } from "@/pages/participant-session-page";
 import { ProjectorPage } from "@/pages/projector-page";
 import { ReviewPage } from "@/pages/review-page";
 import { SessionNewPage } from "@/pages/session-new-page";
+import { DemoPersonasPage } from "@/pages/demo-personas-page";
 import { TemplatesPage } from "@/pages/templates-page";
 
 function RootLayout() {
@@ -28,6 +30,12 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: App,
+});
+
+const demoPersonasRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/demo/personas",
+  component: DemoPersonasPage,
 });
 
 const joinRoute = createRoute({
@@ -120,8 +128,15 @@ const instructorAdminObservabilityRoute = createRoute({
   component: AdminObservabilityPage,
 });
 
+const instructorAdminDemoRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/instructor/admin/demo",
+  component: AdminDemoPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  demoPersonasRoute,
   joinRoute,
   joinWithCodeRoute,
   sessionRoute,
@@ -137,6 +152,7 @@ const routeTree = rootRoute.addChildren([
   instructorAdminRetrievalRoute,
   instructorAdminProtectionRoute,
   instructorAdminObservabilityRoute,
+  instructorAdminDemoRoute,
 ]);
 
 export const router = createRouter({ routeTree });

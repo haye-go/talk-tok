@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { BookOpen, CircleNotch, PushPin, Scales, Sparkle } from "@phosphor-icons/react";
+import { BookOpen, CircleNotch, FloppyDisk, PushPin, Scales, Sparkle } from "@phosphor-icons/react";
 import { useParams } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { InstructorShell } from "@/components/layout/instructor-shell";
 import { SynthesisArtifactCard } from "@/components/synthesis/synthesis-artifact-card";
 import { PresenceBar } from "@/components/stream/presence-bar";
@@ -44,11 +45,31 @@ export function InstructorSessionPage() {
   const generateCategorySummary = useMutation(api.synthesis.generateCategorySummary);
   const generateClassSynthesis = useMutation(api.synthesis.generateClassSynthesis);
   const generateReports = useMutation(api.personalReports.generateForSession);
+  const saveAsTemplate = useMutation(api.sessionTemplates.createFromSession);
+  const pendingRecatRequests = useQuery(api.recategorisation.listForSession, {
+    sessionSlug,
+    status: "pending",
+  });
+  const decideRecategorisation = useMutation(api.recategorisation.decide);
+
+  const semanticStatus = useQuery(api.semantic.getSemanticStatus, { sessionSlug });
+  const noveltyRadar = useQuery(api.semantic.getNoveltyRadar, { sessionSlug });
+  const categoryDrift = useQuery(api.semantic.getCategoryDrift, { sessionSlug });
+  const argumentGraph = useQuery(api.argumentMap.getVisualizationGraph, { sessionSlug });
+
+  const queueEmbeddings = useMutation(api.semantic.queueEmbeddingsForSession);
+  const refreshSignals = useMutation(api.semantic.refreshSignalsForSession);
+  const generateArgMap = useMutation(api.argumentMap.generateForSession);
 
   const [generatingClass, setGeneratingClass] = useState(false);
   const [generatingOpposing, setGeneratingOpposing] = useState(false);
   const [generatingReports, setGeneratingReports] = useState(false);
   const [generatingCategoryId, setGeneratingCategoryId] = useState<string | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
+  const [embeddingQueued, setEmbeddingQueued] = useState(false);
+  const [argMapQueued, setArgMapQueued] = useState(false);
+  const [decidingRecatId, setDecidingRecatId] = useState<string | null>(null);
 
   if (overview === undefined) {
     return (
@@ -88,6 +109,7 @@ export function InstructorSessionPage() {
 
   const patternCounts = responses.inputPatterns as Record<InputPattern, number>;
   const activeCategories = categories;
+  const categoryById = new Map(activeCategories.map((category) => [category.id, category]));
 
   const PHASE_ORDER = ["lobby", "submit", "discover", "challenge", "synthesize", "closed"] as const;
   type Phase = (typeof PHASE_ORDER)[number];
@@ -111,6 +133,24 @@ export function InstructorSessionPage() {
     const idx = PHASE_ORDER.indexOf(session.phase as Phase);
     const prev = PHASE_ORDER[Math.max(idx - 1, 0)];
     void updatePhase({ sessionSlug, phase: prev, currentAct: ACT_FOR_PHASE[prev] });
+  }
+
+  async function handleRecategorisationDecision(args: {
+    requestId: string;
+    decision: "approved" | "rejected";
+    categoryId?: string;
+  }) {
+    setDecidingRecatId(args.requestId);
+    try {
+      await decideRecategorisation({
+        sessionSlug,
+        requestId: args.requestId as Id<"recategorizationRequests">,
+        decision: args.decision,
+        categoryId: args.categoryId as Id<"categories"> | undefined,
+      });
+    } finally {
+      setDecidingRecatId(null);
+    }
   }
 
   async function handleGenerateCategorySummary(categoryId: string) {
@@ -146,6 +186,35 @@ export function InstructorSessionPage() {
       await generateReports({ sessionSlug });
     } finally {
       setGeneratingReports(false);
+    }
+  }
+
+  async function handleSaveTemplate() {
+    setSavingTemplate(true);
+    try {
+      await saveAsTemplate({ sessionSlug });
+      setTemplateSaved(true);
+      setTimeout(() => setTemplateSaved(false), 3000);
+    } finally {
+      setSavingTemplate(false);
+    }
+  }
+
+  async function handleQueueEmbeddings() {
+    setEmbeddingQueued(true);
+    try {
+      await queueEmbeddings({ sessionSlug });
+    } finally {
+      setEmbeddingQueued(false);
+    }
+  }
+
+  async function handleGenerateArgMap() {
+    setArgMapQueued(true);
+    try {
+      await generateArgMap({ sessionSlug });
+    } finally {
+      setArgMapQueued(false);
     }
   }
 
@@ -258,6 +327,18 @@ export function InstructorSessionPage() {
               </Button>
             </div>
           </Card>
+
+          {/* Save as template */}
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            icon={<FloppyDisk size={14} />}
+            onClick={handleSaveTemplate}
+            disabled={savingTemplate}
+          >
+            {templateSaved ? "Template saved!" : savingTemplate ? "Saving..." : "Save as Template"}
+          </Button>
         </div>
       }
       center={
@@ -268,6 +349,71 @@ export function InstructorSessionPage() {
             <MetricTile label="Recat Req" value={String(recategorisation.pendingCount)} />
             <MetricTile label="Follow-ups" value={String(followUps.activeCount)} />
           </div>
+
+          {pendingRecatRequests && pendingRecatRequests.length > 0 && (
+            <Card title="Recategorisation Requests">
+              <div className="grid gap-2">
+                {pendingRecatRequests.slice(0, 6).map((request) => {
+                  const requestedCategory = request.requestedCategoryId
+                    ? categoryById.get(request.requestedCategoryId)
+                    : null;
+                  const canApprove = Boolean(request.requestedCategoryId);
+                  const busy = decidingRecatId === request.id;
+
+                  return (
+                    <div
+                      key={request.id}
+                      className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-surface-strong)] p-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-[var(--c-ink)]">
+                            {requestedCategory
+                              ? `Move to ${requestedCategory.name}`
+                              : `Suggested: ${request.suggestedCategoryName ?? "New category"}`}
+                          </p>
+                          <p className="mt-1 text-[11px] leading-5 text-[var(--c-body)]">
+                            {request.reason}
+                          </p>
+                        </div>
+                        <Badge tone="warning">{request.status}</Badge>
+                      </div>
+                      <div className="mt-2 flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() =>
+                            void handleRecategorisationDecision({
+                              requestId: request.id,
+                              decision: "rejected",
+                            })
+                          }
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={busy || !canApprove}
+                          onClick={() =>
+                            void handleRecategorisationDecision({
+                              requestId: request.id,
+                              decision: "approved",
+                              categoryId: request.requestedCategoryId ?? undefined,
+                            })
+                          }
+                        >
+                          {busy ? "Saving..." : "Approve"}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
 
           <PresenceBar
             typing={presence.typing}
@@ -467,6 +613,245 @@ export function InstructorSessionPage() {
               ))}
             </div>
           </Card>
+
+          {/* Semantic Analysis */}
+          <Card title="Semantic Analysis">
+            {semanticStatus && (
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                <MetricTile label="Embeddings" value={String(semanticStatus.embeddingCount)} />
+                <MetricTile label="Signals" value={String(semanticStatus.signalCount)} />
+                <MetricTile label="Arg Links" value={String(semanticStatus.argumentLinkCount)} />
+              </div>
+            )}
+
+            {semanticStatus?.readiness.missingPrerequisites.length
+              ? semanticStatus.readiness.missingPrerequisites.length > 0 && (
+                  <div className="mb-3 rounded-md bg-[var(--c-surface-soft)] p-2">
+                    <p className="text-[10px] font-medium text-[var(--c-sig-mustard)]">
+                      Missing prerequisites:
+                    </p>
+                    {semanticStatus.readiness.missingPrerequisites.map((p) => (
+                      <p key={p} className="text-[10px] text-[var(--c-muted)]">
+                        • {p}
+                      </p>
+                    ))}
+                  </div>
+                )
+              : null}
+
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="flex-1"
+                onClick={handleQueueEmbeddings}
+                disabled={embeddingQueued}
+              >
+                {embeddingQueued ? (
+                  <>
+                    <CircleNotch size={12} className="mr-1 inline animate-spin" />
+                    Queued
+                  </>
+                ) : (
+                  "Generate Embeddings"
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => void refreshSignals({ sessionSlug })}
+              >
+                Refresh Signals
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="flex-1"
+                onClick={handleGenerateArgMap}
+                disabled={argMapQueued}
+              >
+                {argMapQueued ? (
+                  <>
+                    <CircleNotch size={12} className="mr-1 inline animate-spin" />
+                    Queued
+                  </>
+                ) : (
+                  "Argument Map"
+                )}
+              </Button>
+            </div>
+          </Card>
+
+          {/* Novelty Radar */}
+          {semanticStatus?.readiness.canShowNoveltyRadar && noveltyRadar && (
+            <Card title="Novelty Radar">
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                <MetricTile label="Low" value={String(noveltyRadar.distribution.low)} />
+                <MetricTile label="Medium" value={String(noveltyRadar.distribution.medium)} />
+                <MetricTile label="High" value={String(noveltyRadar.distribution.high)} />
+              </div>
+
+              {noveltyRadar.topDistinctive.length > 0 && (
+                <div className="mb-3">
+                  <p className="mb-1 text-[10px] text-[var(--c-muted)]">Top Distinctive</p>
+                  {noveltyRadar.topDistinctive.slice(0, 5).map((item: any) => (
+                    <div
+                      key={item.signalId}
+                      className="mb-1.5 rounded-sm bg-[var(--c-surface-strong)] p-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-[var(--c-ink)]">
+                          {item.participantLabel}
+                        </span>
+                        <div className="flex gap-1">
+                          {item.categoryName && (
+                            <Badge
+                              tone={categoryColorToTone(item.categoryColor)}
+                              className="text-[8px]"
+                            >
+                              {item.categoryName}
+                            </Badge>
+                          )}
+                          <Badge tone="mustard" className="text-[8px]">
+                            {item.band}
+                          </Badge>
+                        </div>
+                      </div>
+                      {item.bodyPreview && (
+                        <p className="mt-0.5 text-[10px] text-[var(--c-body)]">
+                          {item.bodyPreview.length > 100
+                            ? `${item.bodyPreview.slice(0, 100)}...`
+                            : item.bodyPreview}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {noveltyRadar.categoryAverages.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {noveltyRadar.categoryAverages.map((cat: any) => (
+                    <Badge
+                      key={cat.categoryId}
+                      tone={categoryColorToTone(cat.categoryColor)}
+                      className="text-[8px]"
+                    >
+                      {cat.categoryName}: {cat.averageNoveltyScore.toFixed(1)}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Category Drift */}
+          {categoryDrift && categoryDrift.slices.length > 0 && (
+            <Card title="Category Drift">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr className="border-b border-[var(--c-hairline)] text-left text-[var(--c-muted)]">
+                      <th className="py-1 pr-2 font-medium">Slice</th>
+                      {categoryDrift.slices[0].categoryCounts.map((c: any) => (
+                        <th key={c.categoryId} className="py-1 pr-2 font-medium">
+                          {c.categoryName?.split(" ")[0]}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryDrift.slices.map((slice: any) => (
+                      <tr key={slice.key} className="border-b border-[var(--c-hairline)]">
+                        <td className="py-1 pr-2 text-[var(--c-ink)]">{slice.label}</td>
+                        {slice.categoryCounts.map((c: any) => (
+                          <td
+                            key={c.categoryId}
+                            className="py-1 pr-2 font-mono text-[var(--c-body)]"
+                          >
+                            {c.count}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {categoryDrift.transitions.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-[10px] text-[var(--c-muted)]">
+                    {categoryDrift.transitions.length} transition
+                    {categoryDrift.transitions.length !== 1 ? "s" : ""} detected
+                  </p>
+                </div>
+              )}
+              {categoryDrift.positionShifts.length > 0 && (
+                <div className="mt-1">
+                  <p className="text-[10px] text-[var(--c-muted)]">
+                    {categoryDrift.positionShifts.length} position shift
+                    {categoryDrift.positionShifts.length !== 1 ? "s" : ""} recorded
+                  </p>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Argument Map (card-based MVP) */}
+          {semanticStatus?.readiness.canShowArgumentMap && argumentGraph && (
+            <Card title="Argument Map">
+              <div className="mb-2 flex gap-2 text-[10px] text-[var(--c-muted)]">
+                <span>{argumentGraph.nodes.length} nodes</span>
+                <span>{argumentGraph.edges.length} edges</span>
+                {argumentGraph.layout?.suggestedRenderer && (
+                  <Badge tone="neutral" className="text-[8px]">
+                    {argumentGraph.layout.suggestedRenderer}
+                  </Badge>
+                )}
+              </div>
+
+              {argumentGraph.edges.slice(0, 10).map((edge: any) => {
+                const src = argumentGraph.nodes.find((n: any) => n.nodeKey === edge.sourceKey);
+                const tgt = argumentGraph.nodes.find((n: any) => n.nodeKey === edge.targetKey);
+                return (
+                  <div key={edge.id} className="mb-1.5 rounded-sm bg-[var(--c-surface-strong)] p-2">
+                    <div className="flex items-center gap-1 text-[10px]">
+                      <span className="font-medium text-[var(--c-ink)]">
+                        {src?.label?.slice(0, 30) ?? edge.sourceKey}
+                      </span>
+                      <Badge
+                        tone={
+                          edge.linkType === "supports"
+                            ? "success"
+                            : edge.linkType === "contradicts"
+                              ? "error"
+                              : edge.linkType === "extends"
+                                ? "sky"
+                                : edge.linkType === "bridges"
+                                  ? "mustard"
+                                  : "neutral"
+                        }
+                        className="text-[8px]"
+                      >
+                        {edge.linkType}
+                      </Badge>
+                      <span className="font-medium text-[var(--c-ink)]">
+                        {tgt?.label?.slice(0, 30) ?? edge.targetKey}
+                      </span>
+                    </div>
+                    {edge.rationale && (
+                      <p className="mt-0.5 text-[10px] text-[var(--c-muted)]">{edge.rationale}</p>
+                    )}
+                  </div>
+                );
+              })}
+              {argumentGraph.edges.length > 10 && (
+                <p className="mt-1 text-[10px] text-[var(--c-muted)]">
+                  + {argumentGraph.edges.length - 10} more edges
+                </p>
+              )}
+            </Card>
+          )}
         </div>
       }
       right={

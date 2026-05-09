@@ -72,4 +72,3 @@ pnpm exec tsc -b --pretty false --force
 ```
 
 Full TypeScript may still report unrelated frontend work-in-progress errors.
-

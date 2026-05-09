@@ -17,7 +17,10 @@ const visibilityModeValidator = v.union(
   v.literal("category_summary_only"),
   v.literal("raw_responses_visible"),
 );
-const anonymityModeValidator = v.union(v.literal("nicknames_visible"), v.literal("anonymous_to_peers"));
+const anonymityModeValidator = v.union(
+  v.literal("nicknames_visible"),
+  v.literal("anonymous_to_peers"),
+);
 const critiqueToneValidator = v.union(
   v.literal("gentle"),
   v.literal("direct"),

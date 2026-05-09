@@ -56,10 +56,16 @@ export function FightDraftComposer({
   }
 
   return (
-    <div className="rounded-md border bg-[var(--c-surface-soft)] p-3" style={{ borderColor: "var(--c-sig-coral)" }}>
+    <div
+      className="rounded-md border bg-[var(--c-surface-soft)] p-3"
+      style={{ borderColor: "var(--c-sig-coral)" }}
+    >
       {turnDeadlineAt && (
         <div className="mb-2">
-          <FightCountdown deadlineAt={turnDeadlineAt} label={isMyTurn ? "Your turn:" : "Waiting:"} />
+          <FightCountdown
+            deadlineAt={turnDeadlineAt}
+            label={isMyTurn ? "Your turn:" : "Waiting:"}
+          />
         </div>
       )}
       <textarea

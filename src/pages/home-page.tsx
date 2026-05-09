@@ -1,23 +1,23 @@
-import { ArrowRight, QrCode } from "@phosphor-icons/react";
+import { ArrowRight, Play, Users } from "@phosphor-icons/react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { ButtonLink } from "@/components/ui/button";
+import { DEMO_SESSION_SLUG } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 
-const checkpoints = [
-  "VitePlus + React app scaffolded",
-  "Readable route slugs wired",
-  "Convex provider activates when VITE_CONVEX_URL exists",
-  "Design-system shell ready for UI designer handoff",
-];
-
 export function HomePage() {
+  const demoSession = useQuery(api.demo.getDemoSession);
+
   return (
     <main className="min-h-dvh bg-[var(--c-canvas)] p-6">
       <div className="mx-auto grid max-w-5xl gap-6">
         <header className="flex items-center justify-between">
-          <Badge tone="slate">TalkTok</Badge>
+          <div className="flex items-center gap-3">
+            <img src="/favicon.svg" alt="" className="h-12 w-12" />
+            <span className="font-display text-3xl font-semibold text-[var(--c-ink)]">TalkTok</span>
+          </div>
           <ThemeToggle />
         </header>
         <section className="rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-8">
@@ -32,28 +32,51 @@ export function HomePage() {
             the UI designer.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Button
-              type="button"
-              icon={<QrCode size={18} />}
-              onClick={() => (window.location.href = routes.joinEntry())}
-            >
-              Join discussion
-            </Button>
-            <Button
-              type="button"
+            <ButtonLink
+              href={routes.joinEntry()}
               variant="secondary"
               icon={<ArrowRight size={18} />}
-              onClick={() => (window.location.href = routes.instructor())}
+            >
+              Join discussion
+            </ButtonLink>
+            <ButtonLink
+              href={routes.instructor()}
+              variant="secondary"
+              icon={<ArrowRight size={18} />}
             >
               Instructor dashboard
-            </Button>
+            </ButtonLink>
           </div>
         </section>
-        <section className="grid gap-3 md:grid-cols-2">
-          {checkpoints.map((item) => (
-            <Card key={item}>{item}</Card>
-          ))}
-        </section>
+        {demoSession && (
+          <section className="rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-6">
+            <div className="mb-1 flex items-center gap-2">
+              <Badge tone="coral">Demo</Badge>
+              <span className="font-display text-sm font-semibold tracking-widest text-[var(--c-muted)]">
+                {demoSession.joinCode}
+              </span>
+            </div>
+            <p className="mb-4 text-sm text-[var(--c-body)]">{demoSession.title}</p>
+            <div className="flex flex-wrap gap-2">
+              <ButtonLink
+                href={routes.demoPersonas()}
+                size="sm"
+                variant="secondary"
+                icon={<Users size={14} />}
+              >
+                Try as Student
+              </ButtonLink>
+              <ButtonLink
+                href={routes.instructorSession(DEMO_SESSION_SLUG)}
+                size="sm"
+                variant="secondary"
+                icon={<Play size={14} />}
+              >
+                Instructor view
+              </ButtonLink>
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );

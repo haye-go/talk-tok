@@ -56,8 +56,7 @@ function summarize(calls: Doc<"llmCalls">[]) {
   const outputTokens = calls.reduce((sum, call) => sum + (call.outputTokens ?? 0), 0);
   const reasoningTokens = calls.reduce((sum, call) => sum + (call.reasoningTokens ?? 0), 0);
   const estimatedCostUsd = calls.reduce((sum, call) => sum + (call.estimatedCostUsd ?? 0), 0);
-  const byFeature: Record<string, { calls: number; errors: number; estimatedCostUsd: number }> =
-    {};
+  const byFeature: Record<string, { calls: number; errors: number; estimatedCostUsd: number }> = {};
 
   for (const call of calls) {
     byFeature[call.feature] ??= { calls: 0, errors: 0, estimatedCostUsd: 0 };

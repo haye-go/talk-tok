@@ -152,4 +152,3 @@ pnpm run build
 - Admin can retrieve usage breakdowns by feature, model, and status.
 - Demo ops status exposes enough backend health to diagnose missing defaults, stuck jobs, and AI failures.
 - No frontend files are touched.
-

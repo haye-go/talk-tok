@@ -1,4 +1,5 @@
 import { PretextDisplay } from "@/components/text/pretext-display";
+import { ReactionCounts } from "@/components/reactions/reaction-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,6 +22,7 @@ export interface SubmissionCardData {
 export interface SubmissionCardProps {
   submission: SubmissionCardData;
   showAuthor?: boolean;
+  reactionCounts?: Record<string, number>;
   onAddFollowUp?: (submissionId: Id<"submissions">) => void;
 }
 
@@ -39,6 +41,7 @@ function formatDuration(ms?: number) {
 export function SubmissionCard({
   submission,
   showAuthor = true,
+  reactionCounts,
   onAddFollowUp,
 }: SubmissionCardProps) {
   return (
@@ -59,6 +62,7 @@ export function SubmissionCard({
       }
     >
       <PretextDisplay text={submission.body} />
+      <ReactionCounts counts={reactionCounts} />
       <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--c-muted)]">
         <Badge tone={submission.inputPattern === "likely_pasted" ? "warning" : "neutral"}>
           {inputPatternLabel(submission.inputPattern)}

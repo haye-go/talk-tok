@@ -28,6 +28,8 @@ export const routes = {
   instructorAdminRetrieval: () => "/instructor/admin/retrieval",
   instructorAdminProtection: () => "/instructor/admin/protection",
   instructorAdminObservability: () => "/instructor/admin/observability",
+  instructorAdminDemo: () => "/instructor/admin/demo",
+  demoPersonas: () => "/demo/personas",
 } as const;
 
 export const routeRegistry = [
@@ -51,4 +53,6 @@ export const routeRegistry = [
   { id: "retrieval", path: routes.instructorAdminRetrieval(), surface: "admin" },
   { id: "protection", path: routes.instructorAdminProtection(), surface: "admin" },
   { id: "observability", path: routes.instructorAdminObservability(), surface: "admin" },
+  { id: "demo", path: routes.instructorAdminDemo(), surface: "admin" },
+  { id: "demo-personas", path: routes.demoPersonas(), surface: "public" },
 ] as const;

@@ -44,7 +44,7 @@ export function FightBubble({
             </span>
           ) : (
             <span className={isMe ? "text-[var(--c-success)]" : "text-[var(--c-sig-sky)]"}>
-              {isMe ? "You" : nickname ?? role}
+              {isMe ? "You" : (nickname ?? role)}
             </span>
           )}
         </span>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChartBar, CircleNotch, Sparkle } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { PositionShiftForm } from "@/components/shifts/position-shift-form";
 import { SynthesisArtifactCard } from "@/components/synthesis/synthesis-artifact-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -209,6 +210,9 @@ export function SynthesizeAct({
           </div>
         )}
       </div>
+
+      {/* Position shift */}
+      <PositionShiftForm sessionSlug={sessionSlug} clientKey={clientKey} />
     </div>
   );
 }

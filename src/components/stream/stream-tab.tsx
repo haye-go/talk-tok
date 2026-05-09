@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { ReactionBar } from "@/components/reactions/reaction-bar";
 import { PresenceBar } from "@/components/stream/presence-bar";
 import { ResponseStreamItem } from "@/components/stream/response-stream-item";
 import { categoryColorToTone } from "@/lib/category-colors";
+import { DEMO_SESSION_SLUG } from "@/lib/constants";
 import { MOCK_CATEGORIES, MOCK_STREAM_RESPONSES } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +13,9 @@ interface PeerResponse {
   nickname: string;
   body: string;
   inputPattern: string;
+  categoryId?: string | null;
+  categoryName?: string | null;
+  categoryColor?: string | null;
   createdAt: number;
 }
 
@@ -29,6 +34,8 @@ interface StreamTabProps {
   presenceTyping?: number;
   presenceSubmitted?: number;
   presenceIdle?: number;
+  sessionSlug?: string;
+  clientKey?: string;
 }
 
 export function StreamTab({
@@ -39,26 +46,34 @@ export function StreamTab({
   presenceTyping = 6,
   presenceSubmitted = 24,
   presenceIdle = 4,
+  sessionSlug,
+  clientKey,
 }: StreamTabProps) {
   const [filter, setFilter] = useState<string | null>(null);
 
-  const cats = categories ?? MOCK_CATEGORIES.map((c) => ({
-    id: c.id,
-    name: c.name,
-    color: c.color,
-    assignmentCount: c.count,
-  }));
+  const cats =
+    categories ??
+    MOCK_CATEGORIES.map((c) => ({
+      id: c.id,
+      name: c.name,
+      color: c.color,
+      assignmentCount: c.count,
+    }));
 
-  const responses = peerResponses ?? MOCK_STREAM_RESPONSES.map((r) => ({
-    id: r.id,
-    nickname: r.nickname,
-    body: r.text,
-    inputPattern: r.telemetry.pasteEvents > 0 ? "likely_pasted" : "composed_gradually",
-    createdAt: Date.now(),
-  }));
+  const responses: PeerResponse[] =
+    peerResponses ??
+    MOCK_STREAM_RESPONSES.map((r) => ({
+      id: r.id,
+      nickname: r.nickname,
+      body: r.text,
+      inputPattern: r.telemetry.pasteEvents > 0 ? "likely_pasted" : "composed_gradually",
+      createdAt: Date.now(),
+    }));
+
+  const isDemoMode = sessionSlug === DEMO_SESSION_SLUG && clientKey?.startsWith("demo-");
 
   const filtered = filter
-    ? responses
+    ? responses.filter((response) => response.categoryId === filter)
     : responses;
 
   return (
@@ -103,7 +118,8 @@ export function StreamTab({
       {!canSeeRawPeerResponses ? (
         <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-4 text-center">
           <p className="text-sm text-[var(--c-muted)]">
-            {responses.length} responses collected. Peer responses remain private until the instructor releases them.
+            {responses.length} responses collected. Peer responses remain private until the
+            instructor releases them.
           </p>
         </div>
       ) : (
@@ -112,15 +128,27 @@ export function StreamTab({
             <p className="py-4 text-center text-sm text-[var(--c-muted)]">No responses yet.</p>
           )}
           {filtered.map((r) => (
-            <ResponseStreamItem
-              key={r.id}
-              nickname={r.nickname}
-              text={r.body}
-              categoryColor="neutral"
-              originality={r.inputPattern === "likely_pasted" ? "med" : "high"}
-              telemetryLabel={r.inputPattern === "likely_pasted" ? "Likely pasted" : "Composed gradually"}
-              telemetryWarning={r.inputPattern === "likely_pasted"}
-            />
+            <div key={r.id} className="space-y-1">
+              {isDemoMode && (
+                <p className="text-[9px] font-medium text-[var(--c-sig-sky)]">
+                  {r.nickname}&apos;s response
+                </p>
+              )}
+              <ResponseStreamItem
+                nickname={r.nickname}
+                text={r.body}
+                categoryColor={categoryColorToTone(r.categoryColor)}
+                categoryName={r.categoryName ?? undefined}
+                originality={r.inputPattern === "likely_pasted" ? "med" : "high"}
+                telemetryLabel={
+                  r.inputPattern === "likely_pasted" ? "Likely pasted" : "Composed gradually"
+                }
+                telemetryWarning={r.inputPattern === "likely_pasted"}
+              />
+              {sessionSlug && clientKey && (
+                <ReactionBar submissionId={r.id} sessionSlug={sessionSlug} clientKey={clientKey} />
+              )}
+            </div>
           ))}
         </div>
       )}

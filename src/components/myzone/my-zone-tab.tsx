@@ -1,4 +1,4 @@
-import { ChartBar, CircleNotch, Sword, Timer } from "@phosphor-icons/react";
+import { ArrowsClockwise, ChartBar, CircleNotch, Sword, Timer } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/state/loading-state";
 import { categoryColorToTone } from "@/lib/category-colors";
@@ -33,6 +33,13 @@ interface RecatRequest {
   suggestedCategoryName?: string | null;
 }
 
+interface PositionShift {
+  id: string;
+  reason: string;
+  influencedBy?: string | null;
+  createdAt: number;
+}
+
 interface FightRecord {
   id: string;
   slug: string;
@@ -59,6 +66,7 @@ interface MyZoneTabProps {
   assignmentsBySubmission?: Assignment[];
   recategorisationRequests?: RecatRequest[];
   fightThreads?: FightRecord[];
+  positionShifts?: PositionShift[];
   personalReport?: PersonalReportSummary | null;
   loading?: boolean;
   onViewFight?: (fightSlug: string) => void;
@@ -95,6 +103,7 @@ export function MyZoneTab({
   assignmentsBySubmission,
   recategorisationRequests,
   fightThreads,
+  positionShifts,
   personalReport,
   loading,
   onViewFight,
@@ -279,6 +288,38 @@ export function MyZoneTab({
           </p>
         </div>
       ))}
+
+      {/* Position shifts */}
+      {(positionShifts ?? []).length > 0 && (
+        <div className="space-y-2">
+          <p className="flex items-center gap-1 font-display text-xs font-semibold text-[var(--c-sig-mustard)]">
+            <ArrowsClockwise size={12} />
+            Position Shifts
+          </p>
+          {(positionShifts ?? []).map((shift) => (
+            <div
+              key={shift.id}
+              className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
+              style={{ borderLeft: "3px solid var(--c-sig-mustard)" }}
+            >
+              <p className="text-xs leading-relaxed text-[var(--c-body)]">
+                &ldquo;{shift.reason}&rdquo;
+              </p>
+              {shift.influencedBy && (
+                <p className="mt-1 text-[10px] text-[var(--c-muted)]">
+                  Influenced by: {shift.influencedBy}
+                </p>
+              )}
+              <p className="mt-1 text-[10px] text-[var(--c-muted)]">
+                {new Date(shift.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Fight Me records */}
       {(fightThreads ?? []).map((fight) => (

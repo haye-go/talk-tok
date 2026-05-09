@@ -121,11 +121,7 @@ export default defineSchema({
     .index("by_session_and_created_at", ["sessionId", "createdAt"])
     .index("by_submission", ["submissionId"])
     .index("by_participant", ["participantId"])
-    .index("by_submission_and_participant_and_kind", [
-      "submissionId",
-      "participantId",
-      "kind",
-    ]),
+    .index("by_submission_and_participant_and_kind", ["submissionId", "participantId", "kind"]),
 
   positionShiftEvents: defineTable({
     sessionId: v.id("sessions"),

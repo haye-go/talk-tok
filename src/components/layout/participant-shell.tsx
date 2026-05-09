@@ -3,18 +3,41 @@ import { ActProgressBar } from "@/components/layout/act-progress-bar";
 import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
 import { Card } from "@/components/ui/card";
 import { useAct } from "@/hooks/use-act";
-import type { TabId } from "@/lib/constants";
+import type { ActId, TabId } from "@/lib/constants";
 
 export interface ParticipantShellProps {
+  topBar?: ReactNode;
   main?: ReactNode;
   stream?: ReactNode;
   fightMe?: ReactNode;
   myZone?: ReactNode;
+  currentActId?: ActId;
+  defaultTab?: TabId;
+  activeTab?: TabId;
+  onActiveTabChange?: (tab: TabId) => void;
+  unlockAllTabs?: boolean;
 }
 
-export function ParticipantShell({ main, stream, fightMe, myZone }: ParticipantShellProps) {
-  const { actIndex, currentAct, isTabUnlocked } = useAct();
-  const [activeTab, setActiveTab] = useState<TabId>("main");
+export function ParticipantShell({
+  topBar,
+  main,
+  stream,
+  fightMe,
+  myZone,
+  currentActId = "submit",
+  defaultTab = "main",
+  activeTab: controlledActiveTab,
+  onActiveTabChange,
+  unlockAllTabs = false,
+}: ParticipantShellProps) {
+  const { actIndex, currentAct, isTabUnlocked } = useAct(currentActId);
+  const [internalActiveTab, setInternalActiveTab] = useState<TabId>(defaultTab);
+  const activeTab = controlledActiveTab ?? internalActiveTab;
+
+  function handleTabChange(tab: TabId) {
+    setInternalActiveTab(tab);
+    onActiveTabChange?.(tab);
+  }
 
   const content: Record<TabId, ReactNode> = {
     main: main ?? (
@@ -34,13 +57,14 @@ export function ParticipantShell({ main, stream, fightMe, myZone }: ParticipantS
   };
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[680px] flex-col bg-[var(--c-canvas)] shadow-sm">
+    <div className="mx-auto flex h-dvh w-full max-w-[680px] flex-col bg-[var(--c-canvas)] shadow-sm">
+      {topBar}
       <ActProgressBar actIndex={actIndex} />
       <main className="flex-1 overflow-y-auto p-4">{content[activeTab]}</main>
       <BottomTabBar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
-        isTabUnlocked={isTabUnlocked}
+        onTabChange={handleTabChange}
+        isTabUnlocked={(tab) => unlockAllTabs || isTabUnlocked(tab)}
       />
     </div>
   );

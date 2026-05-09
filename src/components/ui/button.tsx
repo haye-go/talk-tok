@@ -1,9 +1,9 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
-  "inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-info-border)] disabled:pointer-events-none disabled:opacity-50",
+export const buttonVariants = cva(
+  "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-4 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-info-border)] disabled:cursor-not-allowed disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -33,11 +33,37 @@ export interface ButtonProps
   icon?: ReactNode;
 }
 
+export interface ButtonLinkProps
+  extends AnchorHTMLAttributes<HTMLAnchorElement>, VariantProps<typeof buttonVariants> {
+  icon?: ReactNode;
+}
+
 export function Button({ className, icon, children, variant, size, ...props }: ButtonProps) {
   return (
     <button className={cn(buttonVariants({ variant, size }), className)} {...props}>
       {icon ? <span className="mr-2 inline-flex">{icon}</span> : null}
       {children}
     </button>
+  );
+}
+
+export function ButtonLink({
+  className,
+  icon,
+  children,
+  variant,
+  size,
+  href,
+  ...props
+}: ButtonLinkProps) {
+  return (
+    <a
+      href={href}
+      className={cn(buttonVariants({ variant, size }), "no-underline", className)}
+      {...props}
+    >
+      {icon ? <span className="mr-2 inline-flex">{icon}</span> : null}
+      {children}
+    </a>
   );
 }

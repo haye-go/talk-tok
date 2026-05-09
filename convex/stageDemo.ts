@@ -49,7 +49,8 @@ const FOOD_CATEGORIES = [
   {
     slug: "shareable-crowd-food",
     name: "Shareable Crowd Food",
-    description: "Pizza, sushi platters, sandwiches, wraps, snacks, and other group-friendly options.",
+    description:
+      "Pizza, sushi platters, sandwiches, wraps, snacks, and other group-friendly options.",
     color: "amber",
   },
   {
@@ -235,7 +236,11 @@ async function resetFoodSessionData(ctx: MutationCtx, sessionId: Id<"sessions">)
     deleted += count;
   }
 
-  return { deleted, perTable, capped: Object.values(perTable).some((count) => count === MAX_RESET_BATCH) };
+  return {
+    deleted,
+    perTable,
+    capped: Object.values(perTable).some((count) => count === MAX_RESET_BATCH),
+  };
 }
 
 async function countBySession(ctx: QueryCtx, table: SessionScopedTable, sessionId: Id<"sessions">) {
@@ -325,9 +330,11 @@ async function seedWarmStart(
       reasoningBand: "solid",
       originalityBand: response.inputPattern === "likely_pasted" ? "common" : "above_average",
       specificityBand: "clear",
-      summary: "Good hackathon-food answer: practical, easy to argue with, and specific enough for categorisation.",
+      summary:
+        "Good hackathon-food answer: practical, easy to argue with, and specific enough for categorisation.",
       strengths: "It gives a concrete food choice and at least one practical reason.",
-      improvement: "Add one morale reason or one inclusion concern to make the answer harder to dismiss.",
+      improvement:
+        "Add one morale reason or one inclusion concern to make the answer harder to dismiss.",
       nextQuestion: "Would this still work for a 24-hour hackathon with mixed dietary needs?",
       createdAt: args.now,
       updatedAt: args.now,

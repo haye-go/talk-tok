@@ -8,7 +8,9 @@ interface FightCountdownProps {
 }
 
 export function FightCountdown({ deadlineAt, label, className }: FightCountdownProps) {
-  const [remaining, setRemaining] = useState(() => Math.max(0, Math.ceil((deadlineAt - Date.now()) / 1000)));
+  const [remaining, setRemaining] = useState(() =>
+    Math.max(0, Math.ceil((deadlineAt - Date.now()) / 1000)),
+  );
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -24,10 +26,17 @@ export function FightCountdown({ deadlineAt, label, className }: FightCountdownP
   return (
     <div className={cn("flex items-center gap-2 font-display text-xs font-medium", className)}>
       {label && <span className="text-[var(--c-muted)]">{label}</span>}
-      <span className={cn("tabular-nums", urgent ? "text-[var(--c-error)]" : "text-[var(--c-sig-mustard)]")}>
+      <span
+        className={cn(
+          "tabular-nums",
+          urgent ? "text-[var(--c-error)]" : "text-[var(--c-sig-mustard)]",
+        )}
+      >
         {remaining}s
       </span>
-      {urgent && <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--c-error)]" />}
+      {urgent && (
+        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--c-error)]" />
+      )}
     </div>
   );
 }

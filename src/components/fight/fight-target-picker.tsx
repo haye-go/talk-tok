@@ -44,13 +44,19 @@ export function FightTargetPicker({
           <Lightning size={14} className="mr-1 inline text-[var(--c-sig-coral)]" />
           Pick a response to challenge
         </h3>
-        <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
       </div>
 
       {targets === undefined && <LoadingState label="Finding targets..." />}
 
       {targets && targets.length === 0 && (
-        <Card><p className="text-sm text-[var(--c-muted)]">No available targets right now. Other participants may be in active fights.</p></Card>
+        <Card>
+          <p className="text-sm text-[var(--c-muted)]">
+            No available targets right now. Other participants may be in active fights.
+          </p>
+        </Card>
       )}
 
       {targets && targets.length > 0 && (
@@ -61,7 +67,9 @@ export function FightTargetPicker({
               className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
             >
               <div className="flex items-center justify-between">
-                <strong className="font-display text-xs text-[var(--c-ink)]">{target.nickname}</strong>
+                <strong className="font-display text-xs text-[var(--c-ink)]">
+                  {target.nickname}
+                </strong>
                 <span className="text-[10px] text-[var(--c-muted)]">{target.wordCount} words</span>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-[var(--c-body)]">

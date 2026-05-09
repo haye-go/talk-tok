@@ -346,6 +346,7 @@ export const overview = query({
         categoryId: Id<"categories">;
         categorySlug?: string;
         categoryName?: string;
+        categoryColor?: string;
         confidence: number;
         rationale?: string;
         status: "suggested" | "confirmed" | "recategorization_requested";
@@ -383,6 +384,7 @@ export const overview = query({
         categoryId: assignment.categoryId,
         categorySlug: category?.slug,
         categoryName: category?.name,
+        categoryColor: category?.color,
         confidence: assignment.confidence,
         rationale: assignment.rationale,
         status: assignment.status,
@@ -459,13 +461,21 @@ export const overview = query({
         ? sessionSubmissions
             .filter((submission) => submission.participantId !== participant._id)
             .slice(0, PEER_RESPONSE_LIMIT)
-            .map((submission) =>
-              toSubmission(
-                submission,
-                participantsById.get(submission.participantId) ?? null,
-                session,
-              ),
-            )
+            .map((submission) => {
+              const assignment = assignmentBySubmission.get(submission._id);
+
+              return {
+                ...toSubmission(
+                  submission,
+                  participantsById.get(submission.participantId) ?? null,
+                  session,
+                ),
+                categoryId: assignment?.categoryId,
+                categorySlug: assignment?.categorySlug,
+                categoryName: assignment?.categoryName,
+                categoryColor: assignment?.categoryColor,
+              };
+            })
         : [];
     const fightThreadsById = new Map(
       [...attackingFightThreads, ...defendingFightThreads]

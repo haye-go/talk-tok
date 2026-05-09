@@ -196,4 +196,3 @@ pnpm run build
 - Frontend can render argument graph from stable node and edge keys.
 - Frontend can show semantic readiness and missing prerequisites.
 - No frontend files are touched.
-

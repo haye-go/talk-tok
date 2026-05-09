@@ -704,7 +704,11 @@ export const getVisualizationGraph = query({
           nodeKey: key,
           entityType: "submission" as const,
           entityId: submission._id,
-          label: participantLabel(session, participantInfo?.participant, participantInfo?.index ?? 0),
+          label: participantLabel(
+            session,
+            participantInfo?.participant,
+            participantInfo?.index ?? 0,
+          ),
           body: preview(submission.body),
           categoryId,
           categorySlug: category?.slug,
@@ -712,10 +716,15 @@ export const getVisualizationGraph = query({
           categoryColor: category?.color,
           participantId: submission.participantId,
           weight: 1 + reactionCount + (degreeByNodeKey.get(key) ?? 0),
-          radiusScore: Math.min(1, 0.25 + reactionCount / 10 + (degreeByNodeKey.get(key) ?? 0) / 12),
+          radiusScore: Math.min(
+            1,
+            0.25 + reactionCount / 10 + (degreeByNodeKey.get(key) ?? 0) / 12,
+          ),
           clusterKey: category?.slug ?? "uncategorized",
           colorKey: category?.color ?? "uncategorized",
-          xHint: ((categoryId ? categoryOrder.get(categoryId) : undefined) ?? activeCategories.length) * 120,
+          xHint:
+            ((categoryId ? categoryOrder.get(categoryId) : undefined) ?? activeCategories.length) *
+            120,
           yHint: 120 + reactionCount * 8,
         };
       }),
@@ -737,7 +746,9 @@ export const getVisualizationGraph = query({
           radiusScore: Math.min(1, 0.45 + (degreeByNodeKey.get(key) ?? 0) / 10),
           clusterKey: category?.slug ?? "synthesis",
           colorKey: category?.color ?? "synthesis",
-          xHint: ((artifact.categoryId ? categoryOrder.get(artifact.categoryId) : undefined) ?? index) * 120,
+          xHint:
+            ((artifact.categoryId ? categoryOrder.get(artifact.categoryId) : undefined) ?? index) *
+            120,
           yHint: 260,
         };
       }),

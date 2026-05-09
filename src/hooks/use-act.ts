@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getActIndex, getNextActId, getPreviousActId, isTabUnlockedForAct } from "@/lib/act-state";
 import { ACTS, type ActId, type TabId } from "@/lib/constants";
 
 export function useAct(initialAct: ActId = "submit") {
   const [actId, setActId] = useState<ActId>(initialAct);
   const actIndex = getActIndex(actId);
+
+  useEffect(() => {
+    setActId(initialAct);
+  }, [initialAct]);
 
   function setAct(nextActId: ActId) {
     setActId(nextActId);
