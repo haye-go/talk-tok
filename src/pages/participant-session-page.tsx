@@ -12,35 +12,40 @@ import { SubmissionCard } from "@/components/submission/submission-card";
 import { DiscoverAct } from "@/components/acts/discover-act";
 import { ChallengeAct } from "@/components/acts/challenge-act";
 import { SynthesizeAct } from "@/components/acts/synthesize-act";
+import { StreamTab } from "@/components/stream/stream-tab";
+import { MyZoneTab } from "@/components/myzone/my-zone-tab";
 import { FightThread } from "@/components/fight/fight-thread";
 import { PresenceBar } from "@/components/stream/presence-bar";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
-import { PretextDisplay } from "@/components/text/pretext-display";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { useParticipantWorkspace } from "@/hooks/use-participant-workspace";
 import { getOrCreateClientKey, storeParticipant } from "@/lib/client-identity";
 import { routes } from "@/lib/routes";
 
 export function ParticipantSessionPage() {
   const { sessionSlug } = useParams({ from: "/session/$sessionSlug" });
-  const session = useQuery(api.sessions.getBySlug, { sessionSlug });
-  const lobby = useQuery(api.participants.listLobby, { sessionSlug });
   const [clientKey, setClientKey] = useState<string | null>(null);
+
+  // Primary data source — one query for all participant state
+  const workspace = useParticipantWorkspace(sessionSlug, clientKey);
+
+  // Keep existing individual queries for join-gate and lobby (workspace returns null if not joined)
+  const session = useQuery(api.sessions.getBySlug, { sessionSlug });
   const participant = useQuery(
     api.participants.restore,
     clientKey ? { sessionSlug, clientKey } : "skip",
   );
-  const mySubmissions = useQuery(
-    api.submissions.listMine,
-    clientKey ? { sessionSlug, clientKey } : "skip",
-  );
-  const sessionSubmissions = useQuery(api.submissions.listForSession, { sessionSlug, limit: 25 });
+  const lobby = useQuery(api.participants.listLobby, { sessionSlug });
+
   const updateNickname = useMutation(api.participants.updateNickname);
   const touchPresence = useMutation(api.participants.touchPresence);
+  const submitAndQueue = useMutation(api.participantWorkspace.submitAndQueueFeedback);
   const createSubmission = useMutation(api.submissions.create);
+
   const [nickname, setNickname] = useState("");
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
@@ -52,9 +57,7 @@ export function ParticipantSessionPage() {
   }, []);
 
   useEffect(() => {
-    if (!participant || !clientKey) {
-      return;
-    }
+    if (!participant || !clientKey) return;
 
     setNickname(participant.nickname);
     storeParticipant({
@@ -63,24 +66,15 @@ export function ParticipantSessionPage() {
       nickname: participant.nickname,
     });
     const presenceKey = `${sessionSlug}:${participant.participantSlug}:${clientKey}`;
-
-    if (touchedPresenceKey.current === presenceKey) {
-      return;
-    }
-
+    if (touchedPresenceKey.current === presenceKey) return;
     touchedPresenceKey.current = presenceKey;
     void touchPresence({ sessionSlug, clientKey, presenceState: "idle" });
   }, [clientKey, participant, sessionSlug, touchPresence]);
 
   async function handleNicknameSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!participant || !clientKey) {
-      return;
-    }
-
+    if (!participant || !clientKey) return;
     setNicknameError(null);
-
     try {
       const updated = await updateNickname({
         sessionSlug,
@@ -98,33 +92,44 @@ export function ParticipantSessionPage() {
     }
   }
 
-  async function handleCreateSubmission(
-    { body, telemetry }: ResponseComposerSubmit,
-    kind: "initial" | "additional_point" = "initial",
-    parentSubmissionId?: Id<"submissions">,
-  ) {
-    if (!clientKey) {
-      return;
-    }
-
+  async function handleSubmit(sub: ResponseComposerSubmit) {
+    if (!clientKey) return;
     setSubmissionError(null);
-
     try {
-      await createSubmission({
+      await submitAndQueue({
         sessionSlug,
         clientKey,
-        body,
-        kind,
-        parentSubmissionId,
-        telemetry,
+        body: sub.body,
+        kind: "initial",
+        tone: (sub.tone as "gentle" | "direct" | "spicy" | "roast") ?? undefined,
+        telemetry: sub.telemetry,
       });
-      setFollowUpParentId(null);
     } catch (cause) {
       setSubmissionError(cause instanceof Error ? cause.message : "Could not submit response.");
       throw cause;
     }
   }
 
+  async function handleFollowUp(sub: ResponseComposerSubmit, parentId: Id<"submissions">) {
+    if (!clientKey) return;
+    setSubmissionError(null);
+    try {
+      await createSubmission({
+        sessionSlug,
+        clientKey,
+        body: sub.body,
+        kind: "additional_point",
+        parentSubmissionId: parentId,
+        telemetry: sub.telemetry,
+      });
+      setFollowUpParentId(null);
+    } catch (cause) {
+      setSubmissionError(cause instanceof Error ? cause.message : "Could not submit follow-up.");
+      throw cause;
+    }
+  }
+
+  // Loading / error / join-gate states (unchanged)
   if (session === undefined || participant === undefined) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[var(--c-canvas)] p-4">
@@ -132,18 +137,13 @@ export function ParticipantSessionPage() {
       </main>
     );
   }
-
   if (session === null) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[var(--c-canvas)] p-4">
-        <ErrorState
-          title="Session not found"
-          description="This readable session URL does not match an existing session."
-        />
+        <ErrorState title="Session not found" description="This readable session URL does not match an existing session." />
       </main>
     );
   }
-
   if (participant === null) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[var(--c-canvas)] p-4">
@@ -151,11 +151,7 @@ export function ParticipantSessionPage() {
           <p className="text-sm text-[var(--c-muted)]">
             This browser does not have a participant identity for {session.title}.
           </p>
-          <Button
-            type="button"
-            className="mt-4 w-full"
-            onClick={() => (window.location.href = routes.join(session.joinCode))}
-          >
+          <Button type="button" className="mt-4 w-full" onClick={() => (window.location.href = routes.join(session.joinCode))}>
             Join with nickname
           </Button>
         </Card>
@@ -163,12 +159,17 @@ export function ParticipantSessionPage() {
     );
   }
 
+  // Workspace data (may still be loading after join gate passes)
+  const ws = workspace;
+  const currentAct = ws?.session.currentAct ?? session.currentAct;
+  const firstFeedback = ws?.feedbackBySubmission?.[0] ?? null;
+  const firstAssignment = ws?.assignmentsBySubmission?.[0] ?? null;
+
   return (
     <ParticipantShell
       main={
         <div className="grid gap-4">
-          {/* Submit act: topic card + composer with real submission handler */}
-          {session.currentAct === "submit" && (
+          {currentAct === "submit" && (
             <>
               <div className="rounded-md bg-[var(--c-sig-cream)] p-3.5">
                 <p className="text-sm font-medium leading-relaxed text-[var(--c-on-sig-light)]">
@@ -179,14 +180,27 @@ export function ParticipantSessionPage() {
               <ResponseComposer
                 softWordLimit={session.responseSoftLimitWords}
                 submitLabel="Submit response"
-                onSubmit={(_text, _tone, submission) => handleCreateSubmission(submission)}
+                onSubmit={(_text, _tone, submission) => handleSubmit(submission)}
               />
               <p className="text-xs text-[var(--c-muted)]">Signed in as {participant.nickname}</p>
             </>
           )}
-          {session.currentAct === "discover" && <DiscoverAct />}
-          {session.currentAct === "challenge" && <ChallengeAct />}
-          {session.currentAct === "synthesize" && <SynthesizeAct />}
+          {currentAct === "discover" && (
+            <DiscoverAct
+              feedback={firstFeedback}
+              categories={ws?.categorySummary}
+              assignment={firstAssignment}
+            />
+          )}
+          {currentAct === "challenge" && (
+            <ChallengeAct
+              activeFollowUps={ws?.activeFollowUps}
+              fightMeEnabled={ws?.session.fightMeEnabled ?? session.fightMeEnabled}
+            />
+          )}
+          {currentAct === "synthesize" && (
+            <SynthesizeAct categories={ws?.categorySummary} />
+          )}
         </div>
       }
       stream={
@@ -198,73 +212,31 @@ export function ParticipantSessionPage() {
               idle={lobby.aggregate.idle}
             />
           )}
-          {session.visibilityMode === "raw_responses_visible" && sessionSubmissions ? (
-            <div className="grid gap-3">
-              {sessionSubmissions.map((submission) => (
-                <SubmissionCard key={submission.id} submission={submission} />
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <PretextDisplay
-                text={`${sessionSubmissions?.length ?? 0} responses collected. Peer responses remain private until the instructor releases them.`}
-              />
-            </Card>
-          )}
-          {lobby && lobby.recentParticipants.length > 0 && (
-            <Card title="Lobby">
-              <div className="grid gap-2">
-                {lobby.recentParticipants.map((item) => (
-                  <div
-                    key={item.participantSlug}
-                    className="flex items-center justify-between rounded-sm bg-[var(--c-surface-strong)] px-3 py-2 text-sm"
-                  >
-                    <span className="text-[var(--c-ink)]">{item.nickname}</span>
-                    <span className="text-xs text-[var(--c-muted)]">{item.presenceState}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+          <StreamTab
+            peerResponses={ws?.recentPeerResponses}
+            categories={ws?.categorySummary}
+            canSeeRawPeerResponses={ws?.visibility.canSeeRawPeerResponses}
+            canSeeCategorySummary={ws?.visibility.canSeeCategorySummary}
+          />
         </div>
       }
       fightMe={<FightThread />}
       myZone={
         <div className="grid gap-4">
-          <div className="-mx-4 -mt-4 bg-[var(--c-sig-peach)] px-4 py-4">
-            <h2 className="font-display text-lg font-medium text-[var(--c-on-sig-light)]">
-              My Zone
-            </h2>
-            <p className="text-xs text-[var(--c-on-sig-light-body)]" style={{ opacity: 0.7 }}>
-              Your responses and analysis
-            </p>
-          </div>
-          {mySubmissions === undefined && <LoadingState label="Loading your responses..." />}
-          {mySubmissions?.length === 0 && (
-            <p className="text-sm text-[var(--c-muted)]">Your submitted responses appear here.</p>
-          )}
-          {mySubmissions && mySubmissions.length > 0 && (
-            <div className="grid gap-3">
-              {mySubmissions.map((submission) => (
-                <SubmissionCard
-                  key={submission.id}
-                  submission={submission}
-                  showAuthor={false}
-                  onAddFollowUp={(submissionId) => setFollowUpParentId(submissionId)}
-                />
-              ))}
-            </div>
-          )}
+          <MyZoneTab
+            initialResponses={ws?.myZoneHistory.initialResponses}
+            followUpResponses={ws?.myZoneHistory.followUpResponses}
+            feedbackBySubmission={ws?.feedbackBySubmission}
+            assignmentsBySubmission={ws?.assignmentsBySubmission}
+            recategorisationRequests={ws?.recategorisationRequests}
+            fightThreads={ws?.fightMe.mine}
+            loading={ws === undefined}
+          />
           {followUpParentId && (
             <Card
               title="Add follow-up"
               action={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setFollowUpParentId(null)}
-                >
+                <Button type="button" variant="ghost" size="sm" onClick={() => setFollowUpParentId(null)}>
                   Cancel
                 </Button>
               }
@@ -274,7 +246,7 @@ export function ParticipantSessionPage() {
                 submitLabel="Add follow-up"
                 placeholder="Add a clarification or extra point..."
                 onSubmit={(_text, _tone, submission) =>
-                  handleCreateSubmission(submission, "additional_point", followUpParentId)
+                  handleFollowUp(submission, followUpParentId)
                 }
               />
             </Card>
@@ -287,9 +259,7 @@ export function ParticipantSessionPage() {
                 onChange={(event) => setNickname(event.target.value)}
                 error={nicknameError ?? undefined}
               />
-              <Button type="submit" variant="secondary">
-                Update nickname
-              </Button>
+              <Button type="submit" variant="secondary">Update nickname</Button>
             </form>
           </Card>
         </div>
