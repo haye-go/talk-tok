@@ -10,6 +10,7 @@
 
 import type * as participants from "../participants.js";
 import type * as sessions from "../sessions.js";
+import type * as submissions from "../submissions.js";
 
 import type {
   ApiFromModules,
@@ -20,6 +21,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   participants: typeof participants;
   sessions: typeof sessions;
+  submissions: typeof submissions;
 }>;
 
 /**
