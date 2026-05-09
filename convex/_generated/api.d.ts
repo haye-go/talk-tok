@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as llm from "../llm.js";
 import type * as modelSettings from "../modelSettings.js";
 import type * as participants from "../participants.js";
 import type * as promptTemplates from "../promptTemplates.js";
@@ -21,6 +22,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  llm: typeof llm;
   modelSettings: typeof modelSettings;
   participants: typeof participants;
   promptTemplates: typeof promptTemplates;
