@@ -27,7 +27,7 @@ export function SessionNewPage() {
   const [modePreset, setModePreset] = useState<
     "class_discussion" | "conference_qna" | "debate_lab" | "custom"
   >("class_discussion");
-  const [visibility, setVisibility] = useState("immediate");
+  const [visibility, setVisibility] = useState("private_until_released");
   const [anonymity, setAnonymity] = useState("nickname_visible");
   const [wordLimit, setWordLimit] = useState("200");
   const [critiqueTone, setCritiqueTone] = useState("spicy");
@@ -114,8 +114,9 @@ export function SessionNewPage() {
               value={visibility}
               onChange={(e) => setVisibility(e.target.value)}
             >
-              <option value="immediate">Immediate</option>
-              <option value="after_processing">After Processing</option>
+              <option value="private_until_released">Private until released</option>
+              <option value="category_summary_only">Category summaries only</option>
+              <option value="raw_responses_visible">Raw responses visible</option>
             </select>
           </div>
           <div>
