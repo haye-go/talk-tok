@@ -148,6 +148,24 @@ function toLink(row: Doc<"argumentLinks">) {
   };
 }
 
+function participantLabel(
+  session: Doc<"sessions">,
+  participant: Doc<"participants"> | undefined,
+  fallbackIndex: number,
+) {
+  if (!participant) {
+    return `Participant ${fallbackIndex + 1}`;
+  }
+
+  return session.anonymityMode === "nicknames_visible"
+    ? participant.nickname
+    : `Participant ${fallbackIndex + 1}`;
+}
+
+function nodeKey(entityType: EntityType, entityId: string) {
+  return `${entityType}:${entityId}`;
+}
+
 export const generateForSession = mutation({
   args: {
     sessionSlug: v.string(),
@@ -567,6 +585,209 @@ export const getGraph = query({
         submissionsCapped: submissions.length === SUBMISSION_LIMIT,
         artifactsCapped: artifacts.length === ARTIFACT_LIMIT,
         linksCapped: links.length === LINK_LIMIT,
+      },
+    };
+  },
+});
+
+export const getVisualizationGraph = query({
+  args: {
+    sessionSlug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      return null;
+    }
+
+    const [categories, submissions, participants, artifacts, assignments, links, reactions] =
+      await Promise.all([
+        ctx.db
+          .query("categories")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .take(CATEGORY_LIMIT),
+        ctx.db
+          .query("submissions")
+          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+          .order("desc")
+          .take(SUBMISSION_LIMIT),
+        ctx.db
+          .query("participants")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .take(SUBMISSION_LIMIT),
+        ctx.db
+          .query("synthesisArtifacts")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .order("desc")
+          .take(ARTIFACT_LIMIT),
+        ctx.db
+          .query("submissionCategories")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .take(SUBMISSION_LIMIT * 2),
+        ctx.db
+          .query("argumentLinks")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .order("desc")
+          .take(LINK_LIMIT),
+        ctx.db
+          .query("reactions")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .take(SUBMISSION_LIMIT * 3),
+      ]);
+    const participantsById = new Map(
+      participants.map((participant, index) => [participant._id, { participant, index }]),
+    );
+    const categoriesById = new Map(categories.map((category) => [category._id, category]));
+    const categoryBySubmission = new Map<Id<"submissions">, Id<"categories">>();
+    const submissionCountsByCategory = new Map<Id<"categories">, number>();
+    const reactionCountsBySubmission = new Map<Id<"submissions">, number>();
+    const degreeByNodeKey = new Map<string, number>();
+
+    for (const assignment of assignments) {
+      if (!categoryBySubmission.has(assignment.submissionId)) {
+        categoryBySubmission.set(assignment.submissionId, assignment.categoryId);
+        submissionCountsByCategory.set(
+          assignment.categoryId,
+          (submissionCountsByCategory.get(assignment.categoryId) ?? 0) + 1,
+        );
+      }
+    }
+
+    for (const reaction of reactions) {
+      reactionCountsBySubmission.set(
+        reaction.submissionId,
+        (reactionCountsBySubmission.get(reaction.submissionId) ?? 0) + 1,
+      );
+    }
+
+    for (const link of links) {
+      const sourceKey = nodeKey(link.sourceEntityType, link.sourceEntityId);
+      const targetKey = nodeKey(link.targetEntityType, link.targetEntityId);
+      degreeByNodeKey.set(sourceKey, (degreeByNodeKey.get(sourceKey) ?? 0) + 1);
+      degreeByNodeKey.set(targetKey, (degreeByNodeKey.get(targetKey) ?? 0) + 1);
+    }
+
+    const activeCategories = categories.filter((category) => category.status === "active");
+    const categoryOrder = new Map(activeCategories.map((category, index) => [category._id, index]));
+    const nodes = [
+      ...activeCategories.map((category) => {
+        const key = nodeKey("category", category._id);
+        const count = submissionCountsByCategory.get(category._id) ?? 0;
+
+        return {
+          nodeKey: key,
+          entityType: "category" as const,
+          entityId: category._id,
+          label: category.name,
+          body: category.description,
+          categoryId: category._id,
+          categorySlug: category.slug,
+          categoryName: category.name,
+          categoryColor: category.color,
+          weight: 2 + count + (degreeByNodeKey.get(key) ?? 0),
+          radiusScore: Math.min(1, 0.35 + count / 12),
+          clusterKey: category.slug,
+          colorKey: category.color ?? category.slug,
+          xHint: (categoryOrder.get(category._id) ?? 0) * 120,
+          yHint: 0,
+        };
+      }),
+      ...submissions.map((submission) => {
+        const categoryId = categoryBySubmission.get(submission._id);
+        const category = categoryId ? categoriesById.get(categoryId) : undefined;
+        const participantInfo = participantsById.get(submission.participantId);
+        const key = nodeKey("submission", submission._id);
+        const reactionCount = reactionCountsBySubmission.get(submission._id) ?? 0;
+
+        return {
+          nodeKey: key,
+          entityType: "submission" as const,
+          entityId: submission._id,
+          label: participantLabel(session, participantInfo?.participant, participantInfo?.index ?? 0),
+          body: preview(submission.body),
+          categoryId,
+          categorySlug: category?.slug,
+          categoryName: category?.name,
+          categoryColor: category?.color,
+          participantId: submission.participantId,
+          weight: 1 + reactionCount + (degreeByNodeKey.get(key) ?? 0),
+          radiusScore: Math.min(1, 0.25 + reactionCount / 10 + (degreeByNodeKey.get(key) ?? 0) / 12),
+          clusterKey: category?.slug ?? "uncategorized",
+          colorKey: category?.color ?? "uncategorized",
+          xHint: ((categoryId ? categoryOrder.get(categoryId) : undefined) ?? activeCategories.length) * 120,
+          yHint: 120 + reactionCount * 8,
+        };
+      }),
+      ...artifacts.map((artifact, index) => {
+        const category = artifact.categoryId ? categoriesById.get(artifact.categoryId) : undefined;
+        const key = nodeKey("synthesisArtifact", artifact._id);
+
+        return {
+          nodeKey: key,
+          entityType: "synthesisArtifact" as const,
+          entityId: artifact._id,
+          label: artifact.title,
+          body: preview(artifactText(artifact)),
+          categoryId: artifact.categoryId,
+          categorySlug: category?.slug,
+          categoryName: category?.name,
+          categoryColor: category?.color,
+          weight: 2 + (degreeByNodeKey.get(key) ?? 0),
+          radiusScore: Math.min(1, 0.45 + (degreeByNodeKey.get(key) ?? 0) / 10),
+          clusterKey: category?.slug ?? "synthesis",
+          colorKey: category?.color ?? "synthesis",
+          xHint: ((artifact.categoryId ? categoryOrder.get(artifact.categoryId) : undefined) ?? index) * 120,
+          yHint: 260,
+        };
+      }),
+    ];
+    const nodeKeys = new Set(nodes.map((node) => node.nodeKey));
+    const edges = links
+      .map((link) => {
+        const sourceKey = nodeKey(link.sourceEntityType, link.sourceEntityId);
+        const targetKey = nodeKey(link.targetEntityType, link.targetEntityId);
+
+        return {
+          id: link._id,
+          sourceKey,
+          targetKey,
+          sourceEntityType: link.sourceEntityType,
+          sourceEntityId: link.sourceEntityId,
+          targetEntityType: link.targetEntityType,
+          targetEntityId: link.targetEntityId,
+          linkType: link.linkType,
+          strength: link.strength,
+          confidence: link.confidence,
+          weight: Math.max(0.05, link.strength * link.confidence),
+          rationale: link.rationale,
+          source: link.source,
+          createdAt: link.createdAt,
+          updatedAt: link.updatedAt,
+        };
+      })
+      .filter((edge) => nodeKeys.has(edge.sourceKey) && nodeKeys.has(edge.targetKey));
+
+    return {
+      session: {
+        id: session._id,
+        slug: session.slug,
+        title: session.title,
+      },
+      nodes,
+      edges,
+      layout: {
+        suggestedRenderer: "force",
+        clusterField: "clusterKey",
+        colorField: "colorKey",
+        radiusField: "radiusScore",
+      },
+      caps: {
+        categoriesCapped: categories.length === CATEGORY_LIMIT,
+        submissionsCapped: submissions.length === SUBMISSION_LIMIT,
+        artifactsCapped: artifacts.length === ARTIFACT_LIMIT,
+        linksCapped: links.length === LINK_LIMIT,
+        reactionsCapped: reactions.length === SUBMISSION_LIMIT * 3,
       },
     };
   },

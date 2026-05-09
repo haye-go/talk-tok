@@ -8,7 +8,7 @@ import {
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
-const DEMO_SLUG = "ethics-ai-healthcare-demo";
+const DEMO_SLUG = "useless-university-lessons-demo";
 const DEMO_JOIN_CODE = "SPARK";
 const RESET_CONFIRMATION = "RESET DEMO SESSION";
 const MAX_RESET_BATCH = 500;
@@ -41,85 +41,127 @@ type SessionScopedTable =
 
 const DEMO_CATEGORIES = [
   {
-    slug: "liability-law",
-    name: "Liability & Law",
-    description: "Responsibility gaps, insurance, and regulatory accountability.",
-    color: "sky",
-  },
-  {
-    slug: "patient-autonomy",
-    name: "Patient Autonomy",
-    description: "Consent, power dynamics, and patient understanding.",
+    slug: "memorized-forgotten",
+    name: "Memorized and Forgotten",
+    description: "Facts, formulas, definitions, or exam content retained only long enough to pass.",
     color: "rose",
   },
   {
-    slug: "cost-access",
-    name: "Cost & Access",
-    description: "Affordability, unequal deployment, and access tradeoffs.",
+    slug: "bureaucracy-admin",
+    name: "Bureaucracy and Admin",
+    description: "Registration systems, citation rules, formatting requirements, and paperwork rituals.",
+    color: "amber",
+  },
+  {
+    slug: "abstract-theory",
+    name: "Theory With No Obvious Use",
+    description: "Abstract frameworks that felt detached from practical work.",
+    color: "sky",
+  },
+  {
+    slug: "accidentally-useful",
+    name: "Accidentally Useful",
+    description: "Things that seemed useless at the time but later helped unexpectedly.",
     color: "green",
   },
   {
-    slug: "trust-accuracy",
-    name: "Trust & Accuracy",
-    description: "Bias, error rates, explainability, and clinical reliability.",
-    color: "amber",
+    slug: "social-survival",
+    name: "Social Survival Skills",
+    description: "Group projects, presentations, networking, conflict management, and office-hours etiquette.",
+    color: "violet",
   },
 ] as const;
 
 const DEMO_RESPONSES = [
   {
     nickname: "Maya",
-    categorySlug: "patient-autonomy",
-    body: "AI should assist doctors, but patients deserve to know when an AI system shaped the diagnosis. Informed consent is not meaningful if the patient never knows a model was involved.",
+    categorySlug: "memorized-forgotten",
+    body: "The Krebs cycle. I memorized it like a sacred poem for one exam, then immediately forgot it. The only lasting skill was learning how to panic-study complex diagrams at 2 a.m.",
     inputPattern: "composed_gradually",
     compositionMs: 142000,
     pasteEventCount: 0,
-    keystrokeCount: 194,
+    keystrokeCount: 213,
   },
   {
     nickname: "Sam",
-    categorySlug: "liability-law",
-    body: "The liability gap is the real problem. If an AI misdiagnoses someone, responsibility could sit with the hospital, software vendor, clinician, or regulator, and that ambiguity weakens accountability.",
+    categorySlug: "bureaucracy-admin",
+    body: "I learned APA citation rules more deeply than the actual course content. It felt useless, but now I can spot messy references and fake authority in reports embarrassingly fast.",
     inputPattern: "composed_gradually",
     compositionMs: 154000,
     pasteEventCount: 0,
-    keystrokeCount: 216,
+    keystrokeCount: 205,
   },
   {
     nickname: "Priya",
-    categorySlug: "trust-accuracy",
-    body: "Accuracy alone is not enough. A black-box AI can be correct often but still unsafe if doctors cannot explain why it made a recommendation in edge cases.",
+    categorySlug: "abstract-theory",
+    body: "A whole module on post-structuralism felt like academic fog. Weirdly, it later helped me notice when workplace documents use fancy language to hide weak arguments.",
     inputPattern: "mixed",
     compositionMs: 38000,
     pasteEventCount: 1,
-    keystrokeCount: 74,
+    keystrokeCount: 83,
   },
   {
     nickname: "Jake",
-    categorySlug: "cost-access",
-    body: "AI diagnosis could improve access in under-served clinics, but only if the technology is affordable and maintained properly. Otherwise it may widen healthcare inequality.",
+    categorySlug: "social-survival",
+    body: "Group projects taught me less about the subject and more about diplomatic chasing. The useless part was the project; the useful part was learning how to get five tired people to agree.",
     inputPattern: "composed_gradually",
     compositionMs: 121000,
     pasteEventCount: 0,
-    keystrokeCount: 173,
+    keystrokeCount: 196,
   },
   {
     nickname: "Rina",
-    categorySlug: "trust-accuracy",
-    body: "I worry about dataset bias. If training data underrepresents certain communities, AI diagnostic confidence may look scientific while being systematically worse for those groups.",
+    categorySlug: "accidentally-useful",
+    body: "Statistics formulas felt pointless because software did the calculations. Then I started reading workplace dashboards and realized the formula mattered because it told me what the chart was hiding.",
     inputPattern: "composed_gradually",
     compositionMs: 168000,
     pasteEventCount: 0,
-    keystrokeCount: 191,
+    keystrokeCount: 226,
   },
   {
     nickname: "Alex",
-    categorySlug: "liability-law",
-    body: "Doctors already work with probabilistic evidence. The difference with AI is not probability itself but who can audit the model and challenge the decision trail.",
+    categorySlug: "bureaucracy-admin",
+    body: "Lab report formatting. We lost marks for margins and captions while the actual experiment barely worked. It was absurd, but it did teach me that presentation changes whether people trust your work.",
     inputPattern: "likely_pasted",
     compositionMs: 7200,
     pasteEventCount: 1,
-    keystrokeCount: 18,
+    keystrokeCount: 24,
+  },
+  {
+    nickname: "Noah",
+    categorySlug: "social-survival",
+    body: "Presentation classes felt fake because everyone knew we were pretending to be confident. Later I realized that pretending calmly while still figuring things out is basically half of professional life.",
+    inputPattern: "mixed",
+    compositionMs: 46000,
+    pasteEventCount: 1,
+    keystrokeCount: 97,
+  },
+  {
+    nickname: "Leah",
+    categorySlug: "accidentally-useful",
+    body: "A required elective on art history seemed unrelated to my major. It became useful when I had to explain technical ideas visually instead of burying people in bullet points.",
+    inputPattern: "composed_gradually",
+    compositionMs: 133000,
+    pasteEventCount: 0,
+    keystrokeCount: 182,
+  },
+  {
+    nickname: "Dan",
+    categorySlug: "abstract-theory",
+    body: "I thought learning argument fallacies was just exam filler. It became useful when reading meeting notes where every bad decision was dressed up as 'strategic alignment.'",
+    inputPattern: "composed_gradually",
+    compositionMs: 99000,
+    pasteEventCount: 0,
+    keystrokeCount: 151,
+  },
+  {
+    nickname: "Zara",
+    categorySlug: "memorized-forgotten",
+    body: "I memorized lists of theorists and dates that evaporated after finals. The useful lesson was not the facts; it was realizing memory without context has a very short shelf life.",
+    inputPattern: "composed_gradually",
+    compositionMs: 110000,
+    pasteEventCount: 0,
+    keystrokeCount: 176,
   },
 ] as const;
 
@@ -139,6 +181,19 @@ async function findDemoSession(ctx: QueryCtx | MutationCtx) {
     .query("sessions")
     .withIndex("by_slug", (q) => q.eq("slug", DEMO_SLUG))
     .unique();
+}
+
+async function findLegacyDemoSessions(ctx: QueryCtx | MutationCtx) {
+  const sessions = await ctx.db
+    .query("sessions")
+    .withIndex("by_join_code", (q) => q.eq("joinCode", DEMO_JOIN_CODE))
+    .take(20);
+
+  return sessions.filter(
+    (session) =>
+      session.slug !== DEMO_SLUG &&
+      (session.slug.includes("demo") || session.title.toLowerCase().includes("[demo]")),
+  );
 }
 
 async function deleteBatchBySession(
@@ -173,6 +228,7 @@ export const seed = mutation({
   },
   handler: async (ctx, args) => {
     const existing = await findDemoSession(ctx);
+    const legacySessions = await findLegacyDemoSessions(ctx);
 
     if (existing && !args.resetExisting) {
       return {
@@ -182,18 +238,31 @@ export const seed = mutation({
       };
     }
 
+    if (!existing && legacySessions.length > 0 && !args.resetExisting) {
+      throw new Error(
+        `A legacy demo session already uses ${DEMO_JOIN_CODE}. Rerun seed with resetExisting: true to replace it.`,
+      );
+    }
+
     if (existing && args.resetExisting) {
       await resetDemoSessionData(ctx, existing._id);
       await ctx.db.delete(existing._id);
+    }
+
+    if (args.resetExisting) {
+      for (const legacySession of legacySessions) {
+        await resetDemoSessionData(ctx, legacySession._id);
+        await ctx.db.delete(legacySession._id);
+      }
     }
 
     const now = Date.now();
     const sessionId = await ctx.db.insert("sessions", {
       slug: DEMO_SLUG,
       joinCode: DEMO_JOIN_CODE,
-      title: "[Demo] Ethics of AI in Healthcare",
+      title: "[Demo] Useless Things We Learned in University",
       openingPrompt:
-        "Should AI be allowed to make medical diagnoses without human oversight? Consider legal, ethical, and practical dimensions.",
+        "What's the most useless thing you learned in university, and did it become useful later in an unexpected way?",
       modePreset: "class_discussion",
       phase: "discover",
       currentAct: "discover",
@@ -275,12 +344,17 @@ export const seed = mutation({
         status: "success",
         tone: "spicy",
         reasoningBand: response.inputPattern === "likely_pasted" ? "solid" : "strong",
-        originalityBand: response.nickname === "Alex" ? "distinctive" : "above_average",
+        originalityBand:
+          response.categorySlug === "accidentally-useful" || response.nickname === "Priya"
+            ? "distinctive"
+            : "above_average",
         specificityBand: "clear",
-        summary: "Your response identifies a concrete issue that can be developed further.",
-        strengths: "Clear claim with a relevant discussion angle.",
-        improvement: "Add one example or implication to make the point harder to dismiss.",
-        nextQuestion: "What would change your position?",
+        summary:
+          "This works because it starts as a joke but points to a real transfer question: what, if anything, moved from university into life after it?",
+        strengths: "Specific example, readable tone, and a clear reason the lesson felt useless.",
+        improvement:
+          "Push one step further: explain whether the skill itself was useless, or whether it was taught in a way that hid its value.",
+        nextQuestion: "Did the lesson become useful later, or was it truly dead weight?",
         createdAt: now,
         updatedAt: now,
       });
@@ -295,17 +369,18 @@ export const seed = mutation({
       status: "published",
       title: "Class Synthesis",
       summary:
-        "The discussion clusters around liability, patient autonomy, cost and access, and trust in model accuracy.",
+        "The discussion turns 'useless' university lessons into a sharper split between content that evaporated after exams and skills that transferred in disguised ways.",
       keyPoints: [
-        "Liability remains unclear when model, hospital, and clinician responsibilities overlap.",
-        "Consent matters because patients may not know when AI shaped a diagnosis.",
-        "Access gains could be real, but uneven deployment may widen inequality.",
+        "Many supposedly useless lessons were memorized for assessment rather than understood as lasting knowledge.",
+        "Admin rituals such as citations, lab formatting, and paperwork felt pointless but taught institutional fluency.",
+        "Group work and presentations were disliked, yet often became practical training for workplace coordination.",
+        "Some abstract theory became useful later as a way to spot weak reasoning or frame messy problems.",
       ],
       uniqueInsights: [
-        "Several students distinguished probabilistic medical judgment from auditable AI decision trails.",
+        "Several responses argued that the problem was not always the topic itself, but the way university separated it from real context.",
       ],
       opposingViews: [
-        "Some responses emphasized access benefits, while others prioritized accountability risks.",
+        "Some points describe content as genuinely useless, while others suggest the same content became useful only after a later setting gave it meaning.",
       ],
       sourceCounts: { submissions: submissionIds.length, categories: DEMO_CATEGORIES.length },
       createdAt: now,

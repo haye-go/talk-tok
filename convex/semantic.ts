@@ -22,6 +22,9 @@ type SemanticTarget = {
 const ENTITY_LIMIT = 120;
 const EMBEDDING_LIMIT = 240;
 const SIGNAL_LIMIT = 240;
+const CATEGORY_LIMIT = 100;
+const FOLLOW_UP_LIMIT = 40;
+const POSITION_SHIFT_LIMIT = 120;
 
 const entityTypeValidator = v.union(
   v.literal("submission"),
@@ -29,6 +32,15 @@ const entityTypeValidator = v.union(
   v.literal("category"),
   v.literal("fightThread"),
   v.literal("followUpPrompt"),
+);
+
+const signalTypeValidator = v.union(
+  v.literal("novelty"),
+  v.literal("duplicate"),
+  v.literal("opposition"),
+  v.literal("support"),
+  v.literal("bridge"),
+  v.literal("isolated"),
 );
 
 function normalizeSessionSlug(value: string) {
@@ -118,6 +130,28 @@ function toSignal(row: Doc<"semanticSignals">) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+function participantLabel(
+  session: Doc<"sessions">,
+  participant: Doc<"participants"> | undefined,
+  fallbackIndex: number,
+) {
+  if (!participant) {
+    return `Participant ${fallbackIndex + 1}`;
+  }
+
+  return session.anonymityMode === "nicknames_visible"
+    ? participant.nickname
+    : `Participant ${fallbackIndex + 1}`;
+}
+
+function average(values: number[]) {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 export const queueEmbeddingsForSession = mutation({
@@ -481,7 +515,7 @@ export const getSemanticStatus = query({
       return null;
     }
 
-    const [jobs, embeddings, signals] = await Promise.all([
+    const [jobs, embeddings, signals, argumentLinks, aiJobs, submissions] = await Promise.all([
       ctx.db
         .query("semanticEmbeddingJobs")
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
@@ -495,7 +529,29 @@ export const getSemanticStatus = query({
         .query("semanticSignals")
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
         .take(SIGNAL_LIMIT),
+      ctx.db
+        .query("argumentLinks")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(SIGNAL_LIMIT),
+      ctx.db
+        .query("aiJobs")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(80),
+      ctx.db
+        .query("submissions")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(ENTITY_LIMIT),
     ]);
+    const latestArgumentMapJob =
+      aiJobs.find((job) => job.type === "argument_map") ?? null;
+    const missingPrerequisites = [
+      embeddings.length === 0 ? "embeddings" : null,
+      signals.filter((signal) => signal.signalType === "novelty").length === 0
+        ? "novelty_signals"
+        : null,
+      argumentLinks.length === 0 ? "argument_links" : null,
+    ].filter((value): value is string => value !== null);
 
     return {
       latestJob: jobs[0] ?? null,
@@ -503,6 +559,359 @@ export const getSemanticStatus = query({
       embeddingCount: embeddings.length,
       signalCount: signals.length,
       noveltyCount: signals.filter((signal) => signal.signalType === "novelty").length,
+      argumentLinkCount: argumentLinks.length,
+      latestArgumentMapJob,
+      submissionCount: submissions.length,
+      readiness: {
+        canShowNoveltyRadar: embeddings.length > 0 && missingPrerequisites.includes("novelty_signals") === false,
+        canShowArgumentMap: argumentLinks.length > 0,
+        missingPrerequisites,
+      },
+      caps: {
+        embeddingsCapped: embeddings.length === EMBEDDING_LIMIT,
+        signalsCapped: signals.length === SIGNAL_LIMIT,
+        argumentLinksCapped: argumentLinks.length === SIGNAL_LIMIT,
+        submissionsCapped: submissions.length === ENTITY_LIMIT,
+      },
+    };
+  },
+});
+
+export const refreshSignalsForSession = mutation({
+  args: {
+    sessionSlug: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ inserted: number }> => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      throw new Error("Session not found.");
+    }
+
+    await rateLimiter.limit(ctx, "heavyAiAction", {
+      key: `semantic-refresh:${session._id}`,
+      throws: true,
+    });
+
+    return await ctx.runMutation(internal.semantic.refreshNoveltySignals, {
+      sessionId: session._id,
+    });
+  },
+});
+
+export const getNoveltyRadar = query({
+  args: {
+    sessionSlug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      return null;
+    }
+
+    const [signals, submissions, participants, categories, assignments] = await Promise.all([
+      ctx.db
+        .query("semanticSignals")
+        .withIndex("by_session_and_signal_type", (q) =>
+          q.eq("sessionId", session._id).eq("signalType", "novelty"),
+        )
+        .order("desc")
+        .take(SIGNAL_LIMIT),
+      ctx.db
+        .query("submissions")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(ENTITY_LIMIT),
+      ctx.db
+        .query("participants")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(ENTITY_LIMIT),
+      ctx.db
+        .query("categories")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(CATEGORY_LIMIT),
+      ctx.db
+        .query("submissionCategories")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(ENTITY_LIMIT * 2),
+    ]);
+    const participantsById = new Map(participants.map((participant, index) => [
+      participant._id,
+      { participant, index },
+    ]));
+    const submissionsById = new Map(submissions.map((submission) => [submission._id, submission]));
+    const categoriesById = new Map(categories.map((category) => [category._id, category]));
+    const categoryBySubmission = new Map<Id<"submissions">, Id<"categories">>();
+
+    for (const assignment of assignments) {
+      if (!categoryBySubmission.has(assignment.submissionId)) {
+        categoryBySubmission.set(assignment.submissionId, assignment.categoryId);
+      }
+    }
+
+    const distribution = { low: 0, medium: 0, high: 0 };
+    const categoryScores = new Map<Id<"categories">, number[]>();
+    const examples = signals
+      .filter((signal) => signal.submissionId)
+      .map((signal) => {
+        const submission = signal.submissionId ? submissionsById.get(signal.submissionId) : undefined;
+        const participantInfo = submission ? participantsById.get(submission.participantId) : undefined;
+        const categoryId = signal.submissionId
+          ? categoryBySubmission.get(signal.submissionId)
+          : undefined;
+        const category = categoryId ? categoriesById.get(categoryId) : undefined;
+
+        distribution[signal.band] += 1;
+
+        if (categoryId) {
+          const scores = categoryScores.get(categoryId) ?? [];
+          scores.push(signal.score);
+          categoryScores.set(categoryId, scores);
+        }
+
+        return {
+          signalId: signal._id,
+          submissionId: signal.submissionId,
+          participantId: signal.participantId,
+          participantLabel: participantLabel(
+            session,
+            participantInfo?.participant,
+            participantInfo?.index ?? 0,
+          ),
+          categoryId,
+          categorySlug: category?.slug,
+          categoryName: category?.name,
+          categoryColor: category?.color,
+          band: signal.band,
+          score: signal.score,
+          rationale: signal.rationale,
+          bodyPreview: submission?.body.slice(0, 220),
+          createdAt: signal.createdAt,
+        };
+      });
+
+    const categoryAverages = Array.from(categoryScores.entries()).map(([categoryId, scores]) => {
+      const category = categoriesById.get(categoryId);
+
+      return {
+        categoryId,
+        categorySlug: category?.slug ?? "unknown",
+        categoryName: category?.name ?? "Unknown category",
+        categoryColor: category?.color,
+        averageNoveltyScore: average(scores),
+        signalCount: scores.length,
+      };
+    });
+
+    return {
+      session: {
+        id: session._id,
+        slug: session.slug,
+        title: session.title,
+      },
+      distribution,
+      topDistinctive: examples
+        .filter((example) => example.band === "high")
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8),
+      commonClusterExamples: examples
+        .filter((example) => example.band === "low")
+        .sort((a, b) => a.score - b.score)
+        .slice(0, 8),
+      categoryAverages: categoryAverages.sort(
+        (a, b) => b.averageNoveltyScore - a.averageNoveltyScore,
+      ),
+      caps: {
+        signalsCapped: signals.length === SIGNAL_LIMIT,
+        submissionsCapped: submissions.length === ENTITY_LIMIT,
+        categoriesCapped: categories.length === CATEGORY_LIMIT,
+      },
+    };
+  },
+});
+
+export const getCategoryDrift = query({
+  args: {
+    sessionSlug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      return null;
+    }
+
+    const [categories, followUps, submissions, assignments, positionShifts] = await Promise.all([
+      ctx.db
+        .query("categories")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(CATEGORY_LIMIT),
+      ctx.db
+        .query("followUpPrompts")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(FOLLOW_UP_LIMIT),
+      ctx.db
+        .query("submissions")
+        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+        .order("asc")
+        .take(ENTITY_LIMIT),
+      ctx.db
+        .query("submissionCategories")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(ENTITY_LIMIT * 2),
+      ctx.db
+        .query("positionShiftEvents")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(POSITION_SHIFT_LIMIT),
+    ]);
+    const categoriesById = new Map(categories.map((category) => [category._id, category]));
+    const followUpsSorted = [...followUps].sort(
+      (a, b) => a.roundNumber - b.roundNumber || a.createdAt - b.createdAt,
+    );
+    const sliceDefs = [
+      {
+        key: "initial",
+        label: "Initial responses",
+        startsAt: submissions.find((submission) => !submission.followUpPromptId)?.createdAt,
+        endsAt: undefined as number | undefined,
+        order: 0,
+      },
+      ...followUpsSorted.map((prompt, index) => ({
+        key: `follow-up-${prompt.slug}`,
+        label: `Round ${prompt.roundNumber}: ${prompt.title}`,
+        startsAt: prompt.activatedAt ?? prompt.createdAt,
+        endsAt: prompt.closedAt,
+        order: index + 1,
+        followUpPromptId: prompt._id,
+      })),
+    ];
+    const sliceByPrompt = new Map(
+      followUpsSorted.map((prompt) => [prompt._id, `follow-up-${prompt.slug}`]),
+    );
+    const sliceOrder = new Map(sliceDefs.map((slice) => [slice.key, slice.order]));
+    const categoryBySubmission = new Map<Id<"submissions">, Id<"categories">>();
+
+    for (const assignment of assignments) {
+      if (!categoryBySubmission.has(assignment.submissionId)) {
+        categoryBySubmission.set(assignment.submissionId, assignment.categoryId);
+      }
+    }
+
+    const countsBySlice = new Map<string, Map<Id<"categories">, number>>();
+    const uncategorizedBySlice = new Map<string, number>();
+    const participantSliceCategory = new Map<
+      Id<"participants">,
+      Map<string, Id<"categories">>
+    >();
+
+    for (const submission of submissions) {
+      const sliceKey = submission.followUpPromptId
+        ? (sliceByPrompt.get(submission.followUpPromptId) ?? "initial")
+        : "initial";
+      const categoryId = categoryBySubmission.get(submission._id);
+
+      if (!categoryId) {
+        uncategorizedBySlice.set(sliceKey, (uncategorizedBySlice.get(sliceKey) ?? 0) + 1);
+        continue;
+      }
+
+      const categoryCounts = countsBySlice.get(sliceKey) ?? new Map<Id<"categories">, number>();
+      categoryCounts.set(categoryId, (categoryCounts.get(categoryId) ?? 0) + 1);
+      countsBySlice.set(sliceKey, categoryCounts);
+
+      const perParticipant =
+        participantSliceCategory.get(submission.participantId) ??
+        new Map<string, Id<"categories">>();
+      perParticipant.set(sliceKey, categoryId);
+      participantSliceCategory.set(submission.participantId, perParticipant);
+    }
+
+    const transitionCounts = new Map<string, number>();
+
+    for (const perParticipant of participantSliceCategory.values()) {
+      const ordered = Array.from(perParticipant.entries()).sort(
+        ([sliceA], [sliceB]) => (sliceOrder.get(sliceA) ?? 0) - (sliceOrder.get(sliceB) ?? 0),
+      );
+
+      for (let index = 1; index < ordered.length; index += 1) {
+        const [fromSliceKey, fromCategoryId] = ordered[index - 1];
+        const [toSliceKey, toCategoryId] = ordered[index];
+        const key = `${fromSliceKey}:${fromCategoryId}->${toSliceKey}:${toCategoryId}`;
+        transitionCounts.set(key, (transitionCounts.get(key) ?? 0) + 1);
+      }
+    }
+
+    const slices = sliceDefs.map((slice) => {
+      const categoryCounts = countsBySlice.get(slice.key) ?? new Map<Id<"categories">, number>();
+
+      return {
+        key: slice.key,
+        label: slice.label,
+        startsAt: slice.startsAt,
+        endsAt: slice.endsAt,
+        categoryCounts: Array.from(categoryCounts.entries()).map(([categoryId, count]) => {
+          const category = categoriesById.get(categoryId);
+
+          return {
+            categoryId,
+            categorySlug: category?.slug ?? "unknown",
+            categoryName: category?.name ?? "Unknown category",
+            categoryColor: category?.color,
+            count,
+          };
+        }),
+        uncategorizedCount: uncategorizedBySlice.get(slice.key) ?? 0,
+      };
+    });
+    const transitions = Array.from(transitionCounts.entries()).map(([key, count]) => {
+      const match = key.match(/^(.+):([^:]+)->(.+):([^:]+)$/);
+      const fromSliceKey = match?.[1] ?? "unknown";
+      const fromCategoryId = match?.[2] as Id<"categories"> | undefined;
+      const toSliceKey = match?.[3] ?? "unknown";
+      const toCategoryId = match?.[4] as Id<"categories"> | undefined;
+      const fromCategory = fromCategoryId ? categoriesById.get(fromCategoryId) : undefined;
+      const toCategory = toCategoryId ? categoriesById.get(toCategoryId) : undefined;
+
+      return {
+        fromSliceKey,
+        toSliceKey,
+        fromCategoryId,
+        fromCategorySlug: fromCategory?.slug,
+        fromCategoryName: fromCategory?.name,
+        toCategoryId,
+        toCategorySlug: toCategory?.slug,
+        toCategoryName: toCategory?.name,
+        count,
+      };
+    });
+
+    return {
+      session: {
+        id: session._id,
+        slug: session.slug,
+        title: session.title,
+      },
+      slices,
+      transitions,
+      positionShifts: positionShifts.map((event) => ({
+        id: event._id,
+        participantId: event.participantId,
+        submissionId: event.submissionId,
+        categoryId: event.categoryId,
+        reason: event.reason,
+        influencedBy: event.influencedBy,
+        createdAt: event.createdAt,
+      })),
+      caps: {
+        categoriesCapped: categories.length === CATEGORY_LIMIT,
+        followUpsCapped: followUps.length === FOLLOW_UP_LIMIT,
+        submissionsCapped: submissions.length === ENTITY_LIMIT,
+        assignmentsCapped: assignments.length === ENTITY_LIMIT * 2,
+        positionShiftsCapped: positionShifts.length === POSITION_SHIFT_LIMIT,
+      },
     };
   },
 });
@@ -511,14 +920,7 @@ export const listSignalsForSession = query({
   args: {
     sessionSlug: v.string(),
     signalType: v.optional(
-      v.union(
-        v.literal("novelty"),
-        v.literal("duplicate"),
-        v.literal("opposition"),
-        v.literal("support"),
-        v.literal("bridge"),
-        v.literal("isolated"),
-      ),
+      signalTypeValidator,
     ),
   },
   handler: async (ctx, args) => {
