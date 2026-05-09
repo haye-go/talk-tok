@@ -8,6 +8,7 @@ declare const process: { env: Record<string, string | undefined> };
 type JsonRecord = Record<string, unknown>;
 
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings";
 
 function asRecord(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
@@ -79,6 +80,10 @@ function extractContent(responseJson: JsonRecord) {
   return message.content;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function buildOpenAiRequest(args: {
   model: string;
   systemPrompt: string;
@@ -136,6 +141,42 @@ export const loadRuntime = internalQuery({
     }
 
     return { prompt, modelSetting };
+  },
+});
+
+export const loadModelForFeature = internalQuery({
+  args: {
+    feature: v.string(),
+    modelKey: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    if (args.modelKey) {
+      const modelSetting = await ctx.db
+        .query("modelSettings")
+        .withIndex("by_key", (q) => q.eq("key", args.modelKey!))
+        .unique();
+
+      if (!modelSetting) {
+        throw new Error(`Model setting missing: ${args.modelKey}`);
+      }
+
+      if (!modelSetting.enabled) {
+        throw new Error(`Model setting is disabled: ${args.modelKey}`);
+      }
+
+      return modelSetting;
+    }
+
+    const models = await ctx.db.query("modelSettings").take(100);
+    const modelSetting = models.find(
+      (model) => model.enabled && model.features.includes(args.feature),
+    );
+
+    if (!modelSetting) {
+      throw new Error(`No enabled model setting for feature: ${args.feature}`);
+    }
+
+    return modelSetting;
   },
 });
 
@@ -253,6 +294,29 @@ export const runJson = internalAction({
     let errorAlreadyLogged = false;
 
     try {
+      const slowToggle = await ctx.runQuery(internal.demo.isToggleEnabled, {
+        key: "simulateSlowAi",
+      });
+      const failureToggle = await ctx.runQuery(internal.demo.isToggleEnabled, {
+        key: "simulateAiFailure",
+      });
+
+      if (slowToggle.enabled) {
+        const delayMs = asRecord(slowToggle.valueJson).delayMs;
+        await sleep(typeof delayMs === "number" ? Math.min(Math.max(delayMs, 250), 10_000) : 1500);
+      }
+
+      if (failureToggle.enabled) {
+        const message = "Simulated AI failure is enabled.";
+        await ctx.runMutation(internal.llm.markCallError, {
+          llmCallId,
+          latencyMs: Date.now() - startedAt,
+          error: message,
+        });
+        errorAlreadyLogged = true;
+        throw new Error(message);
+      }
+
       const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
         method: "POST",
         headers: {
@@ -303,6 +367,153 @@ export const runJson = internalAction({
     } catch (error) {
       const latencyMs = Date.now() - startedAt;
       const message = error instanceof Error ? error.message : "Unknown LLM error.";
+
+      if (!errorAlreadyLogged) {
+        await ctx.runMutation(internal.llm.markCallError, {
+          llmCallId,
+          latencyMs,
+          error: message,
+        });
+      }
+
+      throw error;
+    }
+  },
+});
+
+export const embedText = internalAction({
+  args: {
+    sessionId: v.optional(v.id("sessions")),
+    text: v.string(),
+    modelKey: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ embedding: number[]; llmCallId: Id<"llmCalls">; model: string; dimensions: number }> => {
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY is not configured in Convex env.");
+    }
+
+    const modelSetting = await ctx.runQuery(internal.llm.loadModelForFeature, {
+      feature: "embedding",
+      modelKey: args.modelKey,
+    });
+    const variables = asRecord(modelSetting.variablesJson);
+    const dimensions =
+      typeof variables.dimensions === "number" && Number.isFinite(variables.dimensions)
+        ? variables.dimensions
+        : 1536;
+    const requestJson = {
+      model: modelSetting.model,
+      input: args.text,
+      dimensions,
+    };
+    const llmCallId: Id<"llmCalls"> = await ctx.runMutation(internal.llm.createCall, {
+      sessionId: args.sessionId,
+      feature: "embedding",
+      provider: modelSetting.provider,
+      model: modelSetting.model,
+      promptTemplateKey: "embedding.openai.v1",
+      requestJson: {
+        model: requestJson.model,
+        dimensions: requestJson.dimensions,
+        inputPreview: args.text.slice(0, 240),
+      },
+    });
+    const startedAt = Date.now();
+    let errorAlreadyLogged = false;
+
+    try {
+      const slowToggle = await ctx.runQuery(internal.demo.isToggleEnabled, {
+        key: "simulateSlowAi",
+      });
+      const failureToggle = await ctx.runQuery(internal.demo.isToggleEnabled, {
+        key: "simulateAiFailure",
+      });
+
+      if (slowToggle.enabled) {
+        const delayMs = asRecord(slowToggle.valueJson).delayMs;
+        await sleep(typeof delayMs === "number" ? Math.min(Math.max(delayMs, 250), 10_000) : 1500);
+      }
+
+      if (failureToggle.enabled) {
+        const message = "Simulated AI failure is enabled.";
+        await ctx.runMutation(internal.llm.markCallError, {
+          llmCallId,
+          latencyMs: Date.now() - startedAt,
+          error: message,
+        });
+        errorAlreadyLogged = true;
+        throw new Error(message);
+      }
+
+      const response = await fetch(OPENAI_EMBEDDINGS_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestJson),
+      });
+      const responseJson = (await response.json()) as JsonRecord;
+      const latencyMs = Date.now() - startedAt;
+
+      if (!response.ok) {
+        const rawErrorMessage = asRecord(responseJson.error).message;
+        const errorMessage =
+          typeof rawErrorMessage === "string"
+            ? rawErrorMessage
+            : `OpenAI embedding request failed with status ${response.status}`;
+        await ctx.runMutation(internal.llm.markCallError, {
+          llmCallId,
+          latencyMs,
+          error: errorMessage,
+          responseJson,
+        });
+        errorAlreadyLogged = true;
+        throw new Error(errorMessage);
+      }
+
+      const data = Array.isArray(responseJson.data) ? responseJson.data : [];
+      const first = asRecord(data[0]);
+      const embedding = Array.isArray(first.embedding)
+        ? first.embedding.filter((value): value is number => typeof value === "number")
+        : [];
+      const usage = extractUsage(responseJson);
+      const estimatedCostUsd = estimateCostUsd({
+        inputTokens: usage.inputTokens,
+        cachedInputTokens: usage.cachedInputTokens,
+        outputTokens: 0,
+        reasoningTokens: 0,
+        inputCostPerMillion: modelSetting.inputCostPerMillion,
+        cachedInputCostPerMillion: modelSetting.cachedInputCostPerMillion,
+        outputCostPerMillion: modelSetting.outputCostPerMillion,
+        reasoningCostPerMillion: modelSetting.reasoningCostPerMillion,
+      });
+
+      if (embedding.length !== dimensions) {
+        throw new Error(`Embedding dimension mismatch: expected ${dimensions}, got ${embedding.length}.`);
+      }
+
+      await ctx.runMutation(internal.llm.markCallSuccess, {
+        llmCallId,
+        ...usage,
+        outputTokens: 0,
+        estimatedCostUsd,
+        latencyMs,
+        responseJson: {
+          ...responseJson,
+          data: [{ embeddingPreview: embedding.slice(0, 8), dimensions: embedding.length }],
+        },
+      });
+
+      return { embedding, llmCallId, model: modelSetting.model, dimensions };
+    } catch (error) {
+      const latencyMs = Date.now() - startedAt;
+      const message = error instanceof Error ? error.message : "Unknown embedding error.";
 
       if (!errorAlreadyLogged) {
         await ctx.runMutation(internal.llm.markCallError, {

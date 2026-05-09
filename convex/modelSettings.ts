@@ -46,6 +46,20 @@ const DEFAULT_MODELS = [
       responseFormat: "json_object",
     },
   },
+  {
+    key: "openai:text-embedding-3-small",
+    provider: "openai",
+    model: "text-embedding-3-small",
+    enabled: true,
+    features: ["embedding"],
+    inputCostPerMillion: 0.02,
+    cachedInputCostPerMillion: 0.02,
+    outputCostPerMillion: 0,
+    reasoningCostPerMillion: 0,
+    variablesJson: {
+      dimensions: 1536,
+    },
+  },
 ] as const;
 
 export const seedDefaults = mutation({

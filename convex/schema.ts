@@ -117,6 +117,7 @@ export default defineSchema({
     ),
     createdAt: timestamp,
   })
+    .index("by_session", ["sessionId"])
     .index("by_session_and_created_at", ["sessionId", "createdAt"])
     .index("by_submission", ["submissionId"])
     .index("by_participant", ["participantId"])
@@ -135,6 +136,7 @@ export default defineSchema({
     influencedBy: v.optional(v.string()),
     createdAt: timestamp,
   })
+    .index("by_session", ["sessionId"])
     .index("by_session_and_created_at", ["sessionId", "createdAt"])
     .index("by_participant", ["participantId"])
     .index("by_submission", ["submissionId"])
@@ -199,6 +201,124 @@ export default defineSchema({
     .index("by_slug", ["slug"])
     .index("by_status", ["status"]),
 
+  semanticEmbeddingJobs: defineTable({
+    sessionId: v.id("sessions"),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("success"),
+      v.literal("error"),
+    ),
+    requestedBy: v.union(v.literal("system"), v.literal("instructor")),
+    entityTypes: v.array(
+      v.union(
+        v.literal("submission"),
+        v.literal("synthesisArtifact"),
+        v.literal("category"),
+        v.literal("fightThread"),
+        v.literal("followUpPrompt"),
+      ),
+    ),
+    progressTotal: v.optional(v.number()),
+    progressDone: v.optional(v.number()),
+    error: v.optional(v.string()),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_and_status", ["sessionId", "status"]),
+
+  semanticEmbeddings: defineTable({
+    sessionId: v.id("sessions"),
+    entityType: v.union(
+      v.literal("submission"),
+      v.literal("synthesisArtifact"),
+      v.literal("category"),
+      v.literal("fightThread"),
+      v.literal("followUpPrompt"),
+    ),
+    entityId: v.string(),
+    contentHash: v.string(),
+    textPreview: v.string(),
+    embeddingModel: v.string(),
+    dimensions: v.number(),
+    embedding: v.array(v.number()),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_and_entity_type", ["sessionId", "entityType"])
+    .index("by_entity", ["entityType", "entityId"])
+    .index("by_entity_and_hash", ["entityType", "entityId", "contentHash"])
+    .vectorIndex("by_embedding", {
+      vectorField: "embedding",
+      dimensions: 1536,
+      filterFields: ["sessionId", "entityType"],
+    }),
+
+  semanticSignals: defineTable({
+    sessionId: v.id("sessions"),
+    submissionId: v.optional(v.id("submissions")),
+    participantId: v.optional(v.id("participants")),
+    categoryId: v.optional(v.id("categories")),
+    signalType: v.union(
+      v.literal("novelty"),
+      v.literal("duplicate"),
+      v.literal("opposition"),
+      v.literal("support"),
+      v.literal("bridge"),
+      v.literal("isolated"),
+    ),
+    band: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+    score: v.number(),
+    rationale: v.optional(v.string()),
+    relatedEntityType: v.optional(v.string()),
+    relatedEntityId: v.optional(v.string()),
+    sourceEmbeddingId: v.optional(v.id("semanticEmbeddings")),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_and_signal_type", ["sessionId", "signalType"])
+    .index("by_submission", ["submissionId"])
+    .index("by_category", ["categoryId"]),
+
+  argumentLinks: defineTable({
+    sessionId: v.id("sessions"),
+    sourceEntityType: v.union(
+      v.literal("submission"),
+      v.literal("category"),
+      v.literal("synthesisArtifact"),
+      v.literal("fightThread"),
+    ),
+    sourceEntityId: v.string(),
+    targetEntityType: v.union(
+      v.literal("submission"),
+      v.literal("category"),
+      v.literal("synthesisArtifact"),
+      v.literal("fightThread"),
+    ),
+    targetEntityId: v.string(),
+    linkType: v.union(
+      v.literal("supports"),
+      v.literal("contradicts"),
+      v.literal("extends"),
+      v.literal("questions"),
+      v.literal("bridges"),
+    ),
+    strength: v.number(),
+    confidence: v.number(),
+    rationale: v.optional(v.string()),
+    source: v.union(v.literal("llm"), v.literal("embedding"), v.literal("instructor")),
+    aiJobId: v.optional(v.id("aiJobs")),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_and_link_type", ["sessionId", "linkType"])
+    .index("by_source_entity", ["sourceEntityType", "sourceEntityId"])
+    .index("by_target_entity", ["targetEntityType", "targetEntityId"]),
+
   submissionCategories: defineTable({
     sessionId: v.id("sessions"),
     submissionId: v.id("submissions"),
@@ -212,6 +332,7 @@ export default defineSchema({
     ),
     createdAt: timestamp,
   })
+    .index("by_session", ["sessionId"])
     .index("by_submission", ["submissionId"])
     .index("by_category", ["categoryId"]),
 
@@ -230,6 +351,7 @@ export default defineSchema({
     createdAt: timestamp,
     updatedAt: timestamp,
   })
+    .index("by_session", ["sessionId"])
     .index("by_session_and_created_at", ["sessionId", "createdAt"])
     .index("by_submission", ["submissionId"])
     .index("by_participant", ["participantId"])
@@ -319,6 +441,7 @@ export default defineSchema({
     source: v.union(v.literal("manual"), v.literal("draft_timeout"), v.literal("ai")),
     createdAt: timestamp,
   })
+    .index("by_session", ["sessionId"])
     .index("by_thread", ["fightThreadId"])
     .index("by_thread_and_turn", ["fightThreadId", "turnNumber"])
     .index("by_participant", ["participantId"]),
@@ -330,6 +453,7 @@ export default defineSchema({
     body: v.string(),
     updatedAt: timestamp,
   })
+    .index("by_session", ["sessionId"])
     .index("by_thread", ["fightThreadId"])
     .index("by_thread_and_participant", ["fightThreadId", "participantId"]),
 
@@ -532,6 +656,7 @@ export default defineSchema({
       v.literal("fight_challenge"),
       v.literal("fight_debrief"),
       v.literal("personal_report"),
+      v.literal("argument_map"),
     ),
     status: v.union(
       v.literal("queued"),
@@ -601,6 +726,13 @@ export default defineSchema({
     .index("by_key", ["key"])
     .index("by_session_and_key", ["sessionId", "key"]),
 
+  demoToggles: defineTable({
+    key: v.string(),
+    enabled: v.boolean(),
+    valueJson: v.any(),
+    updatedAt: timestamp,
+  }).index("by_key", ["key"]),
+
   auditEvents: defineTable({
     sessionId: v.optional(v.id("sessions")),
     actorType: v.union(v.literal("system"), v.literal("participant"), v.literal("instructor")),
@@ -611,6 +743,7 @@ export default defineSchema({
     metadataJson: v.optional(v.any()),
     createdAt: timestamp,
   })
+    .index("by_session", ["sessionId"])
     .index("by_session_and_created_at", ["sessionId", "createdAt"])
     .index("by_action_and_created_at", ["action", "createdAt"]),
 });

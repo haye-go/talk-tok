@@ -24,7 +24,8 @@ type JobType =
   | "synthesis"
   | "fight_challenge"
   | "fight_debrief"
-  | "personal_report";
+  | "personal_report"
+  | "argument_map";
 type ArtifactStatus =
   | "queued"
   | "processing"
@@ -121,6 +122,7 @@ function emptyJobSummary(): Record<JobType, Record<JobStatus, number>> {
     fight_challenge: emptyStatusCounts(),
     fight_debrief: emptyStatusCounts(),
     personal_report: emptyStatusCounts(),
+    argument_map: emptyStatusCounts(),
   };
 }
 

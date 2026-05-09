@@ -262,6 +262,35 @@ const DEFAULT_PROMPTS = [
       responseFormat: "json_object",
     },
   },
+  {
+    key: "argument_map.session.v1",
+    name: "Session argument map",
+    surface: "argument_map",
+    systemPrompt: [
+      "You map argument relationships in a live discussion.",
+      "Use only the supplied categories, submissions, and synthesis artifacts.",
+      "Create links only when the relationship is clear.",
+      "Return strict JSON matching the requested schema.",
+    ].join("\n"),
+    userTemplate: [
+      "Session title: {{sessionTitle}}",
+      "Opening prompt: {{openingPrompt}}",
+      "Categories: {{categoriesJson}}",
+      "Submissions: {{submissionsJson}}",
+      "Synthesis artifacts: {{artifactsJson}}",
+      "",
+      "Return JSON with links.",
+      "Each link must include sourceEntityType, sourceEntityId, targetEntityType, targetEntityId, linkType, strength, confidence, rationale.",
+      "Allowed entity types: submission, category, synthesisArtifact.",
+      "Allowed link types: supports, contradicts, extends, questions, bridges.",
+    ].join("\n"),
+    modelOverride: "openai:gpt-4.1-mini",
+    variablesJson: {
+      temperature: 0.1,
+      maxOutputTokens: 3000,
+      responseFormat: "json_object",
+    },
+  },
 ] as const;
 
 export const seedDefaults = mutation({

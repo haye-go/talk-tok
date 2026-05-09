@@ -9,12 +9,14 @@
  */
 
 import type * as aiFeedback from "../aiFeedback.js";
+import type * as argumentMap from "../argumentMap.js";
 import type * as audit from "../audit.js";
 import type * as bootstrap from "../bootstrap.js";
 import type * as budget from "../budget.js";
 import type * as categorisation from "../categorisation.js";
 import type * as categoryManagement from "../categoryManagement.js";
 import type * as components_ from "../components.js";
+import type * as demo from "../demo.js";
 import type * as fightMe from "../fightMe.js";
 import type * as followUps from "../followUps.js";
 import type * as instructorCommandCenter from "../instructorCommandCenter.js";
@@ -31,6 +33,7 @@ import type * as promptTemplates from "../promptTemplates.js";
 import type * as protection from "../protection.js";
 import type * as reactions from "../reactions.js";
 import type * as recategorisation from "../recategorisation.js";
+import type * as semantic from "../semantic.js";
 import type * as sessionTemplates from "../sessionTemplates.js";
 import type * as sessions from "../sessions.js";
 import type * as submissions from "../submissions.js";
@@ -44,12 +47,14 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   aiFeedback: typeof aiFeedback;
+  argumentMap: typeof argumentMap;
   audit: typeof audit;
   bootstrap: typeof bootstrap;
   budget: typeof budget;
   categorisation: typeof categorisation;
   categoryManagement: typeof categoryManagement;
   components: typeof components_;
+  demo: typeof demo;
   fightMe: typeof fightMe;
   followUps: typeof followUps;
   instructorCommandCenter: typeof instructorCommandCenter;
@@ -66,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   protection: typeof protection;
   reactions: typeof reactions;
   recategorisation: typeof recategorisation;
+  semantic: typeof semantic;
   sessionTemplates: typeof sessionTemplates;
   sessions: typeof sessions;
   submissions: typeof submissions;

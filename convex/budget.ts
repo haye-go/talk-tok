@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalQuery, query, type QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 type JsonRecord = Record<string, unknown>;
@@ -58,6 +59,22 @@ export const checkSessionBudget = internalQuery({
     feature: v.string(),
   },
   handler: async (ctx, args) => {
+    const simulatedBudgetExceeded = await ctx.runQuery(internal.demo.isToggleEnabled, {
+      key: "simulateBudgetExceeded",
+    });
+
+    if (simulatedBudgetExceeded.enabled) {
+      return {
+        allowed: false,
+        warning: true,
+        feature: args.feature,
+        hardStopEnabled: true,
+        totalEstimatedCostUsd: DEFAULT_SESSION_BUDGET_USD,
+        perSessionEstimatedCostUsd: DEFAULT_SESSION_BUDGET_USD,
+        usagePercent: 100,
+      };
+    }
+
     const budget = await getBudgetSettingForSession(ctx, args.sessionId);
     const perSessionEstimatedCostUsd = numberFrom(
       budget.perSessionEstimatedCostUsd,
