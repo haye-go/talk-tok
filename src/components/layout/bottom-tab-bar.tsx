@@ -41,7 +41,7 @@ export function BottomTabBar({
             )}
           >
             <Icon size={20} weight={active ? "bold" : "regular"} />
-            <span>{tab.label}</span>
+            <span className="font-display">{tab.label}</span>
           </button>
         );
       })}
