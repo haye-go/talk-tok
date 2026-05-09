@@ -47,8 +47,8 @@
 :root {
   color-scheme: light;
 
-  --c-canvas: oklch(0.9500 0.012 81.75);
-  --c-surface-soft: oklch(0.9750 0.006 81.75);
+  --c-canvas: oklch(0.95 0.012 81.75);
+  --c-surface-soft: oklch(0.975 0.006 81.75);
   --c-surface-strong: oklch(0.9124 0.0058 81.75);
   --c-surface-dark: oklch(0.2299 0.019 82.2);
 
@@ -72,10 +72,10 @@
   --c-sig-mustard: oklch(0.7507 0.13 79.85);
 
   /* Fixed text colors for signature surfaces (theme-independent) */
-  --c-on-sig-light: oklch(0.2299 0.019 82.20);
-  --c-on-sig-light-body: oklch(0.3391 0.016 82.20);
-  --c-on-sig-dark: oklch(0.9950 0.003 82.20);
-  --c-on-sig-dark-body: oklch(0.8500 0.010 82.20);
+  --c-on-sig-light: oklch(0.2299 0.019 82.2);
+  --c-on-sig-light-body: oklch(0.3391 0.016 82.2);
+  --c-on-sig-dark: oklch(0.995 0.003 82.2);
+  --c-on-sig-dark-body: oklch(0.85 0.01 82.2);
 
   --c-link: oklch(0.5125 0.176 259.09);
   --c-success: oklch(0.436 0.148 142.5);

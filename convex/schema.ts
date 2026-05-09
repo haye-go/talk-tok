@@ -68,7 +68,8 @@ export default defineSchema({
     ),
   })
     .index("by_session", ["sessionId"])
-    .index("by_session_slug", ["sessionId", "participantSlug"]),
+    .index("by_session_slug", ["sessionId", "participantSlug"])
+    .index("by_session_and_client_key_hash", ["sessionId", "clientKeyHash"]),
 
   submissions: defineTable({
     sessionId: v.id("sessions"),

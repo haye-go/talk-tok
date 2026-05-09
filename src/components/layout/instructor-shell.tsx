@@ -6,19 +6,27 @@ import { MetricTile } from "@/components/ui/metric-tile";
 import { useAct } from "@/hooks/use-act";
 
 export interface InstructorShellProps {
+  sessionTitle?: string;
+  participantCount?: number;
   left?: ReactNode;
   center?: ReactNode;
   right?: ReactNode;
 }
 
-export function InstructorShell({ left, center, right }: InstructorShellProps) {
+export function InstructorShell({
+  sessionTitle = "Session",
+  participantCount = 0,
+  left,
+  center,
+  right,
+}: InstructorShellProps) {
   const { actIndex, advanceAct, goBackAct } = useAct();
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--c-canvas)]">
       <InstructorTopBar
-        sessionTitle="Ethics of AI in Healthcare"
-        participantCount={28}
+        sessionTitle={sessionTitle}
+        participantCount={participantCount}
         actIndex={actIndex}
         onPreviousAct={goBackAct}
         onNextAct={advanceAct}

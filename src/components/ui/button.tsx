@@ -12,8 +12,7 @@ const buttonVariants = cva(
         secondary:
           "border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] text-[var(--c-ink)] hover:bg-[var(--c-surface-strong)]",
         ghost: "text-[var(--c-ink)] hover:bg-[var(--c-surface-soft)]",
-        coral:
-          "bg-[var(--c-sig-coral)] text-[var(--c-on-sig-dark)] hover:brightness-95",
+        coral: "bg-[var(--c-sig-coral)] text-[var(--c-on-sig-dark)] hover:brightness-95",
         danger: "bg-[var(--c-error)] text-white hover:brightness-95",
       },
       size: {
