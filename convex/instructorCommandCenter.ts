@@ -8,6 +8,7 @@ const CATEGORY_LIMIT = 100;
 const JOB_LIMIT = 80;
 const AUDIT_LIMIT = 50;
 const RECENT_SUBMISSION_LIMIT = 30;
+const FOLLOW_UP_LIMIT = 30;
 const OFFLINE_AFTER_MS = 60_000;
 
 type PresenceState = "typing" | "submitted" | "idle" | "offline";
@@ -114,6 +115,7 @@ function toSubmission(
     nickname: participant?.nickname ?? "Unknown",
     body: submission.body,
     parentSubmissionId: submission.parentSubmissionId,
+    followUpPromptId: submission.followUpPromptId,
     kind: submission.kind,
     wordCount: submission.wordCount,
     compositionMs: submission.compositionMs,
@@ -139,39 +141,51 @@ export const overview = query({
     }
 
     const now = Date.now();
-    const [participants, submissions, categories, jobs, auditEvents, pendingRequests] =
-      await Promise.all([
-        ctx.db
-          .query("participants")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .take(PARTICIPANT_LIMIT),
-        ctx.db
-          .query("submissions")
-          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(SUBMISSION_LIMIT),
-        ctx.db
-          .query("categories")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .take(CATEGORY_LIMIT),
-        ctx.db
-          .query("aiJobs")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(JOB_LIMIT),
-        ctx.db
-          .query("auditEvents")
-          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(AUDIT_LIMIT),
-        ctx.db
-          .query("recategorizationRequests")
-          .withIndex("by_session_and_status", (q) =>
-            q.eq("sessionId", session._id).eq("status", "pending"),
-          )
-          .order("desc")
-          .take(50),
-      ]);
+    const [
+      participants,
+      submissions,
+      categories,
+      jobs,
+      auditEvents,
+      pendingRequests,
+      followUpPrompts,
+    ] = await Promise.all([
+      ctx.db
+        .query("participants")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(PARTICIPANT_LIMIT),
+      ctx.db
+        .query("submissions")
+        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(SUBMISSION_LIMIT),
+      ctx.db
+        .query("categories")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(CATEGORY_LIMIT),
+      ctx.db
+        .query("aiJobs")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(JOB_LIMIT),
+      ctx.db
+        .query("auditEvents")
+        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(AUDIT_LIMIT),
+      ctx.db
+        .query("recategorizationRequests")
+        .withIndex("by_session_and_status", (q) =>
+          q.eq("sessionId", session._id).eq("status", "pending"),
+        )
+        .order("desc")
+        .take(50),
+      ctx.db
+        .query("followUpPrompts")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(FOLLOW_UP_LIMIT),
+    ]);
 
     const participantsById = new Map(
       participants.map((participant) => [participant._id, participant]),
@@ -270,6 +284,40 @@ export const overview = query({
       recategorisation: {
         pendingCount: pendingRequests.length,
         pendingCapped: pendingRequests.length === 50,
+      },
+      followUps: {
+        activeCount: followUpPrompts.filter((prompt) => prompt.status === "active").length,
+        draftCount: followUpPrompts.filter((prompt) => prompt.status === "draft").length,
+        closedCount: followUpPrompts.filter((prompt) => prompt.status === "closed").length,
+        recent: await Promise.all(
+          followUpPrompts.slice(0, 10).map(async (prompt) => {
+            const targets = await ctx.db
+              .query("followUpTargets")
+              .withIndex("by_prompt", (q) => q.eq("followUpPromptId", prompt._id))
+              .take(20);
+            const responses = await ctx.db
+              .query("submissions")
+              .withIndex("by_follow_up_prompt", (q) => q.eq("followUpPromptId", prompt._id))
+              .take(200);
+
+            return {
+              id: prompt._id,
+              slug: prompt.slug,
+              title: prompt.title,
+              prompt: prompt.prompt,
+              targetMode: prompt.targetMode,
+              status: prompt.status,
+              roundNumber: prompt.roundNumber,
+              activatedAt: prompt.activatedAt,
+              closedAt: prompt.closedAt,
+              targetCount: targets.length,
+              responseCount: responses.length,
+              responseCountCapped: responses.length === 200,
+              createdAt: prompt.createdAt,
+              updatedAt: prompt.updatedAt,
+            };
+          }),
+        ),
       },
       jobs: {
         latest: jobs.slice(0, 12).map(toJob),

@@ -109,6 +109,7 @@ function toPublicSubmission(
         : (participant?.nickname ?? "Unknown"),
     body: submission.body,
     parentSubmissionId: submission.parentSubmissionId,
+    followUpPromptId: submission.followUpPromptId,
     kind: submission.kind,
     wordCount: submission.wordCount,
     typingStartedAt: submission.typingStartedAt,
@@ -195,6 +196,7 @@ export const create = mutation({
     body: v.string(),
     kind: v.union(v.literal("initial"), v.literal("additional_point"), v.literal("reply")),
     parentSubmissionId: v.optional(v.id("submissions")),
+    followUpPromptId: v.optional(v.id("followUpPrompts")),
     telemetry: v.object({
       typingStartedAt: v.optional(v.number()),
       typingFinishedAt: v.optional(v.number()),
@@ -255,6 +257,52 @@ export const create = mutation({
       throw new Error("Top-level responses cannot have a parent submission.");
     }
 
+    if (args.followUpPromptId && args.kind === "initial") {
+      throw new Error("Follow-up responses cannot be initial submissions.");
+    }
+
+    if (args.followUpPromptId) {
+      const followUpPrompt = await ctx.db.get(args.followUpPromptId);
+
+      if (
+        !followUpPrompt ||
+        followUpPrompt.sessionId !== session._id ||
+        followUpPrompt.status !== "active"
+      ) {
+        throw new Error("Follow-up prompt is not active in this session.");
+      }
+
+      if (followUpPrompt.targetMode === "categories") {
+        const targets = await ctx.db
+          .query("followUpTargets")
+          .withIndex("by_prompt", (q) => q.eq("followUpPromptId", followUpPrompt._id))
+          .take(20);
+        const targetCategoryIds = new Set(
+          targets
+            .map((target) => target.categoryId)
+            .filter((categoryId): categoryId is Id<"categories"> => Boolean(categoryId)),
+        );
+        const recentSubmissions = await getRecentParticipantSubmissions(ctx, participant._id, 100);
+        let eligible = false;
+
+        for (const submission of recentSubmissions) {
+          const assignments = await ctx.db
+            .query("submissionCategories")
+            .withIndex("by_submission", (q) => q.eq("submissionId", submission._id))
+            .take(8);
+
+          if (assignments.some((assignment) => targetCategoryIds.has(assignment.categoryId))) {
+            eligible = true;
+            break;
+          }
+        }
+
+        if (!eligible) {
+          throw new Error("This follow-up is not targeted to this participant.");
+        }
+      }
+    }
+
     if ((args.kind === "reply" || args.kind === "additional_point") && args.parentSubmissionId) {
       const parent = await ctx.db.get(args.parentSubmissionId);
 
@@ -288,6 +336,7 @@ export const create = mutation({
       participantId: participant._id,
       body,
       parentSubmissionId: args.parentSubmissionId,
+      followUpPromptId: args.followUpPromptId,
       kind: args.kind,
       wordCount: countWords(body),
       typingStartedAt: args.telemetry.typingStartedAt,
@@ -391,7 +440,7 @@ export const getThread = query({
     const replies = await ctx.db
       .query("submissions")
       .withIndex("by_parent_submission", (q) => q.eq("parentSubmissionId", root._id))
-      .collect();
+      .take(80);
 
     return {
       root: toPublicSubmission(root, rootParticipant, session),

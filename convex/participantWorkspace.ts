@@ -24,6 +24,7 @@ type PublicSubmissionResult = {
   nickname: string;
   body: string;
   parentSubmissionId?: Id<"submissions">;
+  followUpPromptId?: Id<"followUpPrompts">;
   kind: "initial" | "additional_point" | "reply" | "fight_me_turn";
   wordCount: number;
   typingStartedAt?: number;
@@ -146,6 +147,7 @@ function toSubmission(
     nickname: nicknameForPeer(session, participant),
     body: submission.body,
     parentSubmissionId: submission.parentSubmissionId,
+    followUpPromptId: submission.followUpPromptId,
     kind: submission.kind,
     wordCount: submission.wordCount,
     compositionMs: submission.compositionMs,
@@ -224,38 +226,50 @@ export const overview = query({
       return null;
     }
 
-    const [mySubmissions, sessionSubmissions, categories, feedback, requests, jobs] =
-      await Promise.all([
-        ctx.db
-          .query("submissions")
-          .withIndex("by_participant_and_created_at", (q) => q.eq("participantId", participant._id))
-          .order("desc")
-          .take(MY_SUBMISSION_LIMIT),
-        ctx.db
-          .query("submissions")
-          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(SESSION_SUBMISSION_LIMIT),
-        ctx.db
-          .query("categories")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .take(CATEGORY_LIMIT),
-        ctx.db
-          .query("submissionFeedback")
-          .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
-          .order("desc")
-          .take(MY_SUBMISSION_LIMIT),
-        ctx.db
-          .query("recategorizationRequests")
-          .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
-          .order("desc")
-          .take(MY_SUBMISSION_LIMIT),
-        ctx.db
-          .query("aiJobs")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(JOB_LIMIT),
-      ]);
+    const [
+      mySubmissions,
+      sessionSubmissions,
+      categories,
+      feedback,
+      requests,
+      jobs,
+      followUpPrompts,
+    ] = await Promise.all([
+      ctx.db
+        .query("submissions")
+        .withIndex("by_participant_and_created_at", (q) => q.eq("participantId", participant._id))
+        .order("desc")
+        .take(MY_SUBMISSION_LIMIT),
+      ctx.db
+        .query("submissions")
+        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(SESSION_SUBMISSION_LIMIT),
+      ctx.db
+        .query("categories")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(CATEGORY_LIMIT),
+      ctx.db
+        .query("submissionFeedback")
+        .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
+        .order("desc")
+        .take(MY_SUBMISSION_LIMIT),
+      ctx.db
+        .query("recategorizationRequests")
+        .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
+        .order("desc")
+        .take(MY_SUBMISSION_LIMIT),
+      ctx.db
+        .query("aiJobs")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(JOB_LIMIT),
+      ctx.db
+        .query("followUpPrompts")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(80),
+    ]);
 
     const activeCategories = categories.filter((category) => category.status === "active");
     const categoriesById = new Map(activeCategories.map((category) => [category._id, category]));
@@ -316,6 +330,63 @@ export const overview = query({
     }
 
     const mySubmissionIds = new Set(mySubmissions.map((submission) => submission._id));
+    const myCategoryIds = new Set<Id<"categories">>();
+
+    for (const submission of mySubmissions) {
+      const assignment = assignmentBySubmission.get(submission._id);
+
+      if (assignment) {
+        myCategoryIds.add(assignment.categoryId);
+      }
+    }
+
+    const activeFollowUps = [];
+    const activeFollowUpPrompts = followUpPrompts.filter(
+      (followUpPrompt) => followUpPrompt.status === "active",
+    );
+
+    for (const followUpPrompt of activeFollowUpPrompts) {
+      const targets = await ctx.db
+        .query("followUpTargets")
+        .withIndex("by_prompt", (q) => q.eq("followUpPromptId", followUpPrompt._id))
+        .take(20);
+      const isRelevant =
+        followUpPrompt.targetMode === "all" ||
+        targets.some((target) => target.categoryId && myCategoryIds.has(target.categoryId));
+
+      if (!isRelevant) {
+        continue;
+      }
+
+      activeFollowUps.push({
+        id: followUpPrompt._id,
+        slug: followUpPrompt.slug,
+        title: followUpPrompt.title,
+        prompt: followUpPrompt.prompt,
+        instructions: followUpPrompt.instructions,
+        targetMode: followUpPrompt.targetMode,
+        roundNumber: followUpPrompt.roundNumber,
+        activatedAt: followUpPrompt.activatedAt,
+        targets: await Promise.all(
+          targets.map(async (target) => {
+            const category = target.categoryId ? await ctx.db.get(target.categoryId) : null;
+
+            return {
+              id: target._id,
+              targetKind: target.targetKind,
+              categoryId: target.categoryId,
+              categorySlug: category?.slug,
+              categoryName: category?.name,
+              categoryColor: category?.color,
+            };
+          }),
+        ),
+        myResponseCount: mySubmissions.filter(
+          (submission) => submission.followUpPromptId === followUpPrompt._id,
+        ).length,
+      });
+    }
+
     const feedbackBySubmission = feedback
       .filter((row) => mySubmissionIds.has(row.submissionId))
       .map(toFeedback);
@@ -349,6 +420,7 @@ export const overview = query({
       mySubmissions: mySubmissions.map((submission) =>
         toSubmission(submission, participant, session),
       ),
+      activeFollowUps,
       feedbackBySubmission,
       assignmentsBySubmission: mySubmissions
         .map((submission) => {
@@ -385,6 +457,29 @@ export const overview = query({
         .filter((job) => !job.submissionId || mySubmissionIds.has(job.submissionId))
         .slice(0, 20)
         .map(toJob),
+      myZoneHistory: {
+        initialResponses: mySubmissions
+          .filter((submission) => submission.kind === "initial")
+          .map((submission) => toSubmission(submission, participant, session)),
+        followUpResponses: mySubmissions
+          .filter((submission) => Boolean(submission.followUpPromptId))
+          .map((submission) => {
+            const followUpPrompt = followUpPrompts.find(
+              (prompt) => prompt._id === submission.followUpPromptId,
+            );
+
+            return {
+              ...toSubmission(submission, participant, session),
+              followUpTitle: followUpPrompt?.title,
+              followUpSlug: followUpPrompt?.slug,
+              followUpRoundNumber: followUpPrompt?.roundNumber,
+            };
+          }),
+        timeline: mySubmissions.map((submission) => ({
+          type: submission.followUpPromptId ? "follow_up_response" : "response",
+          submission: toSubmission(submission, participant, session),
+        })),
+      },
       caps: {
         mySubmissionsCapped: mySubmissions.length === MY_SUBMISSION_LIMIT,
         sessionSubmissionsCapped: sessionSubmissions.length === SESSION_SUBMISSION_LIMIT,
@@ -401,6 +496,7 @@ export const submitAndQueueFeedback = mutation({
     body: v.string(),
     kind: v.union(v.literal("initial"), v.literal("additional_point"), v.literal("reply")),
     parentSubmissionId: v.optional(v.id("submissions")),
+    followUpPromptId: v.optional(v.id("followUpPrompts")),
     tone: v.optional(toneValidator),
     telemetry: v.object({
       typingStartedAt: v.optional(v.number()),
@@ -426,6 +522,7 @@ export const submitAndQueueFeedback = mutation({
       body: args.body,
       kind: args.kind,
       parentSubmissionId: args.parentSubmissionId,
+      followUpPromptId: args.followUpPromptId,
       telemetry: args.telemetry,
     });
     const feedback: PublicFeedbackResult = await ctx.runMutation(

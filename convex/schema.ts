@@ -76,6 +76,7 @@ export default defineSchema({
     participantId: v.id("participants"),
     body: v.string(),
     parentSubmissionId: v.optional(v.id("submissions")),
+    followUpPromptId: v.optional(v.id("followUpPrompts")),
     kind: v.union(
       v.literal("initial"),
       v.literal("additional_point"),
@@ -100,7 +101,8 @@ export default defineSchema({
     .index("by_participant", ["participantId"])
     .index("by_session_and_created_at", ["sessionId", "createdAt"])
     .index("by_participant_and_created_at", ["participantId", "createdAt"])
-    .index("by_parent_submission", ["parentSubmissionId"]),
+    .index("by_parent_submission", ["parentSubmissionId"])
+    .index("by_follow_up_prompt", ["followUpPromptId"]),
 
   categories: defineTable({
     sessionId: v.id("sessions"),
@@ -153,6 +155,40 @@ export default defineSchema({
     .index("by_submission", ["submissionId"])
     .index("by_participant", ["participantId"])
     .index("by_session_and_status", ["sessionId", "status"]),
+
+  followUpPrompts: defineTable({
+    sessionId: v.id("sessions"),
+    slug: v.string(),
+    title: v.string(),
+    prompt: v.string(),
+    instructions: v.optional(v.string()),
+    targetMode: v.union(v.literal("all"), v.literal("categories")),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("active"),
+      v.literal("closed"),
+      v.literal("archived"),
+    ),
+    roundNumber: v.number(),
+    activatedAt: v.optional(timestamp),
+    closedAt: v.optional(timestamp),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_session_slug", ["sessionId", "slug"])
+    .index("by_session_and_status", ["sessionId", "status"]),
+
+  followUpTargets: defineTable({
+    sessionId: v.id("sessions"),
+    followUpPromptId: v.id("followUpPrompts"),
+    targetKind: v.union(v.literal("all"), v.literal("category")),
+    categoryId: v.optional(v.id("categories")),
+    createdAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_prompt", ["followUpPromptId"])
+    .index("by_category", ["categoryId"]),
 
   promptTemplates: defineTable({
     key: v.string(),
