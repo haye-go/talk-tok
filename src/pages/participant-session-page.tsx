@@ -2,7 +2,13 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { ParticipantShell } from "@/components/layout/participant-shell";
+import {
+  ResponseComposer,
+  type ResponseComposerSubmit,
+} from "@/components/session/response-composer";
+import { SubmissionCard } from "@/components/session/submission-card";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
 import { PretextDisplay } from "@/components/text/pretext-display";
@@ -10,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { getOrCreateClientKey, storeParticipant } from "@/lib/client-identity";
 import { routes } from "@/lib/routes";
 
@@ -23,10 +29,18 @@ export function ParticipantSessionPage() {
     api.participants.restore,
     clientKey ? { sessionSlug, clientKey } : "skip",
   );
+  const mySubmissions = useQuery(
+    api.submissions.listMine,
+    clientKey ? { sessionSlug, clientKey } : "skip",
+  );
+  const sessionSubmissions = useQuery(api.submissions.listForSession, { sessionSlug, limit: 25 });
   const updateNickname = useMutation(api.participants.updateNickname);
   const touchPresence = useMutation(api.participants.touchPresence);
+  const createSubmission = useMutation(api.submissions.create);
   const [nickname, setNickname] = useState("");
   const [nicknameError, setNicknameError] = useState<string | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
   const touchedPresenceKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -80,6 +94,33 @@ export function ParticipantSessionPage() {
     }
   }
 
+  async function handleCreateSubmission(
+    { body, telemetry }: ResponseComposerSubmit,
+    kind: "initial" | "additional_point" = "initial",
+    parentSubmissionId?: Id<"submissions">,
+  ) {
+    if (!clientKey) {
+      return;
+    }
+
+    setSubmissionError(null);
+
+    try {
+      await createSubmission({
+        sessionSlug,
+        clientKey,
+        body,
+        kind,
+        parentSubmissionId,
+        telemetry,
+      });
+      setFollowUpParentId(null);
+    } catch (cause) {
+      setSubmissionError(cause instanceof Error ? cause.message : "Could not submit response.");
+      throw cause;
+    }
+  }
+
   if (session === undefined || participant === undefined) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[var(--c-canvas)] p-4">
@@ -129,10 +170,18 @@ export function ParticipantSessionPage() {
             </p>
           </Card>
           <Card title="Your response">
-            <Textarea label="Response" placeholder="Write your perspective..." />
-            <div className="mt-3 flex items-center justify-between gap-3">
+            {submissionError ? (
+              <InlineAlert tone="error" className="mb-3">
+                {submissionError}
+              </InlineAlert>
+            ) : null}
+            <ResponseComposer
+              softWordLimit={session.responseSoftLimitWords}
+              submitLabel="Submit response"
+              onSubmit={(submission) => handleCreateSubmission(submission)}
+            />
+            <div className="mt-3">
               <Badge tone="warning">{session.critiqueToneDefault} tone</Badge>
-              <Button type="button">Submit</Button>
             </div>
           </Card>
         </div>
@@ -163,7 +212,17 @@ export function ParticipantSessionPage() {
             )}
           </Card>
           <Card title="Response Stream">
-            <PretextDisplay text="Responses and category reveals start in Phase 03." />
+            {session.visibilityMode === "raw_responses_visible" && sessionSubmissions ? (
+              <div className="grid gap-3">
+                {sessionSubmissions.map((submission) => (
+                  <SubmissionCard key={submission.id} submission={submission} />
+                ))}
+              </div>
+            ) : (
+              <PretextDisplay
+                text={`${sessionSubmissions?.length ?? 0} responses collected. Peer responses remain private until the instructor releases them.`}
+              />
+            )}
           </Card>
         </div>
       }
@@ -171,8 +230,49 @@ export function ParticipantSessionPage() {
       myZone={
         <div className="grid gap-4">
           <Card title="My Zone">
-            Private response history, feedback, and contribution trace will mount here.
+            {mySubmissions === undefined ? (
+              <LoadingState label="Loading your responses..." />
+            ) : null}
+            {mySubmissions?.length === 0 ? (
+              <p className="text-sm text-[var(--c-muted)]">Your submitted responses appear here.</p>
+            ) : null}
+            {mySubmissions && mySubmissions.length > 0 ? (
+              <div className="grid gap-3">
+                {mySubmissions.map((submission) => (
+                  <SubmissionCard
+                    key={submission.id}
+                    submission={submission}
+                    showAuthor={false}
+                    onAddFollowUp={(submissionId) => setFollowUpParentId(submissionId)}
+                  />
+                ))}
+              </div>
+            ) : null}
           </Card>
+          {followUpParentId ? (
+            <Card
+              title="Add follow-up"
+              action={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFollowUpParentId(null)}
+                >
+                  Cancel
+                </Button>
+              }
+            >
+              <ResponseComposer
+                softWordLimit={session.responseSoftLimitWords}
+                submitLabel="Add follow-up"
+                placeholder="Add a clarification or extra point..."
+                onSubmit={(submission) =>
+                  handleCreateSubmission(submission, "additional_point", followUpParentId)
+                }
+              />
+            </Card>
+          ) : null}
           <Card title="Nickname">
             <form className="grid gap-3" onSubmit={handleNicknameSubmit}>
               <Input

@@ -8,14 +8,17 @@ import { LoadingState } from "@/components/state/loading-state";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
+import { SubmissionCard } from "@/components/session/submission-card";
+import { inputPatternLabel, type InputPattern } from "@/lib/submission-telemetry";
 import { routes } from "@/lib/routes";
 
 export function InstructorSessionPage() {
   const { sessionSlug } = useParams({ from: "/instructor/session/$sessionSlug" });
   const session = useQuery(api.sessions.getBySlug, { sessionSlug });
   const lobby = useQuery(api.participants.listLobby, { sessionSlug });
+  const submissions = useQuery(api.submissions.listForSession, { sessionSlug, limit: 50 });
 
-  if (session === undefined || lobby === undefined) {
+  if (session === undefined || lobby === undefined || submissions === undefined) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[var(--c-canvas)] p-4">
         <LoadingState label="Loading instructor session..." className="w-full max-w-md" />
@@ -23,7 +26,7 @@ export function InstructorSessionPage() {
     );
   }
 
-  if (session === null || lobby === null) {
+  if (session === null || lobby === null || submissions === null) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[var(--c-canvas)] p-4">
         <ErrorState
@@ -37,6 +40,18 @@ export function InstructorSessionPage() {
   const joinPath = routes.join(session.joinCode);
   const joinUrl =
     typeof window === "undefined" ? joinPath : new URL(joinPath, window.location.origin).toString();
+  const patternCounts = submissions.reduce<Record<InputPattern, number>>(
+    (counts, submission) => {
+      counts[submission.inputPattern] += 1;
+      return counts;
+    },
+    {
+      composed_gradually: 0,
+      likely_pasted: 0,
+      mixed: 0,
+      unknown: 0,
+    },
+  );
 
   return (
     <InstructorShell
@@ -71,11 +86,7 @@ export function InstructorSessionPage() {
       center={
         <div className="grid gap-4">
           <div className="grid gap-3 md:grid-cols-3">
-            <MetricTile
-              label="Joined"
-              value={String(lobby.aggregate.total)}
-              detail="Participants"
-            />
+            <MetricTile label="Submitted" value={String(submissions.length)} detail="Responses" />
             <MetricTile
               label="Typing"
               value={String(lobby.aggregate.typing)}
@@ -103,27 +114,51 @@ export function InstructorSessionPage() {
               {lobby.aggregate.submitted} submitted - {lobby.aggregate.offline} offline
             </p>
           </Card>
+          <Card title="Recent Submissions">
+            <div className="grid gap-3">
+              {submissions.length === 0 ? (
+                <p className="text-sm text-[var(--c-muted)]">No submissions yet.</p>
+              ) : null}
+              {submissions.slice(0, 8).map((submission) => (
+                <SubmissionCard key={submission.id} submission={submission} />
+              ))}
+            </div>
+          </Card>
         </div>
       }
       right={
-        <Card title="Recent Participants">
-          <div className="grid gap-2">
-            {lobby.recentParticipants.length === 0 ? (
-              <p className="text-sm text-[var(--c-muted)]">No participants yet.</p>
-            ) : null}
-            {lobby.recentParticipants.map((participant) => (
-              <div
-                key={participant.participantSlug}
-                className="rounded-sm bg-[var(--c-surface-strong)] px-3 py-2 text-sm"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-[var(--c-ink)]">{participant.nickname}</span>
-                  <span className="text-xs text-[var(--c-muted)]">{participant.presenceState}</span>
+        <div className="grid gap-4">
+          <Card title="Input Pattern Pulse">
+            <div className="grid gap-2 text-sm">
+              {(Object.keys(patternCounts) as InputPattern[]).map((pattern) => (
+                <div key={pattern} className="flex items-center justify-between gap-3">
+                  <span>{inputPatternLabel(pattern)}</span>
+                  <span className="font-mono text-[var(--c-ink)]">{patternCounts[pattern]}</span>
                 </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+              ))}
+            </div>
+          </Card>
+          <Card title="Recent Participants">
+            <div className="grid gap-2">
+              {lobby.recentParticipants.length === 0 ? (
+                <p className="text-sm text-[var(--c-muted)]">No participants yet.</p>
+              ) : null}
+              {lobby.recentParticipants.map((participant) => (
+                <div
+                  key={participant.participantSlug}
+                  className="rounded-sm bg-[var(--c-surface-strong)] px-3 py-2 text-sm"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-[var(--c-ink)]">{participant.nickname}</span>
+                    <span className="text-xs text-[var(--c-muted)]">
+                      {participant.presenceState}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       }
     />
   );
