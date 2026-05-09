@@ -1,82 +1,41 @@
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { LoadingState } from "@/components/state/loading-state";
 
 export function AdminProtectionPage() {
+  const settings = useQuery(api.protection.list, {});
+
   return (
-    <AdminShell
-      title="Protection"
-      description="Rate limits, moderation, telemetry, and budget guardrails."
-    >
+    <AdminShell title="Protection" description="Rate limits, moderation, telemetry, and budget guardrails.">
       <div className="grid gap-4">
-        <Card title="Rate Limits" eyebrow="Participant">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Submissions / minute" type="number" defaultValue="3" />
-            <Input label="Follow-up replies / minute" type="number" defaultValue="5" />
-            <Input label="Reactions / minute" type="number" defaultValue="10" />
-            <Input label="Recat cooldown (seconds)" type="number" defaultValue="60" />
-          </div>
-        </Card>
+        {settings === undefined && <LoadingState label="Loading protection settings..." />}
 
-        <Card title="Fight Me Limits">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Active threads per participant" type="number" defaultValue="1" />
-            <Input label="Turns per thread" type="number" defaultValue="3" />
-          </div>
-        </Card>
+        {settings && settings.length === 0 && (
+          <Card>
+            <p className="text-sm text-[var(--c-muted)]">
+              No protection settings configured. Run seed defaults to create initial entries.
+            </p>
+          </Card>
+        )}
 
-        <Card title="Moderation">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[var(--c-ink)]">Auto-moderate submissions</p>
-                <p className="text-xs text-[var(--c-muted)]">
-                  Flag obviously abusive content before publication
-                </p>
-              </div>
-              <Switch checked={true} onCheckedChange={() => {}} label="" />
+        {settings && settings.length > 0 && (
+          <Card title="Current Settings">
+            <div className="divide-y divide-[var(--c-hairline)]">
+              {settings.map((setting) => (
+                <div key={setting._id} className="flex items-start justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <p className="font-display text-sm font-medium text-[var(--c-ink)]">{setting.key}</p>
+                    <pre className="mt-1 overflow-x-auto rounded-sm bg-[var(--c-surface-strong)] p-2 font-mono text-[10px] text-[var(--c-body)]">
+                      {JSON.stringify(setting.valueJson, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[var(--c-ink)]">Filter AI outputs</p>
-                <p className="text-xs text-[var(--c-muted)]">
-                  Check Fight Me and roast-mode replies for safety
-                </p>
-              </div>
-              <Switch checked={true} onCheckedChange={() => {}} label="" />
-            </div>
-          </div>
-        </Card>
-
-        <Card title="Telemetry">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-[var(--c-ink)]">Composition telemetry</p>
-                <p className="text-xs text-[var(--c-muted)]">
-                  Track typing duration, paste events, idle gaps
-                </p>
-              </div>
-              <Switch checked={true} onCheckedChange={() => {}} label="" />
-            </div>
-            <Input
-              label="Disclosure text"
-              defaultValue="This session records composition timing to help you reflect on your writing process."
-            />
-          </div>
-        </Card>
-
-        <Card title="AI Budget">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input label="Session soft warning ($)" type="number" defaultValue="5.00" />
-            <Input label="Session hard ceiling ($)" type="number" defaultValue="15.00" />
-          </div>
-          <p className="mt-2 text-xs text-[var(--c-muted)]">
-            When soft warning is hit, instructor sees an alert. At hard ceiling, non-essential AI
-            features pause.
-          </p>
-        </Card>
+          </Card>
+        )}
       </div>
     </AdminShell>
   );
