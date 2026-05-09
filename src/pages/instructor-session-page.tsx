@@ -1,5 +1,5 @@
 import { QRCodeSVG } from "qrcode.react";
-import { Lightning, Megaphone, PushPin, Swords, Timer, Warning } from "@phosphor-icons/react";
+import { Lightning, PushPin, Sword, Timer, Warning } from "@phosphor-icons/react";
 import { useParams } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -8,7 +8,6 @@ import { PresenceBar } from "@/components/stream/presence-bar";
 import { SubmissionCard } from "@/components/submission/submission-card";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
@@ -60,8 +59,12 @@ export function InstructorSessionPage() {
         <div className="grid gap-3">
           {/* Category board (mock — real categories come in backend Phase 07) */}
           <div className="flex items-center justify-between">
-            <span className="text-xs text-[var(--c-muted)]">Categories ({MOCK_CATEGORIES.length})</span>
-            <a href="#" className="text-xs text-[var(--c-link)]">+ Add</a>
+            <span className="text-xs text-[var(--c-muted)]">
+              Categories ({MOCK_CATEGORIES.length})
+            </span>
+            <a href="#" className="text-xs text-[var(--c-link)]">
+              + Add
+            </a>
           </div>
           {MOCK_CATEGORIES.filter((c) => c.color !== "neutral").map((cat) => (
             <div
@@ -77,23 +80,35 @@ export function InstructorSessionPage() {
                 {cat.summary.slice(0, 60)}...
               </p>
               <div className="mt-1.5 flex gap-1">
-                <span className="cursor-pointer rounded bg-[var(--c-surface-strong)] px-1.5 py-0.5 text-[9px]">Rename</span>
-                <span className="cursor-pointer rounded bg-[var(--c-surface-strong)] px-1.5 py-0.5 text-[9px]">Split</span>
+                <span className="cursor-pointer rounded bg-[var(--c-surface-strong)] px-1.5 py-0.5 text-[9px]">
+                  Rename
+                </span>
+                <span className="cursor-pointer rounded bg-[var(--c-surface-strong)] px-1.5 py-0.5 text-[9px]">
+                  Split
+                </span>
                 <span className="cursor-pointer rounded bg-[var(--c-surface-strong)] px-1.5 py-0.5 text-[9px]">
                   <PushPin size={9} className="inline" />
                 </span>
-                <span className="cursor-pointer rounded bg-[var(--c-sig-slate)] px-1.5 py-0.5 text-[9px] text-white">Follow-up</span>
+                <span className="cursor-pointer rounded bg-[var(--c-sig-slate)] px-1.5 py-0.5 text-[9px] text-white">
+                  Follow-up
+                </span>
               </div>
             </div>
           ))}
 
           {/* Uncategorized */}
-          <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-2.5" style={{ borderLeft: "3px solid var(--c-muted)" }}>
+          <div
+            className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-2.5"
+            style={{ borderLeft: "3px solid var(--c-muted)" }}
+          >
             <div className="flex items-center justify-between">
               <strong className="text-xs text-[var(--c-muted)]">Uncategorized</strong>
               <span className="text-[10px] text-[var(--c-muted)]">4</span>
             </div>
-            <button type="button" className="mt-1.5 rounded bg-[var(--c-sig-yellow)] px-2 py-0.5 text-[10px] font-medium text-[var(--c-on-sig-light)]">
+            <button
+              type="button"
+              className="mt-1.5 rounded bg-[var(--c-sig-yellow)] px-2 py-0.5 text-[10px] font-medium text-[var(--c-on-sig-light)]"
+            >
               Run categorization
             </button>
           </div>
@@ -106,7 +121,9 @@ export function InstructorSessionPage() {
             <p className="mt-0.5 text-[10px] text-[var(--c-muted)]">
               "Cost & Access" and "Trust & Accuracy" share 3 similar responses
             </p>
-            <a href="#" className="text-[10px] text-[var(--c-link)]">Review merge</a>
+            <a href="#" className="text-[10px] text-[var(--c-link)]">
+              Review merge
+            </a>
           </div>
 
           {/* QR code (real data) */}
@@ -170,7 +187,9 @@ export function InstructorSessionPage() {
               {(Object.keys(patternCounts) as InputPattern[]).map((pattern) => (
                 <div key={pattern} className="flex items-center justify-between gap-3">
                   <span className="text-xs text-[var(--c-body)]">{inputPatternLabel(pattern)}</span>
-                  <span className="font-mono text-xs text-[var(--c-ink)]">{patternCounts[pattern]}</span>
+                  <span className="font-mono text-xs text-[var(--c-ink)]">
+                    {patternCounts[pattern]}
+                  </span>
                 </div>
               ))}
             </div>
@@ -206,15 +225,36 @@ export function InstructorSessionPage() {
                       : "var(--c-muted)";
 
             return (
-              <div key={i} className="border-b border-[var(--c-hairline)] pb-2 text-xs text-[var(--c-body)]">
-                <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: dotColor }} />
+              <div
+                key={i}
+                className="border-b border-[var(--c-hairline)] pb-2 text-xs text-[var(--c-body)]"
+              >
+                <span
+                  className="mr-1.5 inline-block h-2 w-2 rounded-full"
+                  style={{ background: dotColor }}
+                />
                 {event.type === "submit" && "category" in event && (
                   <>
-                    <strong>{event.name}</strong> submitted → <span className="text-[var(--c-ink)]">{event.category}</span>
-                    {" · "}<span className="text-[var(--c-muted)]">{"originality" in event ? event.originality : ""}</span>
+                    <strong>{event.name}</strong> submitted →{" "}
+                    <span className="text-[var(--c-ink)]">{event.category}</span>
+                    {" · "}
+                    <span className="text-[var(--c-muted)]">
+                      {"originality" in event ? event.originality : ""}
+                    </span>
                     {"telemetryLabel" in event && event.telemetryLabel && (
-                      <div className="mt-0.5 text-[10px]" style={{ color: event.telemetryLabel.includes("pasted") ? "var(--c-sig-coral)" : "var(--c-muted)" }}>
-                        {event.telemetryLabel.includes("pasted") ? <Lightning size={10} className="mr-0.5 inline" /> : <Timer size={10} className="mr-0.5 inline" />}
+                      <div
+                        className="mt-0.5 text-[10px]"
+                        style={{
+                          color: event.telemetryLabel.includes("pasted")
+                            ? "var(--c-sig-coral)"
+                            : "var(--c-muted)",
+                        }}
+                      >
+                        {event.telemetryLabel.includes("pasted") ? (
+                          <Lightning size={10} className="mr-0.5 inline" />
+                        ) : (
+                          <Timer size={10} className="mr-0.5 inline" />
+                        )}
                         {event.telemetryLabel}
                       </div>
                     )}
@@ -225,10 +265,14 @@ export function InstructorSessionPage() {
                     <strong>{event.name}</strong> recat: {event.fromCategory} → {event.toCategory}
                   </>
                 )}
-                {event.type === "followup" && <><strong>{event.name}</strong> added follow-up</>}
+                {event.type === "followup" && (
+                  <>
+                    <strong>{event.name}</strong> added follow-up
+                  </>
+                )}
                 {event.type === "fightme" && (
                   <>
-                    <Swords size={10} className="mr-0.5 inline" />
+                    <Sword size={10} className="mr-0.5 inline" />
                     <strong>{event.name}</strong> started Fight Me vs AI
                   </>
                 )}

@@ -71,9 +71,7 @@ export function InstructorDashboardPage() {
                 </div>
                 <Button
                   type="button"
-                  onClick={() =>
-                    (window.location.href = routes.instructorSession(session.slug))
-                  }
+                  onClick={() => (window.location.href = routes.instructorSession(session.slug))}
                 >
                   Open
                 </Button>

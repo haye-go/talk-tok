@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as aiFeedback from "../aiFeedback.js";
+import type * as categorisation from "../categorisation.js";
 import type * as llm from "../llm.js";
 import type * as modelSettings from "../modelSettings.js";
 import type * as participants from "../participants.js";
@@ -22,6 +24,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  aiFeedback: typeof aiFeedback;
+  categorisation: typeof categorisation;
   llm: typeof llm;
   modelSettings: typeof modelSettings;
   participants: typeof participants;

@@ -65,7 +65,9 @@ export function SessionNewPage() {
       <form className="grid max-w-2xl gap-4" onSubmit={handleSubmit}>
         {/* Mode presets */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">Session Mode</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+            Session Mode
+          </label>
           <div className="flex gap-1.5 font-display">
             {MODE_PRESETS.map((mode) => (
               <button
@@ -104,7 +106,9 @@ export function SessionNewPage() {
         {/* Settings grid */}
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--c-muted)]">Visibility Mode</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--c-muted)]">
+              Visibility Mode
+            </label>
             <select
               className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none"
               value={visibility}
@@ -115,7 +119,9 @@ export function SessionNewPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--c-muted)]">Anonymity</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--c-muted)]">
+              Anonymity
+            </label>
             <select
               className="min-h-10 w-full rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 text-sm text-[var(--c-ink)] outline-none"
               value={anonymity}
@@ -132,14 +138,18 @@ export function SessionNewPage() {
             onChange={(e) => setWordLimit(e.target.value)}
           />
           <div>
-            <label className="mb-1 block text-xs font-medium text-[var(--c-muted)]">Default Critique Tone</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--c-muted)]">
+              Default Critique Tone
+            </label>
             <ToneSelector value={critiqueTone} onChange={setCritiqueTone} className="mt-1" />
           </div>
         </div>
 
         {/* Preset categories (visual only for now) */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">Preset Categories (optional)</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--c-muted)]">
+            Preset Categories (optional)
+          </label>
           <div className="flex flex-wrap gap-1.5">
             <Badge tone="sky">Legal/Regulatory &times;</Badge>
             <Badge tone="peach">Ethical &times;</Badge>
@@ -193,7 +203,12 @@ export function SessionNewPage() {
           <Button type="button" variant="secondary" className="flex-1">
             Save as Template
           </Button>
-          <Button type="submit" className="flex-1" disabled={isSubmitting} icon={<Rocket size={16} />}>
+          <Button
+            type="submit"
+            className="flex-1"
+            disabled={isSubmitting}
+            icon={<Rocket size={16} />}
+          >
             {isSubmitting ? "Creating..." : "Go Live"}
           </Button>
         </div>

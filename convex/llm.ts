@@ -3,6 +3,8 @@ import { internalAction, internalMutation, internalQuery } from "./_generated/se
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
+declare const process: { env: Record<string, string | undefined> };
+
 type JsonRecord = Record<string, unknown>;
 
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
@@ -263,9 +265,10 @@ export const runJson = internalAction({
       const latencyMs = Date.now() - startedAt;
 
       if (!response.ok) {
+        const rawErrorMessage = asRecord(responseJson.error).message;
         const errorMessage =
-          typeof asRecord(responseJson.error).message === "string"
-            ? asRecord(responseJson.error).message
+          typeof rawErrorMessage === "string"
+            ? rawErrorMessage
             : `OpenAI request failed with status ${response.status}`;
         await ctx.runMutation(internal.llm.markCallError, {
           llmCallId,

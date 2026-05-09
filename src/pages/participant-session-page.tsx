@@ -175,17 +175,13 @@ export function ParticipantSessionPage() {
                   &ldquo;{session.openingPrompt}&rdquo;
                 </p>
               </div>
-              {submissionError && (
-                <InlineAlert tone="error">{submissionError}</InlineAlert>
-              )}
+              {submissionError && <InlineAlert tone="error">{submissionError}</InlineAlert>}
               <ResponseComposer
                 softWordLimit={session.responseSoftLimitWords}
                 submitLabel="Submit response"
                 onSubmit={(_text, _tone, submission) => handleCreateSubmission(submission)}
               />
-              <p className="text-xs text-[var(--c-muted)]">
-                Signed in as {participant.nickname}
-              </p>
+              <p className="text-xs text-[var(--c-muted)]">Signed in as {participant.nickname}</p>
             </>
           )}
           {session.currentAct === "discover" && <DiscoverAct />}

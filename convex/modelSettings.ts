@@ -1,5 +1,9 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { action, mutation, query } from "./_generated/server";
+
+declare const process: { env: Record<string, string | undefined> };
+
+const OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
 
 const DEFAULT_MODELS = [
   {
@@ -119,5 +123,47 @@ export const update = mutation({
     });
 
     return await ctx.db.get(existing._id);
+  },
+});
+
+export const checkOpenAiKey = action({
+  args: {},
+  handler: async () => {
+    return { hasKey: Boolean(process.env.OPENAI_API_KEY) };
+  },
+});
+
+export const fetchOpenAiModels = action({
+  args: {},
+  handler: async () => {
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      return { status: "error", message: "OPENAI_API_KEY is not configured.", models: [] };
+    }
+
+    const response = await fetch(OPENAI_MODELS_URL, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    const payload = (await response.json()) as { data?: Array<{ id?: unknown }>; error?: unknown };
+
+    if (!response.ok) {
+      const error =
+        payload.error && typeof payload.error === "object" && "message" in payload.error
+          ? String((payload.error as { message?: unknown }).message)
+          : `OpenAI model fetch failed with status ${response.status}.`;
+      return { status: "error", message: error, models: [] };
+    }
+
+    const models = (payload.data ?? [])
+      .map((model) => model.id)
+      .filter((id): id is string => typeof id === "string")
+      .sort();
+
+    return {
+      status: "success",
+      message: `Fetched ${models.length} OpenAI models.`,
+      models,
+    };
   },
 });
