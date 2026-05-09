@@ -190,7 +190,7 @@ export const MOCK_ACTIVITY_FEED = [
 ];
 
 export const CRITIQUE_TONES = [
-  { id: "supportive", label: "Kind" },
+  { id: "gentle", label: "Kind" },
   { id: "direct", label: "Direct" },
   { id: "spicy", label: "Spicy" },
   { id: "roast", label: "Roast" },
