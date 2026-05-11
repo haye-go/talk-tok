@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { BookOpen, CircleNotch, FloppyDisk, Scales, Sparkle } from "@phosphor-icons/react";
 import { useParams } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { AiJobStatusPanel, type AiJobStatusItem } from "@/components/instructor/ai-job-status-panel";
@@ -43,6 +43,16 @@ const BAND_LABELS: Record<string, string> = {
   responsive: "Responsive",
   highly_responsive: "Highly Responsive",
 };
+
+const AI_READINESS_FEATURES = [
+  { feature: "feedback", label: "Feedback", promptKey: "feedback.private.v1" },
+  { feature: "question_baseline", label: "Baseline", promptKey: "question.baseline.v1" },
+  { feature: "categorisation", label: "Categorisation", promptKey: "categorisation.session.v1" },
+  { feature: "synthesis", label: "Synthesis", promptKey: "synthesis.class.v1" },
+  { feature: "personal_report", label: "Reports", promptKey: "report.personal.v1" },
+  { feature: "argument_map", label: "Argument map", promptKey: "argument_map.session.v1" },
+  { feature: "embedding", label: "Embeddings", promptKey: null },
+] as const;
 
 function previewText(value?: string | null, maxLength = 150) {
   const text = value?.trim();
@@ -184,11 +194,20 @@ export function InstructorSessionPage() {
   const argumentGraph = useQuery(api.argumentMap.getVisualizationGraph, questionScopedArgs);
   const aiJobs = useQuery(api.jobs.listForSession, { ...questionScopedArgs, limit: 80 });
   const questionBaseline = useQuery(api.questionBaselines.getForQuestion, questionScopedArgs);
+  const modelSettings = useQuery(api.modelSettings.list);
+  const promptTemplates = useQuery(api.promptTemplates.list);
+  const sessionBudget = useQuery(
+    api.budget.getSessionSpend,
+    overview?.session.id ? { sessionId: overview.session.id } : "skip",
+  );
+  const recentLlmCalls = useQuery(api.llmObservability.recentCalls, { sessionSlug, limit: 12 });
+  const demoToggles = useQuery(api.demo.listToggles, {});
 
   const queueEmbeddings = useMutation(api.semantic.queueEmbeddingsForSession);
   const refreshSignals = useMutation(api.semantic.refreshSignalsForSession);
   const generateArgMap = useMutation(api.argumentMap.generateForSession);
   const generateBaseline = useMutation(api.questionBaselines.generateForQuestion);
+  const checkOpenAiKey = useAction(api.modelSettings.checkOpenAiKey);
 
   const [generatingClass, setGeneratingClass] = useState(false);
   const [generatingOpposing, setGeneratingOpposing] = useState(false);
@@ -204,6 +223,9 @@ export function InstructorSessionPage() {
   const [argMapQueued, setArgMapQueued] = useState(false);
   const [baselineGenerating, setBaselineGenerating] = useState(false);
   const [baselineError, setBaselineError] = useState<string | null>(null);
+  const [openAiKeyState, setOpenAiKeyState] = useState<"checking" | "ready" | "missing" | "error">(
+    "checking",
+  );
   const [decidingRecatId, setDecidingRecatId] = useState<string | null>(null);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [addCategoryName, setAddCategoryName] = useState("");
@@ -217,6 +239,26 @@ export function InstructorSessionPage() {
   const [followUpPrompt, setFollowUpPrompt] = useState("");
   const [savingFollowUp, setSavingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void checkOpenAiKey()
+      .then((result) => {
+        if (!cancelled) {
+          setOpenAiKeyState(result.hasKey ? "ready" : "missing");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOpenAiKeyState("error");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkOpenAiKey]);
 
   if (overview === undefined) {
     return (
@@ -530,6 +572,36 @@ export function InstructorSessionPage() {
   const hasEmbeddings = embeddingCount > 0;
   const hasNoveltySignals = noveltyCount > 0;
   const hasArgumentLinks = argumentLinkCount > 0;
+  const enabledModelFeatures = new Set(
+    (modelSettings ?? [])
+      .filter((setting) => setting.enabled)
+      .flatMap((setting) => setting.features ?? []),
+  );
+  const promptKeys = new Set((promptTemplates ?? []).map((template) => template.key));
+  const missingModelFeatures = AI_READINESS_FEATURES.filter(
+    (item) => !enabledModelFeatures.has(item.feature),
+  );
+  const missingPromptKeys = AI_READINESS_FEATURES.filter(
+    (item) => item.promptKey && !promptKeys.has(item.promptKey),
+  );
+  const activeDemoToggles = (demoToggles ?? []).filter(
+    (toggle) =>
+      toggle.enabled &&
+      ["simulateAiFailure", "simulateBudgetExceeded", "simulateSlowAi"].includes(toggle.key),
+  );
+  const recentLlmFailures = (recentLlmCalls ?? [])
+    .filter((call) => call.status === "error")
+    .slice(0, 3);
+  const budgetUsagePercent =
+    sessionBudget && sessionBudget.perSessionEstimatedCostUsd > 0
+      ? Math.round(
+          (sessionBudget.totalEstimatedCostUsd / sessionBudget.perSessionEstimatedCostUsd) * 100,
+        )
+      : 0;
+  const budgetHardStopActive = sessionBudget
+    ? Boolean(sessionBudget.hardStopEnabled) &&
+      sessionBudget.totalEstimatedCostUsd >= sessionBudget.perSessionEstimatedCostUsd
+    : false;
   const studentActivity = activity.filter((event) => event.actorType === "participant");
   const aiJobStatusItems: AiJobStatusItem[] = [
     {
@@ -975,6 +1047,106 @@ export function InstructorSessionPage() {
                 "Generate Baseline"
               )}
             </Button>
+          </Card>
+
+          <Card title="AI Readiness">
+            <p className="text-xs leading-5 text-[var(--c-muted)]">
+              This checks the operational prerequisites that commonly block AI work: API key,
+              enabled models, prompt templates, budget stops, demo failure toggles, and recent LLM
+              errors.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+              <MetricTile
+                label="OpenAI key"
+                value={
+                  openAiKeyState === "ready"
+                    ? "ready"
+                    : openAiKeyState === "missing"
+                      ? "missing"
+                      : openAiKeyState
+                }
+              />
+              <MetricTile label="Models" value={String(modelSettings?.length ?? 0)} />
+              <MetricTile label="Prompts" value={String(promptTemplates?.length ?? 0)} />
+              <MetricTile label="Budget" value={`${budgetUsagePercent}%`} />
+            </div>
+            <div className="mt-3 grid gap-2 text-xs">
+              <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-[var(--c-ink)]">Model coverage</span>
+                  <Badge tone={missingModelFeatures.length === 0 ? "success" : "warning"}>
+                    {missingModelFeatures.length === 0 ? "ready" : "missing"}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--c-muted)]">
+                  {missingModelFeatures.length === 0
+                    ? "Enabled models cover all AI workflow features."
+                    : `Missing enabled model features: ${missingModelFeatures.map((item) => item.label).join(", ")}.`}
+                </p>
+              </div>
+
+              <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-[var(--c-ink)]">Prompt templates</span>
+                  <Badge tone={missingPromptKeys.length === 0 ? "success" : "warning"}>
+                    {missingPromptKeys.length === 0 ? "ready" : "missing"}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--c-muted)]">
+                  {missingPromptKeys.length === 0
+                    ? "Required prompt templates are present."
+                    : `Missing prompts: ${missingPromptKeys
+                        .map((item) => item.promptKey)
+                        .filter(Boolean)
+                        .join(", ")}.`}
+                </p>
+              </div>
+
+              <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-[var(--c-ink)]">Budget and demo controls</span>
+                  <Badge
+                    tone={
+                      budgetHardStopActive || activeDemoToggles.length > 0 ? "warning" : "success"
+                    }
+                  >
+                    {budgetHardStopActive || activeDemoToggles.length > 0 ? "attention" : "clear"}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--c-muted)]">
+                  {budgetHardStopActive
+                    ? "Budget hard stop is active for this session."
+                    : "No budget hard stop is currently blocking this session."}
+                </p>
+                {activeDemoToggles.length > 0 ? (
+                  <p className="mt-1 text-[11px] text-[var(--c-sig-mustard)]">
+                    Active demo toggles: {activeDemoToggles.map((toggle) => toggle.key).join(", ")}.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-[var(--c-ink)]">Recent LLM failures</span>
+                  <Badge tone={recentLlmFailures.length === 0 ? "success" : "error"}>
+                    {recentLlmFailures.length}
+                  </Badge>
+                </div>
+                {recentLlmFailures.length === 0 ? (
+                  <p className="mt-1 text-[11px] text-[var(--c-muted)]">
+                    No recent LLM errors found for this session.
+                  </p>
+                ) : (
+                  <div className="mt-1 grid gap-1">
+                    {recentLlmFailures.map((call) => (
+                      <p key={call.id} className="text-[11px] leading-4 text-[var(--c-error)]">
+                        {call.feature}: {call.error ?? "Unknown error"}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </Card>
 
           {pendingRecatRequests && pendingRecatRequests.length > 0 && (
