@@ -183,10 +183,12 @@ export function InstructorSessionPage() {
   const categoryDrift = useQuery(api.semantic.getCategoryDrift, questionScopedArgs);
   const argumentGraph = useQuery(api.argumentMap.getVisualizationGraph, questionScopedArgs);
   const aiJobs = useQuery(api.jobs.listForSession, { ...questionScopedArgs, limit: 80 });
+  const questionBaseline = useQuery(api.questionBaselines.getForQuestion, questionScopedArgs);
 
   const queueEmbeddings = useMutation(api.semantic.queueEmbeddingsForSession);
   const refreshSignals = useMutation(api.semantic.refreshSignalsForSession);
   const generateArgMap = useMutation(api.argumentMap.generateForSession);
+  const generateBaseline = useMutation(api.questionBaselines.generateForQuestion);
 
   const [generatingClass, setGeneratingClass] = useState(false);
   const [generatingOpposing, setGeneratingOpposing] = useState(false);
@@ -200,6 +202,8 @@ export function InstructorSessionPage() {
   const [templateSaved, setTemplateSaved] = useState(false);
   const [embeddingQueued, setEmbeddingQueued] = useState(false);
   const [argMapQueued, setArgMapQueued] = useState(false);
+  const [baselineGenerating, setBaselineGenerating] = useState(false);
+  const [baselineError, setBaselineError] = useState<string | null>(null);
   const [decidingRecatId, setDecidingRecatId] = useState<string | null>(null);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [addCategoryName, setAddCategoryName] = useState("");
@@ -336,6 +340,22 @@ export function InstructorSessionPage() {
       } finally {
         setGeneratingClass(false);
       }
+    }
+  }
+
+  async function handleGenerateBaseline(forceRegenerate = false) {
+    setBaselineError(null);
+    setBaselineGenerating(true);
+    try {
+      await generateBaseline({
+        sessionSlug,
+        questionId: activeQuestionId,
+        forceRegenerate,
+      });
+    } catch (cause) {
+      setBaselineError(cause instanceof Error ? cause.message : "Could not generate baseline.");
+    } finally {
+      setBaselineGenerating(false);
     }
   }
 
@@ -497,6 +517,11 @@ export function InstructorSessionPage() {
   const categorisationBusy =
     triggeringCategorisation || isBusyStatus(latestCategorisationJob?.status);
   const reportBusy = generatingReports || isBusyStatus(latestReportJob?.status);
+  const baselineBusy =
+    baselineGenerating ||
+    isBusyStatus(latestBaselineJob?.status) ||
+    isBusyStatus(questionBaseline?.status);
+  const baselineCanGenerate = currentQuestion?.status === "released";
   const embeddingBusy = embeddingQueued || isBusyStatus(latestEmbeddingJob?.status);
   const argMapBusy = argMapQueued || isBusyStatus(latestArgumentMapJob?.status);
   const embeddingCount = semanticStatus?.embeddingCount ?? 0;
@@ -559,11 +584,17 @@ export function InstructorSessionPage() {
     },
     {
       label: "Question baseline",
-      status: latestBaselineJob?.status ?? "idle",
-      detail: progressDetail(latestBaselineJob) ?? "No recent baseline job",
-      tone: jobTone(latestBaselineJob),
-      error: latestBaselineJob?.error,
-      updatedAt: latestBaselineJob?.updatedAt,
+      status: latestBaselineJob?.status ?? questionBaseline?.status ?? "idle",
+      detail:
+        progressDetail(latestBaselineJob) ??
+        (questionBaseline
+          ? `${questionBaseline.status}${questionBaseline.model ? ` using ${questionBaseline.model}` : ""}`
+          : "No baseline generated yet"),
+      tone: baselineError
+        ? "error"
+        : jobTone(latestBaselineJob, questionBaseline?.status === "ready" ? "success" : "neutral"),
+      error: latestBaselineJob?.error ?? questionBaseline?.error ?? baselineError ?? undefined,
+      updatedAt: latestBaselineJob?.updatedAt ?? questionBaseline?.updatedAt,
     },
     {
       label: "Embeddings and signals",
@@ -889,6 +920,62 @@ export function InstructorSessionPage() {
             items={aiJobStatusItems}
             contextLabel={overview.currentQuestion?.title ?? "the current question"}
           />
+
+          <Card title="Hidden Baseline Diagnostics">
+            <p className="text-xs leading-5 text-[var(--c-muted)]">
+              The baseline is the instructor-side reference answer used by private feedback and
+              personal reports. Learners never see the baseline text.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+              <MetricTile label="Status" value={questionBaseline?.status ?? "missing"} />
+              <MetricTile label="Provider" value={questionBaseline?.provider ?? "none"} />
+              <MetricTile label="Model" value={questionBaseline?.model ?? "none"} />
+              <MetricTile
+                label="Generated"
+                value={
+                  questionBaseline?.generatedAt
+                    ? new Date(questionBaseline.generatedAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "not yet"
+                }
+              />
+            </div>
+            <div className="mt-3 rounded-sm bg-[var(--c-surface-strong)] p-2.5">
+              <p className="text-[10px] text-[var(--c-muted)]">
+                Prompt: {questionBaseline?.promptTemplateKey ?? "question.baseline.v1"}
+              </p>
+              {questionBaseline?.error || baselineError ? (
+                <p className="mt-1 text-[11px] leading-4 text-[var(--c-error)]">
+                  {questionBaseline?.error ?? baselineError}
+                </p>
+              ) : null}
+              {!baselineCanGenerate ? (
+                <p className="mt-1 text-[11px] leading-4 text-[var(--c-sig-mustard)]">
+                  Release a question before generating its baseline.
+                </p>
+              ) : null}
+            </div>
+            <Button
+              className="mt-3 w-full"
+              size="sm"
+              variant="secondary"
+              onClick={() => void handleGenerateBaseline(Boolean(questionBaseline))}
+              disabled={baselineBusy || !baselineCanGenerate}
+            >
+              {baselineBusy ? (
+                <>
+                  <CircleNotch size={12} className="mr-1 inline animate-spin" />
+                  Queued
+                </>
+              ) : questionBaseline ? (
+                "Regenerate Baseline"
+              ) : (
+                "Generate Baseline"
+              )}
+            </Button>
+          </Card>
 
           {pendingRecatRequests && pendingRecatRequests.length > 0 && (
             <Card title="Recategorisation Requests">
