@@ -2,8 +2,8 @@ import { useState, type ReactNode } from "react";
 import { ActProgressBar } from "@/components/layout/act-progress-bar";
 import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
 import { Card } from "@/components/ui/card";
-import { useAct } from "@/hooks/use-act";
-import type { ActId, TabId } from "@/lib/constants";
+import { getActIndex, isTabUnlockedForAct } from "@/lib/act-state";
+import { ACTS, type ActId, type TabId } from "@/lib/constants";
 
 export interface ParticipantShellProps {
   topBar?: ReactNode;
@@ -34,7 +34,8 @@ export function ParticipantShell({
   canSelectActs = false,
   onActChange,
 }: ParticipantShellProps) {
-  const { actIndex, currentAct, isTabUnlocked } = useAct(currentActId);
+  const actIndex = getActIndex(currentActId);
+  const currentAct = ACTS[actIndex];
   const [internalActiveTab, setInternalActiveTab] = useState<TabId>(defaultTab);
   const activeTab = controlledActiveTab ?? internalActiveTab;
 
@@ -68,7 +69,7 @@ export function ParticipantShell({
       <BottomTabBar
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        isTabUnlocked={(tab) => unlockAllTabs || isTabUnlocked(tab)}
+        isTabUnlocked={(tab) => unlockAllTabs || isTabUnlockedForAct(currentActId, tab)}
       />
     </div>
   );

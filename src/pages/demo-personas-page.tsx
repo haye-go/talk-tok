@@ -36,11 +36,10 @@ export function DemoPersonasPage() {
   function handlePickPersona(persona: (typeof personas)[number]) {
     setDemoClientKey(persona.demoClientKey);
     storeParticipant({
-      sessionSlug: session!.slug,
+      sessionSlug: session.slug,
       participantSlug: persona.participantSlug,
       nickname: persona.nickname,
     });
-    window.location.href = routes.session(session!.slug);
   }
 
   function personaHref(persona: (typeof personas)[number]) {

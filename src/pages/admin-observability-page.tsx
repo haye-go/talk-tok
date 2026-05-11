@@ -10,7 +10,34 @@ import { Input } from "@/components/ui/input";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { LoadingState } from "@/components/state/loading-state";
 
-function downloadCsv(rows: Record<string, any>[], filename: string) {
+interface CsvRow {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
+interface FeatureSummary {
+  calls: number;
+  estimatedCostUsd?: number;
+  errors: number;
+}
+
+interface RecentCall {
+  _id: string;
+  createdAt: number;
+  feature: string;
+  provider?: string;
+  model?: string;
+  status: string;
+  promptTemplateKey?: string;
+  inputTokens?: number;
+  cachedInputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
+  estimatedCostUsd?: number;
+  latencyMs?: number;
+  error?: string;
+}
+
+function downloadCsv(rows: CsvRow[], filename: string) {
   if (rows.length === 0) return;
   const keys = Object.keys(rows[0]);
   const csv = [
@@ -47,7 +74,7 @@ export function AdminObservabilityPage() {
 
   function handleExport() {
     if (!recentCalls || recentCalls.length === 0) return;
-    const rows = recentCalls.map((c: any) => ({
+    const rows = recentCalls.map((c: RecentCall) => ({
       time: new Date(c.createdAt).toISOString(),
       feature: c.feature,
       provider: c.provider ?? "",
@@ -109,11 +136,11 @@ export function AdminObservabilityPage() {
                   {Object.entries(summary.byFeature).map(([feature, data]) => (
                     <tr key={feature} className="border-b border-[var(--c-hairline)]">
                       <td className="py-2 pr-4 font-medium">{feature}</td>
-                      <td className="py-2 pr-4">{(data as { calls: number }).calls}</td>
+                      <td className="py-2 pr-4">{(data as FeatureSummary).calls}</td>
                       <td className="py-2 pr-4">
-                        ${((data as { estimatedCostUsd: number }).estimatedCostUsd ?? 0).toFixed(3)}
+                        ${((data as FeatureSummary).estimatedCostUsd ?? 0).toFixed(3)}
                       </td>
-                      <td className="py-2">{(data as { errors: number }).errors}</td>
+                      <td className="py-2">{(data as FeatureSummary).errors}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -150,7 +177,7 @@ export function AdminObservabilityPage() {
                   </tr>
                 </thead>
                 <tbody className="text-[var(--c-body)]">
-                  {recentCalls.map((call: any) => {
+                  {recentCalls.map((call: RecentCall) => {
                     const isExpanded = expandedCallId === call._id;
                     return (
                       <tr
@@ -196,7 +223,7 @@ export function AdminObservabilityPage() {
 
               {expandedCallId &&
                 (() => {
-                  const call = recentCalls.find((c: any) => c._id === expandedCallId) as any;
+                  const call = recentCalls.find((c: RecentCall) => c._id === expandedCallId) ?? null;
                   if (!call) return null;
                   return (
                     <div className="border-t border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">

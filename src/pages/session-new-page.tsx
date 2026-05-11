@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { ArrowsClockwise, Rocket } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { ToneSelector } from "@/components/submission/tone-selector";
 import { Badge } from "@/components/ui/badge";
@@ -95,7 +96,9 @@ export function SessionNewPage() {
                   onClick={async () => {
                     setCreatingTemplateId(t.id);
                     try {
-                      const s = await createFromTemplate({ templateId: t.id as any });
+                      const s = await createFromTemplate({
+                        templateId: t.id as Id<"sessionTemplates">,
+                      });
                       window.location.href = routes.instructorSession(s.slug);
                     } finally {
                       setCreatingTemplateId(null);

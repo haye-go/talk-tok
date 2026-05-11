@@ -11,6 +11,11 @@ import { Input } from "@/components/ui/input";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { Switch } from "@/components/ui/switch";
 
+interface DemoToggle {
+  key: string;
+  enabled: boolean;
+}
+
 const TOGGLE_KEYS = [
   { key: "simulateAiFailure" as const, label: "Simulate AI Failure" },
   { key: "simulateBudgetExceeded" as const, label: "Simulate Budget Exceeded" },
@@ -95,7 +100,7 @@ export function AdminDemoPage() {
     }
   }
 
-  const toggleMap = new Map((toggles ?? []).map((t: any) => [t.key, t.enabled]));
+  const toggleMap = new Map((toggles ?? []).map((t: DemoToggle) => [t.key, t.enabled]));
 
   return (
     <AdminShell title="Demo Management" description="Seed, reset, and configure demo sessions.">

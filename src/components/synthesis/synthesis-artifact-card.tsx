@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BookOpen, CircleNotch, Flag, Scales, Sparkle, Trash } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { BadgeProps } from "@/components/ui/badge";
@@ -60,7 +61,7 @@ export function SynthesisArtifactCard({
   async function handleAction(action: "publish" | "finalize" | "archive") {
     setBusy(true);
     try {
-      const args = { sessionSlug, artifactId: artifact.id as any };
+      const args = { sessionSlug, artifactId: artifact.id as Id<"synthesisArtifacts"> };
       if (action === "publish") await publish(args);
       else if (action === "finalize") await finalize(args);
       else await archive(args);

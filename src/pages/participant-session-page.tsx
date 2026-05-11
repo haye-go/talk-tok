@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -37,7 +37,20 @@ import { routes } from "@/lib/routes";
 
 export function ParticipantSessionPage() {
   const { sessionSlug } = useParams({ from: "/session/$sessionSlug" });
-  const [clientKey, setClientKey] = useState<string | null>(null);
+  const clientKey = useMemo(() => {
+    const demoClientKey = new URLSearchParams(window.location.search).get("demoClientKey");
+
+    if (sessionSlug === DEMO_SESSION_SLUG && demoClientKey?.startsWith("demo-")) {
+      setDemoClientKey(demoClientKey);
+      window.history.replaceState(null, "", routes.session(sessionSlug));
+    }
+
+    if (sessionSlug !== DEMO_SESSION_SLUG && isDemoClientKey()) {
+      restoreOriginalClientKey();
+    }
+
+    return getOrCreateClientKey();
+  }, [sessionSlug]);
 
   // Primary data source — one query for all participant state
   const workspace = useParticipantWorkspace(sessionSlug, clientKey);
@@ -60,32 +73,18 @@ export function ParticipantSessionPage() {
   const createSubmission = useMutation(api.submissions.create);
   const requestRecategorisation = useMutation(api.recategorisation.request);
 
-  const [nickname, setNickname] = useState("");
+  const [nicknameDraft, setNicknameDraft] = useState<string | null>(null);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("main");
-  const [actOverride, setActOverride] = useState<ActId | null>(null);
+  const [actOverride, setActOverride] = useState<{ baseAct: ActId; value: ActId } | null>(null);
   const touchedPresenceKey = useRef<string | null>(null);
   const isDemoParticipant = sessionSlug === DEMO_SESSION_SLUG && clientKey?.startsWith("demo-");
-  const liveActForReset = workspace?.session.currentAct ?? session?.currentAct;
-
-  useEffect(() => {
-    const demoClientKey = new URLSearchParams(window.location.search).get("demoClientKey");
-    if (sessionSlug === DEMO_SESSION_SLUG && demoClientKey?.startsWith("demo-")) {
-      setDemoClientKey(demoClientKey);
-      window.history.replaceState(null, "", routes.session(sessionSlug));
-    }
-    if (sessionSlug !== DEMO_SESSION_SLUG && isDemoClientKey()) {
-      restoreOriginalClientKey();
-    }
-    setClientKey(getOrCreateClientKey());
-  }, [sessionSlug]);
 
   useEffect(() => {
     if (!participant || !clientKey) return;
 
-    setNickname(participant.nickname);
     storeParticipant({
       sessionSlug,
       participantSlug: participant.participantSlug,
@@ -97,9 +96,7 @@ export function ParticipantSessionPage() {
     void touchPresence({ sessionSlug, clientKey, presenceState: "idle" });
   }, [clientKey, participant, sessionSlug, touchPresence]);
 
-  useEffect(() => {
-    setActOverride(null);
-  }, [liveActForReset]);
+  const nickname = nicknameDraft ?? participant?.nickname ?? "";
 
   async function handleNicknameSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -218,7 +215,7 @@ export function ParticipantSessionPage() {
   // Workspace data (may still be loading after join gate passes)
   const ws = workspace;
   const currentAct = ws?.session.currentAct ?? session.currentAct;
-  const visibleAct = actOverride ?? currentAct;
+  const visibleAct = actOverride?.baseAct === currentAct ? actOverride.value : currentAct;
   const firstFeedback = ws?.feedbackBySubmission?.[0] ?? null;
   const firstAssignment = ws?.assignmentsBySubmission?.[0] ?? null;
   const firstInitialResponse = ws?.myZoneHistory.initialResponses?.[0] ?? null;
@@ -231,7 +228,7 @@ export function ParticipantSessionPage() {
   const canUseFightMe = Boolean(clientKey && firstInitialResponse);
 
   function handleActChange(actId: ActId) {
-    setActOverride(actId);
+    setActOverride({ baseAct: currentAct, value: actId });
     setActiveTab("main");
   }
 
@@ -422,7 +419,7 @@ export function ParticipantSessionPage() {
               <Input
                 label="Visible nickname"
                 value={nickname}
-                onChange={(event) => setNickname(event.target.value)}
+                onChange={(event) => setNicknameDraft(event.target.value)}
                 error={nicknameError ?? undefined}
               />
               <Button type="submit" variant="secondary">

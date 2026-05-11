@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Lightning } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/state/loading-state";
@@ -29,7 +30,7 @@ export function FightTargetPicker({
       const result = await createChallenge({
         sessionSlug,
         clientKey,
-        defenderSubmissionId: defenderSubmissionId as any,
+        defenderSubmissionId: defenderSubmissionId as Id<"submissions">,
       });
       onChallengeCreated(result.slug);
     } catch {

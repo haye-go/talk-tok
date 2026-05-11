@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Archive, Rocket } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { EmptyState } from "@/components/state/empty-state";
 import { LoadingState } from "@/components/state/loading-state";
@@ -27,7 +28,9 @@ export function TemplatesPage() {
   async function handleCreate(templateId: string) {
     setCreatingId(templateId);
     try {
-      const session = await createFromTemplate({ templateId: templateId as any });
+      const session = await createFromTemplate({
+        templateId: templateId as Id<"sessionTemplates">,
+      });
       window.location.href = routes.instructorSession(session.slug);
     } finally {
       setCreatingId(null);
@@ -37,7 +40,7 @@ export function TemplatesPage() {
   async function handleArchive(templateId: string) {
     setArchivingId(templateId);
     try {
-      await archiveTemplate({ templateId: templateId as any });
+      await archiveTemplate({ templateId: templateId as Id<"sessionTemplates"> });
     } finally {
       setArchivingId(null);
     }

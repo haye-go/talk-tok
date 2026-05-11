@@ -1,5 +1,6 @@
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 
 const REACTION_KINDS = [
@@ -30,7 +31,7 @@ export function ReactionBar({
   const toggle = useMutation(api.reactions.toggle);
 
   function handleToggle(kind: ReactionKind) {
-    void toggle({ sessionSlug, clientKey, submissionId: submissionId as any, kind });
+    void toggle({ sessionSlug, clientKey, submissionId: submissionId as Id<"submissions">, kind });
   }
 
   return (

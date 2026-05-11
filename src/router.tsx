@@ -1,5 +1,6 @@
-import { createRoute, createRootRoute, createRouter, Outlet } from "@tanstack/react-router";
+import { createRoute, createRootRoute, createRouter } from "@tanstack/react-router";
 import App from "./App";
+import { RootLayout } from "@/components/layout/root-layout";
 import { AdminModelsPage } from "@/pages/admin-models-page";
 import { AdminObservabilityPage } from "@/pages/admin-observability-page";
 import { AdminPromptsPage } from "@/pages/admin-prompts-page";
@@ -17,10 +18,6 @@ import { ReviewPage } from "@/pages/review-page";
 import { SessionNewPage } from "@/pages/session-new-page";
 import { DemoPersonasPage } from "@/pages/demo-personas-page";
 import { TemplatesPage } from "@/pages/templates-page";
-
-function RootLayout() {
-  return <Outlet />;
-}
 
 const rootRoute = createRootRoute({
   component: RootLayout,

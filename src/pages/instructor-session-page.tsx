@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { BookOpen, CircleNotch, Eye, FloppyDisk, Scales, Sparkle } from "@phosphor-icons/react";
 import { useParams } from "@tanstack/react-router";
@@ -91,6 +91,58 @@ interface SessionSettingsUpdate {
   summaryGateEnabled: boolean;
 }
 
+interface PersonalReportsSummary {
+  total?: number;
+  success?: number;
+  queued?: number;
+  processing?: number;
+  error?: number;
+}
+
+interface NoveltyRadarItem {
+  signalId: string;
+  participantLabel: string;
+  categoryName?: string;
+  categoryColor?: string;
+  band: string;
+  bodyPreview?: string;
+}
+
+interface NoveltyRadarCategoryAverage {
+  categoryId: string;
+  categoryName: string;
+  categoryColor?: string;
+  averageNoveltyScore: number;
+}
+
+interface CategoryCountCell {
+  categoryId: string;
+  categoryName?: string;
+  count: number;
+}
+
+interface CategoryDriftSlice {
+  key: string;
+  label: string;
+  categoryCounts: CategoryCountCell[];
+}
+
+function getSessionControlsKey(session: SessionControlSnapshot) {
+  return [
+    session.title,
+    session.openingPrompt,
+    session.phase,
+    session.visibilityMode,
+    session.anonymityMode,
+    session.responseSoftLimitWords,
+    session.categorySoftCap,
+    session.critiqueToneDefault,
+    session.telemetryEnabled,
+    session.fightMeEnabled,
+    session.summaryGateEnabled,
+  ].join("|");
+}
+
 const VISIBILITY_OPTIONS: Array<{
   value: VisibilityMode;
   label: string;
@@ -140,18 +192,6 @@ function SessionControlsCard({
   const [visibilityError, setVisibilityError] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [settingsSaved, setSettingsSaved] = useState(false);
-
-  useEffect(() => {
-    setTitle(session.title);
-    setOpeningPrompt(session.openingPrompt);
-    setAnonymityMode(session.anonymityMode);
-    setResponseSoftLimitWords(String(session.responseSoftLimitWords));
-    setCategorySoftCap(String(session.categorySoftCap));
-    setCritiqueToneDefault(session.critiqueToneDefault);
-    setTelemetryEnabled(session.telemetryEnabled);
-    setFightMeEnabled(session.fightMeEnabled);
-    setSummaryGateEnabled(session.summaryGateEnabled);
-  }, [session]);
 
   async function handleVisibilityClick(visibilityMode: VisibilityMode) {
     setVisibilityError(null);
@@ -550,7 +590,7 @@ export function InstructorSessionPage() {
   async function handleGenerateCategorySummary(categoryId: string) {
     setGeneratingCategoryId(categoryId);
     try {
-      await generateCategorySummary({ sessionSlug, categoryId: categoryId as any });
+      await generateCategorySummary({ sessionSlug, categoryId: categoryId as Id<"categories"> });
     } finally {
       setGeneratingCategoryId(null);
     }
@@ -711,7 +751,7 @@ export function InstructorSessionPage() {
   const artifactCounts = synthesis?.artifactCounts;
   const recentArtifacts = synthesis?.recentArtifacts ?? [];
   const latestClassSynthesis = synthesis?.latestClassSynthesis;
-  const reportsSummary = reports?.summary;
+  const reportsSummary = reports?.summary as PersonalReportsSummary | undefined;
   const recentReports = reports?.recent ?? [];
   const latestCategorisationJob = overview.jobs.latest.find((job) => job.type === "categorisation");
   const categorisationBusy =
@@ -996,6 +1036,7 @@ export function InstructorSessionPage() {
       center={
         <div className="grid gap-3">
           <SessionControlsCard
+            key={getSessionControlsKey(session)}
             session={session}
             onVisibilityChange={handleVisibilityChange}
             onSettingsSave={handleSettingsSave}
@@ -1194,15 +1235,12 @@ export function InstructorSessionPage() {
             {reportsSummary && (
               <div className="mb-3 grid grid-cols-4 gap-2">
                 <MetricTile label="Total" value={String(reportsSummary.total ?? 0)} />
-                <MetricTile label="Success" value={String((reportsSummary as any).success ?? 0)} />
+                <MetricTile label="Success" value={String(reportsSummary.success ?? 0)} />
                 <MetricTile
                   label="Processing"
-                  value={String(
-                    ((reportsSummary as any).queued ?? 0) +
-                      ((reportsSummary as any).processing ?? 0),
-                  )}
+                  value={String((reportsSummary.queued ?? 0) + (reportsSummary.processing ?? 0))}
                 />
-                <MetricTile label="Error" value={String((reportsSummary as any).error ?? 0)} />
+                <MetricTile label="Error" value={String(reportsSummary.error ?? 0)} />
               </div>
             )}
 
@@ -1399,7 +1437,7 @@ export function InstructorSessionPage() {
               {noveltyRadar.topDistinctive.length > 0 && (
                 <div className="mb-3">
                   <p className="mb-1 text-[10px] text-[var(--c-muted)]">Top Distinctive</p>
-                  {noveltyRadar.topDistinctive.slice(0, 5).map((item: any) => (
+                  {noveltyRadar.topDistinctive.slice(0, 5).map((item: NoveltyRadarItem) => (
                     <div
                       key={item.signalId}
                       className="mb-1.5 rounded-sm bg-[var(--c-surface-strong)] p-2"
@@ -1436,7 +1474,7 @@ export function InstructorSessionPage() {
 
               {noveltyRadar.categoryAverages.length > 0 && (
                 <div className="flex flex-wrap gap-1">
-                  {noveltyRadar.categoryAverages.map((cat: any) => (
+                  {noveltyRadar.categoryAverages.map((cat: NoveltyRadarCategoryAverage) => (
                     <Badge
                       key={cat.categoryId}
                       tone={categoryColorToTone(cat.categoryColor)}
@@ -1458,7 +1496,7 @@ export function InstructorSessionPage() {
                   <thead>
                     <tr className="border-b border-[var(--c-hairline)] text-left text-[var(--c-muted)]">
                       <th className="py-1 pr-2 font-medium">Slice</th>
-                      {categoryDrift.slices[0].categoryCounts.map((c: any) => (
+                      {categoryDrift.slices[0].categoryCounts.map((c: CategoryCountCell) => (
                         <th key={c.categoryId} className="py-1 pr-2 font-medium">
                           {c.categoryName?.split(" ")[0]}
                         </th>
@@ -1466,10 +1504,10 @@ export function InstructorSessionPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {categoryDrift.slices.map((slice: any) => (
+                    {categoryDrift.slices.map((slice: CategoryDriftSlice) => (
                       <tr key={slice.key} className="border-b border-[var(--c-hairline)]">
                         <td className="py-1 pr-2 text-[var(--c-ink)]">{slice.label}</td>
-                        {slice.categoryCounts.map((c: any) => (
+                        {slice.categoryCounts.map((c: CategoryCountCell) => (
                           <td
                             key={c.categoryId}
                             className="py-1 pr-2 font-mono text-[var(--c-body)]"

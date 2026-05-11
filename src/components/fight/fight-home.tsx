@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Lightning, Robot, Sword } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { FightCountdown } from "@/components/fight/fight-countdown";
 import { FightTargetPicker } from "@/components/fight/fight-target-picker";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +63,7 @@ export function FightHome({
       const result = await createVsAi({
         sessionSlug,
         clientKey,
-        sourceSubmissionId: mySubmissionId as any,
+        sourceSubmissionId: mySubmissionId as Id<"submissions">,
       });
       onNavigateToThread(result.slug);
     } finally {

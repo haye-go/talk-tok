@@ -131,18 +131,20 @@ export function ArgumentMapGraph({
 }: ArgumentMapGraphProps) {
   const [layoutNodes, setLayoutNodes] = useState<PositionedNode[]>([]);
   const [layoutEdges, setLayoutEdges] = useState<PositionedEdge[]>([]);
-  const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(nodes[0]?.nodeKey ?? null);
+  const [selectedNodeKeyState, setSelectedNodeKeyState] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
   const nodeByKey = useMemo(() => new Map(nodes.map((node) => [node.nodeKey, node])), [nodes]);
+  const selectedNodeKey =
+    selectedNodeKeyState && nodeByKey.has(selectedNodeKeyState)
+      ? selectedNodeKeyState
+      : nodes[0]?.nodeKey ?? null;
   const selectedNode = selectedNodeKey ? nodeByKey.get(selectedNodeKey) : null;
   const selectedEdge = layoutEdges.find((edge) => edge.id === selectedEdgeId) ?? null;
   const visibleEdges = layoutEdges.slice(0, 8);
 
   useEffect(() => {
     if (nodes.length === 0) {
-      setLayoutNodes([]);
-      setLayoutEdges([]);
       return;
     }
 
@@ -199,22 +201,14 @@ export function ArgumentMapGraph({
     };
   }, [edges, nodeByKey, nodes]);
 
-  useEffect(() => {
-    if (!selectedNodeKey && nodes[0]) {
-      setSelectedNodeKey(nodes[0].nodeKey);
-    } else if (selectedNodeKey && !nodeByKey.has(selectedNodeKey)) {
-      setSelectedNodeKey(nodes[0]?.nodeKey ?? null);
-    }
-  }, [nodeByKey, nodes, selectedNodeKey]);
-
   function selectNode(nodeKey: string) {
-    setSelectedNodeKey(nodeKey);
+    setSelectedNodeKeyState(nodeKey);
     setSelectedEdgeId(null);
   }
 
   function selectEdge(edgeId: string) {
     setSelectedEdgeId(edgeId);
-    setSelectedNodeKey(null);
+    setSelectedNodeKeyState(null);
   }
 
   return (

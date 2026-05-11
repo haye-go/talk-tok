@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Fire } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -24,20 +24,15 @@ export function FightDraftComposer({
   existingDraft,
   placeholder = "Your rebuttal...",
 }: FightDraftComposerProps) {
-  const [text, setText] = useState(existingDraft ?? "");
+  const [textOverride, setTextOverride] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const saveDraft = useMutation(api.fightMe.saveDraft);
   const submitTurn = useMutation(api.fightMe.submitTurn);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (existingDraft !== undefined && existingDraft !== text) {
-      setText(existingDraft);
-    }
-  }, [existingDraft]);
+  const text = textOverride ?? existingDraft ?? "";
 
   function handleChange(value: string) {
-    setText(value);
+    setTextOverride(value);
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       void saveDraft({ sessionSlug, fightSlug, clientKey, body: value });
@@ -49,7 +44,7 @@ export function FightDraftComposer({
     setSubmitting(true);
     try {
       await submitTurn({ sessionSlug, fightSlug, clientKey, body: text.trim() });
-      setText("");
+      setTextOverride("");
     } finally {
       setSubmitting(false);
     }

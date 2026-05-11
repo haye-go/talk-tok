@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { QrCode } from "@phosphor-icons/react";
 import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
@@ -21,21 +21,11 @@ export function JoinPage() {
   const normalizedCode = normalizeSessionCode(sessionCode);
   const session = useQuery(api.sessions.getByJoinCode, { sessionCode: normalizedCode });
   const joinSession = useMutation(api.participants.join);
-  const [nickname, setNickname] = useState("");
+  const storedNickname = session ? (readStoredParticipant(session.slug)?.nickname ?? "") : "";
+  const [nicknameDraft, setNicknameDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!session) {
-      return;
-    }
-
-    const stored = readStoredParticipant(session.slug);
-
-    if (stored?.nickname) {
-      setNickname(stored.nickname);
-    }
-  }, [session]);
+  const nickname = nicknameDraft ?? storedNickname;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -92,7 +82,7 @@ export function JoinPage() {
               label="Nickname"
               placeholder="Enter a nickname"
               value={nickname}
-              onChange={(event) => setNickname(event.target.value)}
+              onChange={(event) => setNicknameDraft(event.target.value)}
               required
             />
             {error ? <p className="text-sm text-[var(--c-error)]">{error}</p> : null}

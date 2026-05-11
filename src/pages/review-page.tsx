@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChartBar, CircleNotch } from "@phosphor-icons/react";
 import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
@@ -39,11 +39,7 @@ const RESPONSIVENESS_LABELS: Record<string, string> = {
 
 export function ReviewPage() {
   const { sessionSlug } = useParams({ from: "/session/$sessionSlug/review" });
-  const [clientKey, setClientKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    setClientKey(getOrCreateClientKey());
-  }, []);
+  const [clientKey] = useState<string>(() => getOrCreateClientKey());
 
   const report = useQuery(
     api.personalReports.getMine,

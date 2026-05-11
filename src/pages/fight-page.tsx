@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -10,15 +10,11 @@ export function FightPage() {
   const { sessionSlug, fightSlug } = useParams({
     from: "/session/$sessionSlug/fight/$fightSlug",
   });
-  const [clientKey, setClientKey] = useState<string | null>(null);
+  const [clientKey] = useState<string>(() => getOrCreateClientKey());
   const participant = useQuery(
     api.participants.restore,
     clientKey ? { sessionSlug, clientKey } : "skip",
   );
-
-  useEffect(() => {
-    setClientKey(getOrCreateClientKey());
-  }, []);
 
   return (
     <ParticipantShell
@@ -29,7 +25,7 @@ export function FightPage() {
         <FightThread
           sessionSlug={sessionSlug}
           fightSlug={fightSlug}
-          clientKey={clientKey ?? undefined}
+          clientKey={clientKey}
           myParticipantId={participant?.id}
         />
       }
