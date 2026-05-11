@@ -26,6 +26,7 @@ const toneValidator = v.union(
 type PublicSubmissionResult = {
   id: Id<"submissions">;
   sessionId: Id<"sessions">;
+  questionId?: Id<"sessionQuestions">;
   participantId: Id<"participants">;
   participantSlug: string;
   nickname: string;
@@ -150,6 +151,7 @@ function toSubmission(
 ) {
   return {
     id: submission._id,
+    questionId: submission.questionId,
     participantId: submission.participantId,
     participantSlug: participant?.participantSlug ?? "unknown",
     nickname: nicknameForPeer(session, participant),
@@ -243,6 +245,7 @@ export const overview = query({
   args: {
     sessionSlug: v.string(),
     clientKey: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
@@ -341,6 +344,11 @@ export const overview = query({
         .order("desc")
         .take(1),
     ]);
+    const requestedQuestion = args.questionId ? await ctx.db.get(args.questionId) : null;
+    const selectedQuestion =
+      requestedQuestion && requestedQuestion.sessionId === session._id
+        ? requestedQuestion
+        : currentQuestion;
 
     const activeCategories = categories.filter((category) => category.status === "active");
     const categoriesById = new Map(activeCategories.map((category) => [category._id, category]));
@@ -433,6 +441,7 @@ export const overview = query({
 
       activeFollowUps.push({
         id: followUpPrompt._id,
+        questionId: followUpPrompt.questionId,
         slug: followUpPrompt.slug,
         title: followUpPrompt.title,
         prompt: followUpPrompt.prompt,
@@ -446,6 +455,7 @@ export const overview = query({
 
             return {
               id: target._id,
+              questionId: target.questionId,
               targetKind: target.targetKind,
               categoryId: target.categoryId,
               categorySlug: category?.slug,
@@ -500,7 +510,7 @@ export const overview = query({
       session: toSessionSnapshot(session),
       questions: questions.map(toPublicQuestion),
       currentQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
-      selectedQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
+      selectedQuestion: selectedQuestion ? toPublicQuestion(selectedQuestion) : null,
       participant: toParticipant(participant),
       visibility: {
         mode: session.visibilityMode,
@@ -666,6 +676,7 @@ export const submitAndQueueFeedback = mutation({
     sessionSlug: v.string(),
     clientKey: v.string(),
     body: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     kind: v.union(v.literal("initial"), v.literal("additional_point"), v.literal("reply")),
     parentSubmissionId: v.optional(v.id("submissions")),
     followUpPromptId: v.optional(v.id("followUpPrompts")),
@@ -692,6 +703,7 @@ export const submitAndQueueFeedback = mutation({
       sessionSlug: args.sessionSlug,
       clientKey: args.clientKey,
       body: args.body,
+      questionId: args.questionId,
       kind: args.kind,
       parentSubmissionId: args.parentSubmissionId,
       followUpPromptId: args.followUpPromptId,

@@ -307,7 +307,7 @@ export const seed = mutation({
       throw new Error("Demo session was not created.");
     }
 
-    await createDefaultQuestionForSession(ctx, session, now);
+    const questionId = await createDefaultQuestionForSession(ctx, session, now);
 
     const categoryIdsBySlug = new Map<string, Id<"categories">>();
     const categoryNamesBySlug = new Map<string, string>();
@@ -346,6 +346,7 @@ export const seed = mutation({
       const typingStartedAt = now - response.compositionMs - (responseIndex + 1) * 18_000;
       const submissionId = await ctx.db.insert("submissions", {
         sessionId,
+        questionId,
         participantId,
         body: response.body,
         kind: "initial",
@@ -589,6 +590,7 @@ export const seed = mutation({
 
     const followUpId = await ctx.db.insert("followUpPrompts", {
       sessionId,
+      questionId,
       slug: "make-it-teachable",
       title: "Make the course teachable",
       prompt:
@@ -604,6 +606,7 @@ export const seed = mutation({
 
     await ctx.db.insert("followUpTargets", {
       sessionId,
+      questionId,
       followUpPromptId: followUpId,
       targetKind: "all",
       createdAt: now,
@@ -615,6 +618,7 @@ export const seed = mutation({
     if (mayaId && mayaSubmissionId) {
       await ctx.db.insert("submissions", {
         sessionId,
+        questionId,
         participantId: mayaId,
         parentSubmissionId: mayaSubmissionId,
         followUpPromptId: followUpId,

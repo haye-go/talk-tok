@@ -100,6 +100,7 @@ export default defineSchema({
 
   submissions: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     participantId: v.id("participants"),
     body: v.string(),
     parentSubmissionId: v.optional(v.id("submissions")),
@@ -125,8 +126,11 @@ export default defineSchema({
     createdAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
+    .index("by_questionId_and_createdAt", ["questionId", "createdAt"])
     .index("by_participant", ["participantId"])
     .index("by_session_and_created_at", ["sessionId", "createdAt"])
+    .index("by_participant_and_questionId", ["participantId", "questionId"])
     .index("by_participant_and_created_at", ["participantId", "createdAt"])
     .index("by_parent_submission", ["parentSubmissionId"])
     .index("by_follow_up_prompt", ["followUpPromptId"]),
@@ -382,6 +386,7 @@ export default defineSchema({
 
   followUpPrompts: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     slug: v.string(),
     title: v.string(),
     prompt: v.string(),
@@ -400,17 +405,20 @@ export default defineSchema({
     updatedAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_session_slug", ["sessionId", "slug"])
     .index("by_session_and_status", ["sessionId", "status"]),
 
   followUpTargets: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     followUpPromptId: v.id("followUpPrompts"),
     targetKind: v.union(v.literal("all"), v.literal("category")),
     categoryId: v.optional(v.id("categories")),
     createdAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_prompt", ["followUpPromptId"])
     .index("by_category", ["categoryId"]),
 

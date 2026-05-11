@@ -303,6 +303,7 @@ async function seedWarmStart(
   ctx: MutationCtx,
   args: {
     sessionId: Id<"sessions">;
+    questionId: Id<"sessionQuestions">;
     now: number;
     categoryIdsBySlug: Map<string, Id<"categories">>;
   },
@@ -321,6 +322,7 @@ async function seedWarmStart(
     const typingStartedAt = args.now - response.compositionMs - (index + 1) * 20_000;
     const submissionId = await ctx.db.insert("submissions", {
       sessionId: args.sessionId,
+      questionId: args.questionId,
       participantId,
       body: response.body,
       kind: "initial",
@@ -425,13 +427,14 @@ export const seedFoodHackathon = mutation({
       throw new Error("Stage demo session was not created.");
     }
 
-    await createDefaultQuestionForSession(ctx, session, now);
+    const questionId = await createDefaultQuestionForSession(ctx, session, now);
 
     const categoryIdsBySlug = await seedCategories(ctx, sessionId, now);
 
     if (args.includeWarmStart) {
       await seedWarmStart(ctx, {
         sessionId,
+        questionId,
         now,
         categoryIdsBySlug,
       });

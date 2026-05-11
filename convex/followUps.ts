@@ -3,6 +3,7 @@ import { api, internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { rateLimiter } from "./components";
+import { createDefaultQuestionForSession } from "./sessionQuestions";
 
 const FOLLOW_UP_LIMIT = 80;
 const TARGET_LIMIT = 20;
@@ -21,6 +22,7 @@ const toneValidator = v.union(
 type PublicSubmissionResult = {
   id: Id<"submissions">;
   sessionId: Id<"sessions">;
+  questionId?: Id<"sessionQuestions">;
   participantId: Id<"participants">;
   participantSlug: string;
   nickname: string;
@@ -262,6 +264,7 @@ async function toPublicPrompt(ctx: QueryCtx | MutationCtx, prompt: Doc<"followUp
 
       return {
         id: target._id,
+        questionId: target.questionId,
         targetKind: target.targetKind,
         categoryId: target.categoryId,
         categorySlug: category?.slug,
@@ -279,6 +282,7 @@ async function toPublicPrompt(ctx: QueryCtx | MutationCtx, prompt: Doc<"followUp
   return {
     id: prompt._id,
     sessionId: prompt.sessionId,
+    questionId: prompt.questionId,
     slug: prompt.slug,
     title: prompt.title,
     prompt: prompt.prompt,
@@ -301,6 +305,7 @@ export const create = mutation({
     sessionSlug: v.string(),
     title: v.optional(v.string()),
     prompt: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     instructions: v.optional(v.string()),
     targetMode: v.union(v.literal("all"), v.literal("categories")),
     categoryIds: v.optional(v.array(v.id("categories"))),
@@ -316,6 +321,16 @@ export const create = mutation({
     const prompt = normalizePrompt(args.prompt);
     const title = normalizeTitle(args.title ?? prompt, `Follow-up ${Date.now()}`);
     const categoryIds = args.categoryIds ?? [];
+    const questionId = args.questionId ?? (await createDefaultQuestionForSession(ctx, session));
+    const question = await ctx.db.get(questionId);
+
+    if (!question || question.sessionId !== session._id) {
+      throw new Error("Question not found in this session.");
+    }
+
+    if (question.status === "archived") {
+      throw new Error("Archived questions cannot receive follow-ups.");
+    }
 
     if (args.targetMode === "categories" && categoryIds.length === 0) {
       throw new Error("Category-targeted follow-ups require at least one category.");
@@ -342,6 +357,7 @@ export const create = mutation({
     const now = Date.now();
     const followUpPromptId = await ctx.db.insert("followUpPrompts", {
       sessionId: session._id,
+      questionId,
       slug: await createUniqueSlug(ctx, session._id, title),
       title,
       prompt,
@@ -357,6 +373,7 @@ export const create = mutation({
     if (args.targetMode === "all") {
       await ctx.db.insert("followUpTargets", {
         sessionId: session._id,
+        questionId,
         followUpPromptId,
         targetKind: "all",
         createdAt: now,
@@ -365,6 +382,7 @@ export const create = mutation({
       for (const categoryId of uniqueCategoryIds) {
         await ctx.db.insert("followUpTargets", {
           sessionId: session._id,
+          questionId,
           followUpPromptId,
           targetKind: "category",
           categoryId,
@@ -565,6 +583,7 @@ export const submitResponse = mutation({
 
     await rateLimiter.limit(ctx, "followUpResponse", { key: participant._id, throws: true });
     await assertSummaryGateOpen(ctx, session);
+    const questionId = prompt.questionId ?? (await createDefaultQuestionForSession(ctx, session));
 
     if (!(await assertParticipantEligible(ctx, prompt, participant._id))) {
       throw new Error("This follow-up is not targeted to this participant.");
@@ -574,6 +593,7 @@ export const submitResponse = mutation({
       sessionSlug: args.sessionSlug,
       clientKey: args.clientKey,
       body: args.body,
+      questionId,
       kind: args.parentSubmissionId ? "reply" : "additional_point",
       parentSubmissionId: args.parentSubmissionId,
       followUpPromptId: prompt._id,

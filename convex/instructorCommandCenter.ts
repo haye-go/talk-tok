@@ -151,6 +151,7 @@ function toSubmission(
 ) {
   return {
     id: submission._id,
+    questionId: submission.questionId,
     participantId: submission.participantId,
     participantSlug: participant?.participantSlug ?? "unknown",
     nickname: participant?.nickname ?? "Unknown",
@@ -429,6 +430,7 @@ export const overview = query({
 
             return {
               id: prompt._id,
+              questionId: prompt.questionId,
               slug: prompt.slug,
               title: prompt.title,
               prompt: prompt.prompt,

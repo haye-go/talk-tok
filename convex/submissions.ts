@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { rateLimiter } from "./components";
+import { createDefaultQuestionForSession } from "./sessionQuestions";
 
 const MAX_BODY_LENGTH = 8_000;
 const MIN_BODY_LENGTH = 5;
@@ -102,6 +103,7 @@ function toPublicSubmission(
   return {
     id: submission._id,
     sessionId: submission.sessionId,
+    questionId: submission.questionId,
     participantId: submission.participantId,
     participantSlug: participant?.participantSlug ?? "unknown",
     nickname:
@@ -221,6 +223,7 @@ export const create = mutation({
     sessionSlug: v.string(),
     clientKey: v.string(),
     body: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     kind: v.union(v.literal("initial"), v.literal("additional_point"), v.literal("reply")),
     parentSubmissionId: v.optional(v.id("submissions")),
     followUpPromptId: v.optional(v.id("followUpPrompts")),
@@ -255,6 +258,20 @@ export const create = mutation({
     }
 
     await rateLimiter.limit(ctx, "submitResponse", { key: participant._id, throws: true });
+    const questionId = args.questionId ?? (await createDefaultQuestionForSession(ctx, session));
+    const question = await ctx.db.get(questionId);
+
+    if (!question || question.sessionId !== session._id) {
+      throw new Error("Question not found in this session.");
+    }
+
+    if (question.status === "archived") {
+      throw new Error("This question is archived.");
+    }
+
+    if (!question.contributionsOpen) {
+      throw new Error("Contributions are closed for this question.");
+    }
 
     const contentLimits = asRecord(
       await ctx.runQuery(internal.protection.loadSetting, {
@@ -298,6 +315,7 @@ export const create = mutation({
       if (
         !followUpPrompt ||
         followUpPrompt.sessionId !== session._id ||
+        (followUpPrompt.questionId !== undefined && followUpPrompt.questionId !== questionId) ||
         followUpPrompt.status !== "active"
       ) {
         throw new Error("Follow-up prompt is not active in this session.");
@@ -340,6 +358,10 @@ export const create = mutation({
       if (!parent || parent.sessionId !== session._id) {
         throw new Error("Parent submission not found in this session.");
       }
+
+      if (parent.questionId !== undefined && parent.questionId !== questionId) {
+        throw new Error("Parent submission belongs to a different question.");
+      }
     }
 
     const now = Date.now();
@@ -364,6 +386,7 @@ export const create = mutation({
 
     const submissionId = await ctx.db.insert("submissions", {
       sessionId: session._id,
+      questionId,
       participantId: participant._id,
       body,
       parentSubmissionId: args.parentSubmissionId,
