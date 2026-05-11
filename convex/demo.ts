@@ -315,6 +315,7 @@ export const seed = mutation({
     for (const category of DEMO_CATEGORIES) {
       const categoryId = await ctx.db.insert("categories", {
         sessionId,
+        questionId,
         slug: category.slug,
         name: category.name,
         description: category.description,
@@ -364,6 +365,7 @@ export const seed = mutation({
       if (categoryId) {
         await ctx.db.insert("submissionCategories", {
           sessionId,
+          questionId,
           submissionId,
           categoryId,
           confidence: 0.86,

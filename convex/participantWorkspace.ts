@@ -189,6 +189,7 @@ function toFeedback(feedback: Doc<"submissionFeedback">) {
 function toRecategorisationRequest(request: Doc<"recategorizationRequests">) {
   return {
     id: request._id,
+    questionId: request.questionId,
     submissionId: request.submissionId,
     currentCategoryId: request.currentCategoryId,
     requestedCategoryId: request.requestedCategoryId,
@@ -350,8 +351,13 @@ export const overview = query({
         ? requestedQuestion
         : currentQuestion;
 
-    const activeCategories = categories.filter((category) => category.status === "active");
-    const categoriesById = new Map(activeCategories.map((category) => [category._id, category]));
+    const selectedQuestionId = selectedQuestion?._id;
+    const activeCategories = categories.filter(
+      (category) =>
+        category.status === "active" &&
+        (!selectedQuestionId || !category.questionId || category.questionId === selectedQuestionId),
+    );
+    const categoriesById = new Map(categories.map((category) => [category._id, category]));
     const participantIds = new Set(
       sessionSubmissions.map((submission) => submission.participantId),
     );
@@ -361,10 +367,12 @@ export const overview = query({
       Id<"submissions">,
       {
         id: Id<"submissionCategories">;
+        questionId?: Id<"sessionQuestions">;
         categoryId: Id<"categories">;
         categorySlug?: string;
         categoryName?: string;
         categoryColor?: string;
+        categoryStatus?: "active" | "archived";
         confidence: number;
         rationale?: string;
         status: "suggested" | "confirmed" | "recategorization_requested";
@@ -399,10 +407,12 @@ export const overview = query({
       );
       assignmentBySubmission.set(submission._id, {
         id: assignment._id,
+        questionId: assignment.questionId,
         categoryId: assignment.categoryId,
         categorySlug: category?.slug,
         categoryName: category?.name,
         categoryColor: category?.color,
+        categoryStatus: category?.status,
         confidence: assignment.confidence,
         rationale: assignment.rationale,
         status: assignment.status,
@@ -546,6 +556,7 @@ export const overview = query({
               .sort((a, b) => a.name.localeCompare(b.name))
               .map((category) => ({
                 id: category._id,
+                questionId: category.questionId,
                 slug: category.slug,
                 name: category.name,
                 description: category.description,

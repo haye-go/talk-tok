@@ -340,7 +340,13 @@ export const create = mutation({
             .withIndex("by_submission", (q) => q.eq("submissionId", submission._id))
             .take(8);
 
-          if (assignments.some((assignment) => targetCategoryIds.has(assignment.categoryId))) {
+          if (
+            assignments.some(
+              (assignment) =>
+                (!assignment.questionId || assignment.questionId === questionId) &&
+                targetCategoryIds.has(assignment.categoryId),
+            )
+          ) {
             eligible = true;
             break;
           }

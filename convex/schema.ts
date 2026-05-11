@@ -171,6 +171,7 @@ export default defineSchema({
 
   categories: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     slug: v.string(),
     name: v.string(),
     description: v.optional(v.string()),
@@ -183,7 +184,9 @@ export default defineSchema({
     updatedAt: timestamp,
   })
     .index("by_session", ["sessionId"])
-    .index("by_session_slug", ["sessionId", "slug"]),
+    .index("by_session_slug", ["sessionId", "slug"])
+    .index("by_questionId", ["questionId"])
+    .index("by_questionId_and_slug", ["questionId", "slug"]),
 
   sessionTemplates: defineTable({
     slug: v.string(),
@@ -348,6 +351,7 @@ export default defineSchema({
 
   submissionCategories: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     submissionId: v.id("submissions"),
     categoryId: v.id("categories"),
     confidence: v.number(),
@@ -361,10 +365,13 @@ export default defineSchema({
   })
     .index("by_session", ["sessionId"])
     .index("by_submission", ["submissionId"])
+    .index("by_questionId", ["questionId"])
+    .index("by_submissionId_and_questionId", ["submissionId", "questionId"])
     .index("by_category", ["categoryId"]),
 
   recategorizationRequests: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     submissionId: v.id("submissions"),
     participantId: v.id("participants"),
     currentCategoryId: v.optional(v.id("categories")),
@@ -382,6 +389,8 @@ export default defineSchema({
     .index("by_session_and_created_at", ["sessionId", "createdAt"])
     .index("by_submission", ["submissionId"])
     .index("by_participant", ["participantId"])
+    .index("by_questionId", ["questionId"])
+    .index("by_questionId_and_status", ["questionId", "status"])
     .index("by_session_and_status", ["sessionId", "status"]),
 
   followUpPrompts: defineTable({

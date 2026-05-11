@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { rateLimiter } from "./components";
+import { createDefaultQuestionForSession } from "./sessionQuestions";
 
 const MAX_REASON_LENGTH = 1000;
 const REQUEST_WINDOW_MS = 60_000;
@@ -67,6 +68,7 @@ function toPublicRequest(request: Doc<"recategorizationRequests">) {
   return {
     id: request._id,
     sessionId: request.sessionId,
+    questionId: request.questionId,
     submissionId: request.submissionId,
     participantId: request.participantId,
     currentCategoryId: request.currentCategoryId,
@@ -80,6 +82,34 @@ function toPublicRequest(request: Doc<"recategorizationRequests">) {
     createdAt: request.createdAt,
     updatedAt: request.updatedAt,
   };
+}
+
+async function questionIdForSubmission(
+  ctx: MutationCtx,
+  session: Doc<"sessions">,
+  submission: Doc<"submissions">,
+) {
+  if (submission.questionId) {
+    return submission.questionId;
+  }
+
+  return await createDefaultQuestionForSession(ctx, session);
+}
+
+async function latestAssignmentForQuestion(
+  ctx: QueryCtx | MutationCtx,
+  submissionId: Id<"submissions">,
+  questionId: Id<"sessionQuestions">,
+) {
+  const assignments = await ctx.db
+    .query("submissionCategories")
+    .withIndex("by_submission", (q) => q.eq("submissionId", submissionId))
+    .order("desc")
+    .take(8);
+
+  return assignments.find(
+    (assignment) => !assignment.questionId || assignment.questionId === questionId,
+  );
 }
 
 async function assertRequestAllowed(
@@ -140,25 +170,28 @@ export const request = mutation({
       throw new Error("Choose a category or suggest a category name.");
     }
 
+    const questionId = await questionIdForSubmission(ctx, session, submission);
+
     if (args.requestedCategoryId) {
       const requested = await ctx.db.get(args.requestedCategoryId);
 
-      if (!requested || requested.sessionId !== session._id || requested.status !== "active") {
+      if (
+        !requested ||
+        requested.sessionId !== session._id ||
+        requested.status !== "active" ||
+        (requested.questionId && requested.questionId !== questionId)
+      ) {
         throw new Error("Requested category not found in this session.");
       }
     }
 
     await assertRequestAllowed(ctx, participant._id);
 
-    const currentAssignment = await ctx.db
-      .query("submissionCategories")
-      .withIndex("by_submission", (q) => q.eq("submissionId", submission._id))
-      .order("desc")
-      .take(1)
-      .then((rows) => rows[0]);
+    const currentAssignment = await latestAssignmentForQuestion(ctx, submission._id, questionId);
     const now = Date.now();
     const requestId = await ctx.db.insert("recategorizationRequests", {
       sessionId: session._id,
+      questionId,
       submissionId: submission._id,
       participantId: participant._id,
       currentCategoryId: currentAssignment?.categoryId,
@@ -182,6 +215,7 @@ export const request = mutation({
       targetType: "recategorizationRequest",
       targetId: requestId,
       metadataJson: {
+        questionId,
         submissionId: submission._id,
         requestedCategoryId: args.requestedCategoryId,
         suggestedCategoryName: args.suggestedCategoryName,
@@ -213,6 +247,14 @@ export const decide = mutation({
     }
 
     const now = Date.now();
+    const submission = await ctx.db.get(requestDoc.submissionId);
+
+    if (!submission || submission.sessionId !== session._id) {
+      throw new Error("Submission not found for this recategorisation request.");
+    }
+
+    const questionId =
+      requestDoc.questionId ?? (await questionIdForSubmission(ctx, session, submission));
 
     if (args.decision === "approved") {
       const categoryId = args.categoryId ?? requestDoc.requestedCategoryId;
@@ -223,7 +265,12 @@ export const decide = mutation({
 
       const category = await ctx.db.get(categoryId);
 
-      if (!category || category.sessionId !== session._id || category.status !== "active") {
+      if (
+        !category ||
+        category.sessionId !== session._id ||
+        category.status !== "active" ||
+        (category.questionId && category.questionId !== questionId)
+      ) {
         throw new Error("Target category not found in this session.");
       }
 
@@ -231,13 +278,17 @@ export const decide = mutation({
         .query("submissionCategories")
         .withIndex("by_submission", (q) => q.eq("submissionId", requestDoc.submissionId))
         .take(8);
+      const assignmentsForQuestion = existingAssignments.filter(
+        (assignment) => !assignment.questionId || assignment.questionId === questionId,
+      );
 
-      for (const assignment of existingAssignments) {
+      for (const assignment of assignmentsForQuestion) {
         await ctx.db.delete(assignment._id);
       }
 
       await ctx.db.insert("submissionCategories", {
         sessionId: session._id,
+        questionId,
         submissionId: requestDoc.submissionId,
         categoryId,
         confidence: 1,
@@ -248,6 +299,7 @@ export const decide = mutation({
     }
 
     await ctx.db.patch(requestDoc._id, {
+      questionId: requestDoc.questionId ?? questionId,
       status: args.decision,
       instructorNote: args.instructorNote,
       decidedAt: now,
@@ -261,6 +313,7 @@ export const decide = mutation({
       targetType: "recategorizationRequest",
       targetId: requestDoc._id,
       metadataJson: {
+        questionId,
         submissionId: requestDoc.submissionId,
         categoryId: args.categoryId ?? requestDoc.requestedCategoryId,
       },
@@ -273,6 +326,7 @@ export const decide = mutation({
 export const listForSession = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     status: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     limit: v.optional(v.number()),
   },
@@ -284,19 +338,51 @@ export const listForSession = query({
     }
 
     const limit = Math.min(MAX_LIST_LIMIT, Math.max(1, args.limit ?? DEFAULT_LIST_LIMIT));
-    const requests = args.status
-      ? await ctx.db
-          .query("recategorizationRequests")
-          .withIndex("by_session_and_status", (q) =>
-            q.eq("sessionId", session._id).eq("status", args.status!),
-          )
-          .order("desc")
-          .take(limit)
-      : await ctx.db
-          .query("recategorizationRequests")
-          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(limit);
+    const question = args.questionId ? await ctx.db.get(args.questionId) : null;
+
+    if (args.questionId && (!question || question.sessionId !== session._id)) {
+      throw new Error("Question not found in this session.");
+    }
+
+    if (args.questionId && args.status) {
+      const requests = await ctx.db
+        .query("recategorizationRequests")
+        .withIndex("by_questionId_and_status", (q) =>
+          q.eq("questionId", args.questionId).eq("status", args.status!),
+        )
+        .order("desc")
+        .take(limit);
+
+      return requests.map(toPublicRequest);
+    }
+
+    if (args.questionId) {
+      const requests = await ctx.db
+        .query("recategorizationRequests")
+        .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
+        .order("desc")
+        .take(limit);
+
+      return requests.map(toPublicRequest);
+    }
+
+    if (args.status) {
+      const requests = await ctx.db
+        .query("recategorizationRequests")
+        .withIndex("by_session_and_status", (q) =>
+          q.eq("sessionId", session._id).eq("status", args.status!),
+        )
+        .order("desc")
+        .take(limit);
+
+      return requests.map(toPublicRequest);
+    }
+
+    const requests = await ctx.db
+      .query("recategorizationRequests")
+      .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+      .order("desc")
+      .take(limit);
 
     return requests.map(toPublicRequest);
   },

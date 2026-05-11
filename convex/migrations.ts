@@ -200,4 +200,98 @@ export const backfillFollowUpTargetQuestionIds = migrations.define({
   },
 });
 
+export const backfillCategoryQuestionIds = migrations.define({
+  table: "categories",
+  batchSize: 50,
+  migrateOne: async (ctx, category) => {
+    if (category.questionId) {
+      return;
+    }
+
+    const session = await ctx.db.get(category.sessionId);
+
+    if (!session) {
+      return;
+    }
+
+    return {
+      questionId: await ensureDefaultQuestionForSession(ctx, session),
+    };
+  },
+});
+
+export const backfillSubmissionCategoryQuestionIds = migrations.define({
+  table: "submissionCategories",
+  batchSize: 50,
+  migrateOne: async (ctx, assignment) => {
+    if (assignment.questionId) {
+      return;
+    }
+
+    const submission = await ctx.db.get(assignment.submissionId);
+
+    if (submission?.questionId && submission.sessionId === assignment.sessionId) {
+      return { questionId: submission.questionId };
+    }
+
+    const category = await ctx.db.get(assignment.categoryId);
+
+    if (category?.questionId && category.sessionId === assignment.sessionId) {
+      return { questionId: category.questionId };
+    }
+
+    const session = await ctx.db.get(assignment.sessionId);
+
+    if (!session) {
+      return;
+    }
+
+    return {
+      questionId: await ensureDefaultQuestionForSession(ctx, session),
+    };
+  },
+});
+
+export const backfillRecategorizationRequestQuestionIds = migrations.define({
+  table: "recategorizationRequests",
+  batchSize: 50,
+  migrateOne: async (ctx, request) => {
+    if (request.questionId) {
+      return;
+    }
+
+    const submission = await ctx.db.get(request.submissionId);
+
+    if (submission?.questionId && submission.sessionId === request.sessionId) {
+      return { questionId: submission.questionId };
+    }
+
+    if (request.currentCategoryId) {
+      const currentCategory = await ctx.db.get(request.currentCategoryId);
+
+      if (currentCategory?.questionId && currentCategory.sessionId === request.sessionId) {
+        return { questionId: currentCategory.questionId };
+      }
+    }
+
+    if (request.requestedCategoryId) {
+      const requestedCategory = await ctx.db.get(request.requestedCategoryId);
+
+      if (requestedCategory?.questionId && requestedCategory.sessionId === request.sessionId) {
+        return { questionId: requestedCategory.questionId };
+      }
+    }
+
+    const session = await ctx.db.get(request.sessionId);
+
+    if (!session) {
+      return;
+    }
+
+    return {
+      questionId: await ensureDefaultQuestionForSession(ctx, session),
+    };
+  },
+});
+
 export const run = migrations.runner();

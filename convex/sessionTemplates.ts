@@ -393,11 +393,12 @@ export const createSessionFromTemplate = mutation({
       throw new Error("Session was not created.");
     }
 
-    await createDefaultQuestionForSession(ctx, session, now);
+    const questionId = await createDefaultQuestionForSession(ctx, session, now);
 
     for (const category of template.presetCategories) {
       await ctx.db.insert("categories", {
         sessionId,
+        questionId,
         slug: slugify(category.name, "category"),
         name: category.name,
         description: category.description,

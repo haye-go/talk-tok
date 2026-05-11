@@ -278,12 +278,18 @@ async function countSessionQuestionsBySession(ctx: QueryCtx, sessionId: Id<"sess
   ).length;
 }
 
-async function seedCategories(ctx: MutationCtx, sessionId: Id<"sessions">, now: number) {
+async function seedCategories(
+  ctx: MutationCtx,
+  sessionId: Id<"sessions">,
+  questionId: Id<"sessionQuestions">,
+  now: number,
+) {
   const categoryIdsBySlug = new Map<string, Id<"categories">>();
 
   for (const category of FOOD_CATEGORIES) {
     const categoryId = await ctx.db.insert("categories", {
       sessionId,
+      questionId,
       slug: category.slug,
       name: category.name,
       description: category.description,
@@ -340,6 +346,7 @@ async function seedWarmStart(
     if (categoryId) {
       await ctx.db.insert("submissionCategories", {
         sessionId: args.sessionId,
+        questionId: args.questionId,
         submissionId,
         categoryId,
         confidence: 0.88,
@@ -429,7 +436,7 @@ export const seedFoodHackathon = mutation({
 
     const questionId = await createDefaultQuestionForSession(ctx, session, now);
 
-    const categoryIdsBySlug = await seedCategories(ctx, sessionId, now);
+    const categoryIdsBySlug = await seedCategories(ctx, sessionId, questionId, now);
 
     if (args.includeWarmStart) {
       await seedWarmStart(ctx, {

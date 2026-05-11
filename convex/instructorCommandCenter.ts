@@ -147,7 +147,13 @@ function emptyArtifactStatusCounts(): Record<ArtifactStatus, number> {
 function toSubmission(
   submission: Doc<"submissions">,
   participant: Doc<"participants"> | null,
-  assignment: { categoryId: Id<"categories">; categoryName?: string; categorySlug?: string } | null,
+  assignment: {
+    questionId?: Id<"sessionQuestions">;
+    categoryId: Id<"categories">;
+    categoryName?: string;
+    categorySlug?: string;
+    categoryStatus?: "active" | "archived";
+  } | null,
 ) {
   return {
     id: submission._id,
@@ -165,8 +171,10 @@ function toSubmission(
     keystrokeCount: submission.keystrokeCount,
     inputPattern: submission.inputPattern,
     categoryId: assignment?.categoryId,
+    assignmentQuestionId: assignment?.questionId,
     categoryName: assignment?.categoryName,
     categorySlug: assignment?.categorySlug,
+    categoryStatus: assignment?.categoryStatus,
     createdAt: submission.createdAt,
   };
 }
@@ -254,11 +262,22 @@ export const overview = query({
     const participantsById = new Map(
       participants.map((participant) => [participant._id, participant]),
     );
-    const activeCategories = categories.filter((category) => category.status === "active");
-    const categoriesById = new Map(activeCategories.map((category) => [category._id, category]));
+    const currentQuestionId = currentQuestion?._id;
+    const activeCategories = categories.filter(
+      (category) =>
+        category.status === "active" &&
+        (!currentQuestionId || !category.questionId || category.questionId === currentQuestionId),
+    );
+    const categoriesById = new Map(categories.map((category) => [category._id, category]));
     const assignmentBySubmission = new Map<
       Id<"submissions">,
-      { categoryId: Id<"categories">; categoryName?: string; categorySlug?: string }
+      {
+        questionId?: Id<"sessionQuestions">;
+        categoryId: Id<"categories">;
+        categoryName?: string;
+        categorySlug?: string;
+        categoryStatus?: "active" | "archived";
+      }
     >();
     const categoryCounts = new Map<Id<"categories">, number>();
     const presenceAggregate: Record<PresenceState, number> = {
@@ -296,9 +315,11 @@ export const overview = query({
 
       const category = categoriesById.get(assignment.categoryId);
       assignmentBySubmission.set(submission._id, {
+        questionId: assignment.questionId,
         categoryId: assignment.categoryId,
         categoryName: category?.name,
         categorySlug: category?.slug,
+        categoryStatus: category?.status,
       });
       categoryCounts.set(
         assignment.categoryId,
@@ -379,6 +400,7 @@ export const overview = query({
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((category) => ({
           id: category._id,
+          questionId: category.questionId,
           slug: category.slug,
           name: category.name,
           description: category.description,

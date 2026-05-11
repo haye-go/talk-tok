@@ -182,6 +182,7 @@ async function getTargets(ctx: QueryCtx | MutationCtx, followUpPromptId: Id<"fol
 async function getParticipantCategoryIds(
   ctx: QueryCtx | MutationCtx,
   participantId: Id<"participants">,
+  questionId?: Id<"sessionQuestions">,
 ) {
   const submissions = await ctx.db
     .query("submissions")
@@ -197,6 +198,10 @@ async function getParticipantCategoryIds(
       .take(8);
 
     for (const assignment of assignments) {
+      if (questionId && assignment.questionId && assignment.questionId !== questionId) {
+        continue;
+      }
+
       categoryIds.add(assignment.categoryId);
     }
   }
@@ -219,7 +224,7 @@ async function assertParticipantEligible(
       .map((target) => target.categoryId)
       .filter((categoryId): categoryId is Id<"categories"> => Boolean(categoryId)),
   );
-  const participantCategoryIds = await getParticipantCategoryIds(ctx, participantId);
+  const participantCategoryIds = await getParticipantCategoryIds(ctx, participantId, prompt.questionId);
 
   for (const categoryId of participantCategoryIds) {
     if (targetCategoryIds.has(categoryId)) {
@@ -345,7 +350,12 @@ export const create = mutation({
     for (const categoryId of uniqueCategoryIds) {
       const category = await ctx.db.get(categoryId);
 
-      if (!category || category.sessionId !== session._id || category.status !== "active") {
+      if (
+        !category ||
+        category.sessionId !== session._id ||
+        category.status !== "active" ||
+        (category.questionId && category.questionId !== questionId)
+      ) {
         throw new Error("Target category not found in this session.");
       }
     }
