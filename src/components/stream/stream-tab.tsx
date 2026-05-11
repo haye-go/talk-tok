@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { ReactionBar } from "@/components/reactions/reaction-bar";
 import { PresenceBar } from "@/components/stream/presence-bar";
@@ -8,18 +9,18 @@ import { DEMO_SESSION_SLUG } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 interface PeerResponse {
-  id: string;
+  id: Id<"submissions">;
   nickname: string;
   body: string;
   inputPattern: string;
-  categoryId?: string | null;
+  categoryId?: Id<"categories"> | null;
   categoryName?: string | null;
   categoryColor?: string | null;
   createdAt: number;
 }
 
 interface CategorySummary {
-  id: string;
+  id: Id<"categories">;
   name: string;
   color?: string | null;
   assignmentCount: number;
@@ -48,7 +49,7 @@ export function StreamTab({
   sessionSlug,
   clientKey,
 }: StreamTabProps) {
-  const [filter, setFilter] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Id<"categories"> | null>(null);
 
   const cats = categories ?? [];
   const responses: PeerResponse[] = peerResponses ?? [];

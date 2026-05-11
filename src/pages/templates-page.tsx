@@ -22,25 +22,23 @@ export function TemplatesPage() {
   const templates = useQuery(api.sessionTemplates.list, {});
   const createFromTemplate = useMutation(api.sessionTemplates.createSessionFromTemplate);
   const archiveTemplate = useMutation(api.sessionTemplates.archive);
-  const [creatingId, setCreatingId] = useState<string | null>(null);
-  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [creatingId, setCreatingId] = useState<Id<"sessionTemplates"> | null>(null);
+  const [archivingId, setArchivingId] = useState<Id<"sessionTemplates"> | null>(null);
 
-  async function handleCreate(templateId: string) {
+  async function handleCreate(templateId: Id<"sessionTemplates">) {
     setCreatingId(templateId);
     try {
-      const session = await createFromTemplate({
-        templateId: templateId as Id<"sessionTemplates">,
-      });
+      const session = await createFromTemplate({ templateId });
       window.location.href = routes.instructorSession(session.slug);
     } finally {
       setCreatingId(null);
     }
   }
 
-  async function handleArchive(templateId: string) {
+  async function handleArchive(templateId: Id<"sessionTemplates">) {
     setArchivingId(templateId);
     try {
-      await archiveTemplate({ templateId: templateId as Id<"sessionTemplates"> });
+      await archiveTemplate({ templateId });
     } finally {
       setArchivingId(null);
     }

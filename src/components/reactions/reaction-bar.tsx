@@ -14,7 +14,7 @@ const REACTION_KINDS = [
 type ReactionKind = (typeof REACTION_KINDS)[number]["kind"];
 
 interface ReactionBarProps {
-  submissionId: string;
+  submissionId: Id<"submissions">;
   sessionSlug: string;
   clientKey: string;
   counts?: Record<string, number>;
@@ -31,7 +31,7 @@ export function ReactionBar({
   const toggle = useMutation(api.reactions.toggle);
 
   function handleToggle(kind: ReactionKind) {
-    void toggle({ sessionSlug, clientKey, submissionId: submissionId as Id<"submissions">, kind });
+    void toggle({ sessionSlug, clientKey, submissionId, kind });
   }
 
   return (

@@ -31,7 +31,7 @@ export function SessionNewPage() {
   const createSession = useMutation(api.sessions.create);
   const templates = useQuery(api.sessionTemplates.list, {});
   const createFromTemplate = useMutation(api.sessionTemplates.createSessionFromTemplate);
-  const [creatingTemplateId, setCreatingTemplateId] = useState<string | null>(null);
+  const [creatingTemplateId, setCreatingTemplateId] = useState<Id<"sessionTemplates"> | null>(null);
   const [title, setTitle] = useState("");
   const [openingPrompt, setOpeningPrompt] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -97,7 +97,7 @@ export function SessionNewPage() {
                     setCreatingTemplateId(t.id);
                     try {
                       const s = await createFromTemplate({
-                        templateId: t.id as Id<"sessionTemplates">,
+                        templateId: t.id,
                       });
                       window.location.href = routes.instructorSession(s.slug);
                     } finally {

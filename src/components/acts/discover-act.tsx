@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { FeedbackCard } from "@/components/feedback/feedback-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { categoryColorToTone } from "@/lib/category-colors";
 
 interface CategorySummary {
-  id: string;
+  id: Id<"categories">;
   name: string;
   color?: string | null;
   assignmentCount: number;
@@ -28,11 +29,11 @@ interface FeedbackData {
 interface AssignmentData {
   categoryName?: string | null;
   categorySlug?: string | null;
-  categoryId: string;
+  categoryId: Id<"categories">;
 }
 
 interface RecategorisationRequestInput {
-  requestedCategoryId?: string;
+  requestedCategoryId?: Id<"categories">;
   suggestedCategoryName?: string;
   reason: string;
 }
@@ -82,6 +83,7 @@ export function DiscoverAct({
   const placementName = assignment?.categoryName ?? null;
   const alternateCategories = cats.filter((cat) => cat.id !== assignment?.categoryId);
   const selectedCategoryId = requestedCategoryId || alternateCategories[0]?.id || "__new";
+  const selectedCategory = alternateCategories.find((category) => category.id === selectedCategoryId);
 
   const totalResponses = cats.reduce((sum, c) => sum + c.assignmentCount, 0);
 
@@ -108,7 +110,7 @@ export function DiscoverAct({
     setRecatSubmitting(true);
     try {
       await onRequestRecategorisation({
-        requestedCategoryId: selectedCategoryId === "__new" ? undefined : selectedCategoryId,
+        requestedCategoryId: selectedCategoryId === "__new" ? undefined : selectedCategory?.id,
         suggestedCategoryName: selectedCategoryId === "__new" ? trimmedSuggested : undefined,
         reason: trimmedReason,
       });

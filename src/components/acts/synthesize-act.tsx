@@ -2,14 +2,15 @@ import { useState } from "react";
 import { ChartBar, CircleNotch, Sparkle } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { PositionShiftForm } from "@/components/shifts/position-shift-form";
 import { SynthesisArtifactCard } from "@/components/synthesis/synthesis-artifact-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 interface SynthesisArtifact {
-  id: string;
-  categoryId?: string;
+  id: Id<"synthesisArtifacts">;
+  categoryId?: Id<"categories">;
   kind: string;
   status: string;
   title: string;
@@ -24,7 +25,7 @@ interface SynthesisArtifact {
 }
 
 interface PersonalReport {
-  id: string;
+  id: Id<"personalReports">;
   status: string;
   participationBand?: string | null;
   reasoningBand?: string | null;

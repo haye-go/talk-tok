@@ -157,7 +157,7 @@ export function ParticipantSessionPage() {
   }
 
   async function handleRequestRecategorisation(request: {
-    requestedCategoryId?: string;
+    requestedCategoryId?: Id<"categories">;
     suggestedCategoryName?: string;
     reason: string;
   }) {
@@ -168,8 +168,8 @@ export function ParticipantSessionPage() {
     await requestRecategorisation({
       sessionSlug,
       clientKey,
-      submissionId: firstInitialResponse.id as Id<"submissions">,
-      requestedCategoryId: request.requestedCategoryId as Id<"categories"> | undefined,
+      submissionId: firstInitialResponse.id,
+      requestedCategoryId: request.requestedCategoryId,
       suggestedCategoryName: request.suggestedCategoryName,
       reason: request.reason,
     });
@@ -296,7 +296,7 @@ export function ParticipantSessionPage() {
                       type="button"
                       variant="ghost"
                       onClick={() => {
-                        setFollowUpParentId(firstInitialResponse.id as Id<"submissions">);
+                        setFollowUpParentId(firstInitialResponse.id);
                         handleActChange("discover");
                       }}
                     >
@@ -328,7 +328,7 @@ export function ParticipantSessionPage() {
                 }
                 onAddFollowUp={
                   firstInitialResponse
-                    ? () => setFollowUpParentId(firstInitialResponse.id as Id<"submissions">)
+                    ? () => setFollowUpParentId(firstInitialResponse.id)
                     : undefined
                 }
               />

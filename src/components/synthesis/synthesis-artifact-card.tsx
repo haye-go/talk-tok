@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import type { BadgeProps } from "@/components/ui/badge";
 
 interface Artifact {
-  id: string;
+  id: Id<"synthesisArtifacts">;
   kind: string;
   status: string;
   title: string;
@@ -61,7 +61,7 @@ export function SynthesisArtifactCard({
   async function handleAction(action: "publish" | "finalize" | "archive") {
     setBusy(true);
     try {
-      const args = { sessionSlug, artifactId: artifact.id as Id<"synthesisArtifacts"> };
+      const args = { sessionSlug, artifactId: artifact.id };
       if (action === "publish") await publish(args);
       else if (action === "finalize") await finalize(args);
       else await archive(args);

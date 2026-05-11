@@ -25,7 +25,7 @@ interface FightHomeProps {
   fightMeEnabled: boolean;
   sessionSlug: string;
   clientKey: string;
-  mySubmissionId?: string;
+  mySubmissionId?: Id<"submissions">;
   onNavigateToThread: (fightSlug: string) => void;
 }
 
@@ -63,7 +63,7 @@ export function FightHome({
       const result = await createVsAi({
         sessionSlug,
         clientKey,
-        sourceSubmissionId: mySubmissionId as Id<"submissions">,
+        sourceSubmissionId: mySubmissionId,
       });
       onNavigateToThread(result.slug);
     } finally {

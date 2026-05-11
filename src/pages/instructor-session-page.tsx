@@ -475,7 +475,7 @@ export function InstructorSessionPage() {
   const [triggeringCategorisation, setTriggeringCategorisation] = useState(false);
   const [categorisationMessage, setCategorisationMessage] = useState<string | null>(null);
   const [categorisationError, setCategorisationError] = useState<string | null>(null);
-  const [generatingCategoryId, setGeneratingCategoryId] = useState<string | null>(null);
+  const [generatingCategoryId, setGeneratingCategoryId] = useState<Id<"categories"> | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
   const [embeddingQueued, setEmbeddingQueued] = useState(false);
@@ -486,10 +486,10 @@ export function InstructorSessionPage() {
   const [addCategoryDescription, setAddCategoryDescription] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<Id<"categories"> | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingCategoryDescription, setEditingCategoryDescription] = useState("");
-  const [followUpCategoryId, setFollowUpCategoryId] = useState<string | null>(null);
+  const [followUpCategoryId, setFollowUpCategoryId] = useState<Id<"categories"> | null>(null);
   const [followUpPrompt, setFollowUpPrompt] = useState("");
   const [savingFollowUp, setSavingFollowUp] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
@@ -570,27 +570,27 @@ export function InstructorSessionPage() {
   }
 
   async function handleRecategorisationDecision(args: {
-    requestId: string;
+    requestId: Id<"recategorizationRequests">;
     decision: "approved" | "rejected";
-    categoryId?: string;
+    categoryId?: Id<"categories">;
   }) {
     setDecidingRecatId(args.requestId);
     try {
       await decideRecategorisation({
         sessionSlug,
-        requestId: args.requestId as Id<"recategorizationRequests">,
+        requestId: args.requestId,
         decision: args.decision,
-        categoryId: args.categoryId as Id<"categories"> | undefined,
+        categoryId: args.categoryId,
       });
     } finally {
       setDecidingRecatId(null);
     }
   }
 
-  async function handleGenerateCategorySummary(categoryId: string) {
+  async function handleGenerateCategorySummary(categoryId: Id<"categories">) {
     setGeneratingCategoryId(categoryId);
     try {
-      await generateCategorySummary({ sessionSlug, categoryId: categoryId as Id<"categories"> });
+      await generateCategorySummary({ sessionSlug, categoryId });
     } finally {
       setGeneratingCategoryId(null);
     }
@@ -681,13 +681,13 @@ export function InstructorSessionPage() {
     setEditingCategoryDescription(category.description ?? "");
   }
 
-  async function handleRenameCategory(categoryId: string) {
+  async function handleRenameCategory(categoryId: Id<"categories">) {
     setCategoryError(null);
     setSavingCategory(true);
     try {
       await updateCategory({
         sessionSlug,
-        categoryId: categoryId as Id<"categories">,
+        categoryId,
         name: editingCategoryName,
         description: editingCategoryDescription || undefined,
       });
@@ -709,7 +709,7 @@ export function InstructorSessionPage() {
     );
   }
 
-  async function handleCreateCategoryFollowUp(categoryId: string) {
+  async function handleCreateCategoryFollowUp(categoryId: Id<"categories">) {
     setFollowUpError(null);
     setSavingFollowUp(true);
     try {
@@ -718,7 +718,7 @@ export function InstructorSessionPage() {
         title: `Follow-up: ${activeCategories.find((category) => category.id === categoryId)?.name ?? "Category"}`,
         prompt: followUpPrompt,
         targetMode: "categories",
-        categoryIds: [categoryId as Id<"categories">],
+        categoryIds: [categoryId],
         activateNow: true,
       });
       setFollowUpCategoryId(null);

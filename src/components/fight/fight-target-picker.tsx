@@ -24,13 +24,13 @@ export function FightTargetPicker({
   const createChallenge = useMutation(api.fightMe.createChallenge);
   const [creating, setCreating] = useState(false);
 
-  async function handleChallenge(defenderSubmissionId: string) {
+  async function handleChallenge(defenderSubmissionId: Id<"submissions">) {
     setCreating(true);
     try {
       const result = await createChallenge({
         sessionSlug,
         clientKey,
-        defenderSubmissionId: defenderSubmissionId as Id<"submissions">,
+        defenderSubmissionId,
       });
       onChallengeCreated(result.slug);
     } catch {
@@ -80,7 +80,7 @@ export function FightTargetPicker({
                 <Button
                   variant="coral"
                   size="sm"
-                  onClick={() => handleChallenge(target.submissionId as string)}
+                  onClick={() => handleChallenge(target.submissionId)}
                   disabled={creating}
                 >
                   Challenge
