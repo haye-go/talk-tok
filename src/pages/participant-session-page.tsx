@@ -532,7 +532,11 @@ export function ParticipantSessionPage() {
             fightThreads={ws?.fightMe.mine}
             positionShifts={positionShifts ?? undefined}
             personalReport={ws?.personalReport}
+            personalReportsVisible={selectedQuestion?.personalReportsVisible ?? false}
             loading={ws === undefined}
+            onViewFight={(fightSlug) =>
+              (window.location.href = routes.sessionFight(sessionSlug, fightSlug))
+            }
             onViewReport={() => (window.location.href = routes.sessionReview(sessionSlug))}
           />
           <Card title="Nickname">
