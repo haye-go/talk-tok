@@ -4,6 +4,11 @@ import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/s
 import type { Doc, Id } from "./_generated/dataModel";
 import { rateLimiter } from "./components";
 import { createDefaultQuestionForSession } from "./sessionQuestions";
+import {
+  assertCanAnswerFollowUp,
+  canAnswerFollowUp,
+  canSubmitToQuestion,
+} from "./questionCapabilities";
 
 const FOLLOW_UP_LIMIT = 80;
 const TARGET_LIMIT = 20;
@@ -224,7 +229,11 @@ async function assertParticipantEligible(
       .map((target) => target.categoryId)
       .filter((categoryId): categoryId is Id<"categories"> => Boolean(categoryId)),
   );
-  const participantCategoryIds = await getParticipantCategoryIds(ctx, participantId, prompt.questionId);
+  const participantCategoryIds = await getParticipantCategoryIds(
+    ctx,
+    participantId,
+    prompt.questionId,
+  );
 
   for (const categoryId of participantCategoryIds) {
     if (targetCategoryIds.has(categoryId)) {
@@ -337,6 +346,14 @@ export const create = mutation({
       throw new Error("Archived questions cannot receive follow-ups.");
     }
 
+    if (args.activateNow && session.phase === "closed") {
+      throw new Error("Closed sessions cannot activate follow-ups.");
+    }
+
+    if (args.activateNow && !canSubmitToQuestion(session, question)) {
+      throw new Error("This question cannot accept active follow-ups.");
+    }
+
     if (args.targetMode === "categories" && categoryIds.length === 0) {
       throw new Error("Category-targeted follow-ups require at least one category.");
     }
@@ -403,6 +420,7 @@ export const create = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId,
       actorType: "instructor",
       action: args.activateNow ? "follow_up.created_active" : "follow_up.created_draft",
       targetType: "followUpPrompt",
@@ -441,6 +459,18 @@ export const setStatus = mutation({
 
     const now = Date.now();
 
+    if (args.status === "active" && session.phase === "closed") {
+      throw new Error("Closed sessions cannot activate follow-ups.");
+    }
+
+    if (args.status === "active" && prompt.questionId) {
+      const question = await ctx.db.get(prompt.questionId);
+
+      if (!question || !canSubmitToQuestion(session, question)) {
+        throw new Error("This question cannot accept active follow-ups.");
+      }
+    }
+
     await ctx.db.patch(prompt._id, {
       status: args.status,
       activatedAt: args.status === "active" ? (prompt.activatedAt ?? now) : prompt.activatedAt,
@@ -449,6 +479,7 @@ export const setStatus = mutation({
     });
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId: prompt.questionId,
       actorType: "instructor",
       action: `follow_up.${args.status}`,
       targetType: "followUpPrompt",
@@ -531,6 +562,16 @@ export const activeForParticipant = query({
     const relevant = [];
 
     for (const prompt of activePrompts) {
+      if (prompt.questionId) {
+        const question = await ctx.db.get(prompt.questionId);
+
+        if (!question || !canAnswerFollowUp(session, question, prompt)) {
+          continue;
+        }
+      } else if (session.phase === "closed") {
+        continue;
+      }
+
       if (!(await assertParticipantEligible(ctx, prompt, participant._id))) {
         continue;
       }
@@ -594,6 +635,13 @@ export const submitResponse = mutation({
     await rateLimiter.limit(ctx, "followUpResponse", { key: participant._id, throws: true });
     await assertSummaryGateOpen(ctx, session);
     const questionId = prompt.questionId ?? (await createDefaultQuestionForSession(ctx, session));
+    const question = await ctx.db.get(questionId);
+
+    if (!question || question.sessionId !== session._id) {
+      throw new Error("Question not found for this follow-up.");
+    }
+
+    assertCanAnswerFollowUp(session, question, prompt);
 
     if (!(await assertParticipantEligible(ctx, prompt, participant._id))) {
       throw new Error("This follow-up is not targeted to this participant.");
@@ -621,6 +669,7 @@ export const submitResponse = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId,
       actorType: "participant",
       actorParticipantId: participant._id,
       action: "follow_up.response_submitted",

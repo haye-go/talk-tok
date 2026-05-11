@@ -33,6 +33,7 @@ import type * as positionShifts from "../positionShifts.js";
 import type * as promptTemplates from "../promptTemplates.js";
 import type * as protection from "../protection.js";
 import type * as questionBaselines from "../questionBaselines.js";
+import type * as questionCapabilities from "../questionCapabilities.js";
 import type * as questionScope from "../questionScope.js";
 import type * as reactions from "../reactions.js";
 import type * as recategorisation from "../recategorisation.js";
@@ -76,6 +77,7 @@ declare const fullApi: ApiFromModules<{
   promptTemplates: typeof promptTemplates;
   protection: typeof protection;
   questionBaselines: typeof questionBaselines;
+  questionCapabilities: typeof questionCapabilities;
   questionScope: typeof questionScope;
   reactions: typeof reactions;
   recategorisation: typeof recategorisation;

@@ -1,20 +1,11 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import {
-  mutation,
-  query,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
 type QuestionStatus = "draft" | "released" | "archived";
 
-const statusValidator = v.union(
-  v.literal("draft"),
-  v.literal("released"),
-  v.literal("archived"),
-);
+const statusValidator = v.union(v.literal("draft"), v.literal("released"), v.literal("archived"));
 
 const visibilityPatchValidator = v.object({
   peerResponsesVisible: v.optional(v.boolean()),
@@ -134,7 +125,10 @@ export function toPublicQuestion(question: Doc<"sessionQuestions">) {
   };
 }
 
-export async function listQuestionsForSession(ctx: QueryCtx | MutationCtx, sessionId: Id<"sessions">) {
+export async function listQuestionsForSession(
+  ctx: QueryCtx | MutationCtx,
+  sessionId: Id<"sessions">,
+) {
   return await ctx.db
     .query("sessionQuestions")
     .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
@@ -185,7 +179,8 @@ export async function createDefaultQuestionForSession(
   const existingQuestions = await listQuestionsForSession(ctx, session._id);
 
   if (existingQuestions.length > 0) {
-    const question = existingQuestions.find((row) => row.status === "released") ?? existingQuestions[0];
+    const question =
+      existingQuestions.find((row) => row.status === "released") ?? existingQuestions[0];
     if (question.status !== "released") {
       await ctx.db.patch(question._id, {
         status: "released",
@@ -335,6 +330,7 @@ export const createQuestion = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId,
       actorType: "instructor",
       action: "session_question.created",
       targetType: "sessionQuestion",
@@ -382,6 +378,7 @@ export const updateQuestion = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: question.sessionId,
+      questionId: question._id,
       actorType: "instructor",
       action: "session_question.updated",
       targetType: "sessionQuestion",
@@ -407,9 +404,15 @@ export const releaseQuestion = mutation({
     }
 
     const now = Date.now();
+    const session = await ctx.db.get(question.sessionId);
+
+    if (!session) {
+      throw new Error("Session not found.");
+    }
+
     await ctx.db.patch(question._id, {
       status: "released",
-      contributionsOpen: true,
+      contributionsOpen: session.phase !== "closed",
       releasedAt: question.releasedAt ?? now,
       archivedAt: undefined,
       updatedAt: now,
@@ -417,6 +420,7 @@ export const releaseQuestion = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: question.sessionId,
+      questionId: question._id,
       actorType: "instructor",
       action: "session_question.released",
       targetType: "sessionQuestion",
@@ -452,6 +456,7 @@ export const archiveQuestion = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: question.sessionId,
+      questionId: question._id,
       actorType: "instructor",
       action: "session_question.archived",
       targetType: "sessionQuestion",
@@ -483,6 +488,7 @@ export const setCurrentQuestion = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: question.sessionId,
+      questionId: question._id,
       actorType: "instructor",
       action: "session_question.current_set",
       targetType: "sessionQuestion",
@@ -509,6 +515,16 @@ export const setContributionState = mutation({
       throw new Error("Archived questions cannot accept contributions.");
     }
 
+    if (question.status === "draft" && args.contributionsOpen) {
+      throw new Error("Release the question before opening contributions.");
+    }
+
+    const session = await ctx.db.get(question.sessionId);
+
+    if (args.contributionsOpen && session?.phase === "closed") {
+      throw new Error("Closed sessions cannot accept contributions.");
+    }
+
     const now = Date.now();
     await ctx.db.patch(question._id, {
       contributionsOpen: args.contributionsOpen,
@@ -517,6 +533,7 @@ export const setContributionState = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: question.sessionId,
+      questionId: question._id,
       actorType: "instructor",
       action: "session_question.contribution_state_updated",
       targetType: "sessionQuestion",
@@ -548,6 +565,7 @@ export const updateVisibility = mutation({
     await ctx.db.patch(question._id, patch);
     await ctx.runMutation(internal.audit.record, {
       sessionId: question.sessionId,
+      questionId: question._id,
       actorType: "instructor",
       action: "session_question.visibility_updated",
       targetType: "sessionQuestion",

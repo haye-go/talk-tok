@@ -11,6 +11,8 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
+import { assertCanUseFightMe, canUseFightMe } from "./questionCapabilities";
+import { createDefaultQuestionForSession } from "./sessionQuestions";
 
 const ACCEPTANCE_TIMEOUT_MS = 20_000;
 const TURN_TIMEOUT_MS = 60_000;
@@ -196,6 +198,60 @@ async function getFightThreadByIdOrSlug(
   return null;
 }
 
+async function questionForSubmission(
+  ctx: MutationCtx,
+  session: Doc<"sessions">,
+  submission: Doc<"submissions">,
+) {
+  const questionId = submission.questionId ?? (await createDefaultQuestionForSession(ctx, session));
+  const question = await ctx.db.get(questionId);
+
+  if (!question || question.sessionId !== session._id) {
+    throw new Error("Question not found for this submission.");
+  }
+
+  return question;
+}
+
+async function questionIdForThread(ctx: QueryCtx | MutationCtx, thread: Doc<"fightThreads">) {
+  const sourceSubmission = thread.attackerSubmissionId
+    ? await ctx.db.get(thread.attackerSubmissionId)
+    : thread.defenderSubmissionId
+      ? await ctx.db.get(thread.defenderSubmissionId)
+      : null;
+
+  return sourceSubmission?.questionId;
+}
+
+async function questionForThread(
+  ctx: MutationCtx,
+  session: Doc<"sessions">,
+  thread: Doc<"fightThreads">,
+) {
+  const sourceSubmission = thread.attackerSubmissionId
+    ? await ctx.db.get(thread.attackerSubmissionId)
+    : thread.defenderSubmissionId
+      ? await ctx.db.get(thread.defenderSubmissionId)
+      : null;
+
+  if (sourceSubmission?.questionId) {
+    const question = await ctx.db.get(sourceSubmission.questionId);
+
+    if (question && question.sessionId === session._id) {
+      return question;
+    }
+  }
+
+  const questionId = await createDefaultQuestionForSession(ctx, session);
+  const question = await ctx.db.get(questionId);
+
+  if (!question) {
+    throw new Error("Question not found for this fight.");
+  }
+
+  return question;
+}
+
 function toPublicTurn(turn: Doc<"fightTurns">) {
   return {
     id: turn._id,
@@ -291,6 +347,7 @@ async function queueDebrief(ctx: MutationCtx, thread: Doc<"fightThreads">) {
   }
 
   const now = Date.now();
+  const questionId = await questionIdForThread(ctx, thread);
   const debriefId = await ctx.db.insert("fightDebriefs", {
     sessionId: thread.sessionId,
     fightThreadId: thread._id,
@@ -300,6 +357,7 @@ async function queueDebrief(ctx: MutationCtx, thread: Doc<"fightThreads">) {
   });
   const jobId = await ctx.db.insert("aiJobs", {
     sessionId: thread.sessionId,
+    questionId,
     type: "fight_debrief",
     status: "queued",
     requestedBy: "system",
@@ -369,8 +427,10 @@ async function advanceAfterTurn(
   });
 
   if (nextRole === "ai") {
+    const questionId = await questionIdForThread(ctx, thread);
     const jobId = await ctx.db.insert("aiJobs", {
       sessionId: thread.sessionId,
+      questionId,
       type: "fight_challenge",
       status: "queued",
       requestedBy: "system",
@@ -409,10 +469,6 @@ export const createChallenge = mutation({
       throw new Error("Session not found.");
     }
 
-    if (!session.fightMeEnabled) {
-      throw new Error("Fight Me is not enabled for this session.");
-    }
-
     const attacker = await getParticipantByClientKey(ctx, session._id, args.clientKey);
     const defenderSubmission = await ctx.db.get(args.defenderSubmissionId);
 
@@ -426,6 +482,9 @@ export const createChallenge = mutation({
       throw new Error("Defender submission not found in this session.");
     }
 
+    const question = await questionForSubmission(ctx, session, defenderSubmission);
+    assertCanUseFightMe(session, question);
+
     if (defenderSubmission.participantId === attacker._id) {
       throw new Error("You cannot challenge your own response.");
     }
@@ -436,7 +495,8 @@ export const createChallenge = mutation({
       if (
         !attackerSubmission ||
         attackerSubmission.sessionId !== session._id ||
-        attackerSubmission.participantId !== attacker._id
+        attackerSubmission.participantId !== attacker._id ||
+        (attackerSubmission.questionId && attackerSubmission.questionId !== question._id)
       ) {
         throw new Error("Attacker source submission not found for this participant.");
       }
@@ -483,6 +543,7 @@ export const createChallenge = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId: question._id,
       actorType: "participant",
       actorParticipantId: attacker._id,
       action: "fight.challenge_created",
@@ -511,10 +572,6 @@ export const createVsAi = mutation({
       throw new Error("Session not found.");
     }
 
-    if (!session.fightMeEnabled) {
-      throw new Error("Fight Me is not enabled for this session.");
-    }
-
     const participant = await getParticipantByClientKey(ctx, session._id, args.clientKey);
     const sourceSubmission = await ctx.db.get(args.sourceSubmissionId);
 
@@ -540,6 +597,9 @@ export const createVsAi = mutation({
       throw new Error("Source submission not found for this participant.");
     }
 
+    const question = await questionForSubmission(ctx, session, sourceSubmission);
+    assertCanUseFightMe(session, question);
+
     const now = Date.now();
     const fightThreadId = await ctx.db.insert("fightThreads", {
       sessionId: session._id,
@@ -557,6 +617,7 @@ export const createVsAi = mutation({
     });
     const jobId = await ctx.db.insert("aiJobs", {
       sessionId: session._id,
+      questionId: question._id,
       type: "fight_challenge",
       status: "queued",
       requestedBy: "system",
@@ -596,6 +657,9 @@ export const saveDraft = mutation({
     if (!session || !thread || thread.sessionId !== session._id) {
       throw new Error("Fight thread not found in this session.");
     }
+
+    const question = await questionForThread(ctx, session, thread);
+    assertCanUseFightMe(session, question);
 
     const participant = await getParticipantByClientKey(ctx, session._id, args.clientKey);
 
@@ -652,6 +716,9 @@ export const acceptChallenge = mutation({
       throw new Error("Fight thread not found in this session.");
     }
 
+    const question = await questionForThread(ctx, session, thread);
+    assertCanUseFightMe(session, question);
+
     const defender = await getParticipantByClientKey(ctx, session._id, args.clientKey);
 
     if (!defender || thread.defenderParticipantId !== defender._id) {
@@ -707,6 +774,7 @@ export const acceptChallenge = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId: question._id,
       actorType: "participant",
       actorParticipantId: defender._id,
       action: "fight.challenge_accepted",
@@ -814,6 +882,9 @@ export const submitTurn = mutation({
     if (!session || !thread || thread.sessionId !== session._id) {
       throw new Error("Fight thread not found in this session.");
     }
+
+    const question = await questionForThread(ctx, session, thread);
+    assertCanUseFightMe(session, question);
 
     const participant = await getParticipantByClientKey(ctx, session._id, args.clientKey);
 
@@ -1045,6 +1116,10 @@ export const findAvailableTargets = query({
       return [];
     }
 
+    if (session.phase === "closed" || !session.fightMeEnabled) {
+      return [];
+    }
+
     const submissions = await ctx.db
       .query("submissions")
       .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
@@ -1055,6 +1130,14 @@ export const findAvailableTargets = query({
     for (const submission of submissions) {
       if (submission.participantId === participant._id || submission.kind === "fight_me_turn") {
         continue;
+      }
+
+      if (submission.questionId) {
+        const question = await ctx.db.get(submission.questionId);
+
+        if (!question || !canUseFightMe(session, question)) {
+          continue;
+        }
       }
 
       const defender = await ctx.db.get(submission.participantId);
@@ -1194,7 +1277,7 @@ export const loadAiTurnContext = internalQuery({
       throw new Error("Fight session not found.");
     }
 
-    return { thread, session, sourceSubmission, turns };
+    return { thread, session, sourceSubmission, turns, questionId: sourceSubmission?.questionId };
   },
 });
 
@@ -1274,12 +1357,13 @@ export const generateAiTurn = internalAction({
     await ctx.runMutation(internal.fightMe.markJobProcessing, { jobId: args.jobId });
 
     try {
-      const { thread, session, sourceSubmission, turns } = await ctx.runQuery(
+      const { thread, session, sourceSubmission, turns, questionId } = await ctx.runQuery(
         internal.fightMe.loadAiTurnContext,
         { fightThreadId: args.fightThreadId },
       );
       const result = await ctx.runAction(internal.llm.runJson, {
         sessionId: session._id,
+        questionId,
         feature: "fight_challenge",
         promptKey: "fight.ai_challenge.v1",
         variables: {
@@ -1344,7 +1428,7 @@ export const loadDebriefContext = internalQuery({
       throw new Error("Fight session not found.");
     }
 
-    return { debrief, thread, session, turns };
+    return { debrief, thread, session, turns, questionId: await questionIdForThread(ctx, thread) };
   },
 });
 
@@ -1415,11 +1499,15 @@ export const generateDebrief = internalAction({
     await ctx.runMutation(internal.fightMe.markDebriefProcessing, args);
 
     try {
-      const { thread, session, turns } = await ctx.runQuery(internal.fightMe.loadDebriefContext, {
-        debriefId: args.debriefId,
-      });
+      const { thread, session, turns, questionId } = await ctx.runQuery(
+        internal.fightMe.loadDebriefContext,
+        {
+          debriefId: args.debriefId,
+        },
+      );
       const result = await ctx.runAction(internal.llm.runJson, {
         sessionId: session._id,
+        questionId,
         feature: "fight_debrief",
         promptKey: "fight.debrief.v1",
         variables: {

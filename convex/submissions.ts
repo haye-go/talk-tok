@@ -4,6 +4,11 @@ import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/s
 import type { Doc, Id } from "./_generated/dataModel";
 import { rateLimiter } from "./components";
 import { createDefaultQuestionForSession } from "./sessionQuestions";
+import {
+  assertCanAnswerFollowUp,
+  assertCanReplyToQuestion,
+  assertCanSubmitToQuestion,
+} from "./questionCapabilities";
 
 const MAX_BODY_LENGTH = 8_000;
 const MIN_BODY_LENGTH = 5;
@@ -265,14 +270,6 @@ export const create = mutation({
       throw new Error("Question not found in this session.");
     }
 
-    if (question.status === "archived") {
-      throw new Error("This question is archived.");
-    }
-
-    if (!question.contributionsOpen) {
-      throw new Error("Contributions are closed for this question.");
-    }
-
     const contentLimits = asRecord(
       await ctx.runQuery(internal.protection.loadSetting, {
         key: "contentLimits",
@@ -321,6 +318,8 @@ export const create = mutation({
         throw new Error("Follow-up prompt is not active in this session.");
       }
 
+      assertCanAnswerFollowUp(session, question, followUpPrompt);
+
       if (followUpPrompt.targetMode === "categories") {
         const targets = await ctx.db
           .query("followUpTargets")
@@ -358,6 +357,14 @@ export const create = mutation({
       }
     }
 
+    if (!args.followUpPromptId) {
+      if (args.kind === "reply" || args.parentSubmissionId) {
+        assertCanReplyToQuestion(session, question);
+      } else {
+        assertCanSubmitToQuestion(session, question);
+      }
+    }
+
     if ((args.kind === "reply" || args.kind === "additional_point") && args.parentSubmissionId) {
       const parent = await ctx.db.get(args.parentSubmissionId);
 
@@ -368,6 +375,8 @@ export const create = mutation({
       if (parent.questionId !== undefined && parent.questionId !== questionId) {
         throw new Error("Parent submission belongs to a different question.");
       }
+
+      assertCanReplyToQuestion(session, question);
     }
 
     const now = Date.now();

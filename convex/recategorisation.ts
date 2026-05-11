@@ -4,6 +4,7 @@ import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/s
 import type { Doc, Id } from "./_generated/dataModel";
 import { rateLimiter } from "./components";
 import { createDefaultQuestionForSession } from "./sessionQuestions";
+import { assertCanRequestRecategorisation } from "./questionCapabilities";
 
 const MAX_REASON_LENGTH = 1000;
 const REQUEST_WINDOW_MS = 60_000;
@@ -171,6 +172,13 @@ export const request = mutation({
     }
 
     const questionId = await questionIdForSubmission(ctx, session, submission);
+    const question = await ctx.db.get(questionId);
+
+    if (!question || question.sessionId !== session._id) {
+      throw new Error("Question not found for this submission.");
+    }
+
+    assertCanRequestRecategorisation(session, question);
 
     if (args.requestedCategoryId) {
       const requested = await ctx.db.get(args.requestedCategoryId);
@@ -209,6 +217,7 @@ export const request = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId,
       actorType: "participant",
       actorParticipantId: participant._id,
       action: "recategorization.requested",
@@ -307,6 +316,7 @@ export const decide = mutation({
     });
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId,
       actorType: "instructor",
       action:
         args.decision === "approved" ? "recategorization.approved" : "recategorization.rejected",

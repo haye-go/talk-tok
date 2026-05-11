@@ -17,6 +17,7 @@ const FOLLOW_UP_LIMIT = 30;
 const FIGHT_THREAD_LIMIT = 60;
 const SYNTHESIS_ARTIFACT_LIMIT = 80;
 const PERSONAL_REPORT_LIMIT = 220;
+const SEMANTIC_ROW_LIMIT = 240;
 const OFFLINE_AFTER_MS = 60_000;
 
 type PresenceState = "typing" | "submitted" | "idle" | "offline";
@@ -206,6 +207,9 @@ export const overview = query({
       fightThreads,
       synthesisArtifacts,
       personalReports,
+      semanticEmbeddings,
+      semanticSignals,
+      argumentLinks,
     ] = await Promise.all([
       listQuestionsForSession(ctx, session._id),
       getCurrentQuestionForSession(ctx, session),
@@ -259,6 +263,18 @@ export const overview = query({
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
         .order("desc")
         .take(PERSONAL_REPORT_LIMIT),
+      ctx.db
+        .query("semanticEmbeddings")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(SEMANTIC_ROW_LIMIT),
+      ctx.db
+        .query("semanticSignals")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(SEMANTIC_ROW_LIMIT),
+      ctx.db
+        .query("argumentLinks")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(SEMANTIC_ROW_LIMIT),
     ]);
 
     const participantsById = new Map(
@@ -344,6 +360,47 @@ export const overview = query({
     for (const report of personalReports) {
       reportCounts[report.status] += 1;
     }
+    const questionSummaries = questions.map((question) => {
+      const questionSubmissions = submissions.filter(
+        (submission) => submission.questionId === question._id,
+      );
+      const questionJobs = jobs.filter((job) => job.questionId === question._id);
+      const latestJob = questionJobs[0] ?? null;
+      const uncategorizedCount = questionSubmissions.filter((submission) => {
+        const assignment = assignmentBySubmission.get(submission._id);
+
+        return !assignment || (assignment.questionId && assignment.questionId !== question._id);
+      }).length;
+
+      return {
+        question: toPublicQuestion(question),
+        counts: {
+          submissions: questionSubmissions.length,
+          categories: categories.filter(
+            (category) => category.questionId === question._id && category.status === "active",
+          ).length,
+          uncategorized: uncategorizedCount,
+          recategorisationPending: pendingRequests.filter(
+            (request) => request.questionId === question._id,
+          ).length,
+          synthesis: synthesisArtifacts.filter((artifact) => artifact.questionId === question._id)
+            .length,
+          personalReportJobs: questionJobs.filter((job) => job.type === "personal_report").length,
+          embeddings: semanticEmbeddings.filter((row) => row.questionId === question._id).length,
+          signals: semanticSignals.filter((row) => row.questionId === question._id).length,
+          argumentLinks: argumentLinks.filter((row) => row.questionId === question._id).length,
+        },
+        latestJob: latestJob ? toJob(latestJob) : null,
+        capped: {
+          submissions: submissions.length === SUBMISSION_LIMIT,
+          synthesis: synthesisArtifacts.length === SYNTHESIS_ARTIFACT_LIMIT,
+          semantic:
+            semanticEmbeddings.length === SEMANTIC_ROW_LIMIT ||
+            semanticSignals.length === SEMANTIC_ROW_LIMIT ||
+            argumentLinks.length === SEMANTIC_ROW_LIMIT,
+        },
+      };
+    });
     const submissionCountsByParticipant = new Map<Id<"participants">, number>();
     const followUpCountsByParticipant = new Map<Id<"participants">, number>();
 
@@ -382,6 +439,7 @@ export const overview = query({
       questions: questions.map(toPublicQuestion),
       currentQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
       selectedQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
+      questionSummaries,
       caps: {
         participantsCapped: participants.length === PARTICIPANT_LIMIT,
         submissionsCapped: submissions.length === SUBMISSION_LIMIT,

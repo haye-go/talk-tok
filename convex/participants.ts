@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { rateLimiter } from "./components";
+import { canJoinSession } from "./questionCapabilities";
 
 const OFFLINE_AFTER_MS = 60_000;
 const MAX_NICKNAME_LENGTH = 40;
@@ -187,6 +188,10 @@ export const join = mutation({
         participant: toPublicParticipant(updated),
         session: toPublicSession(session),
       };
+    }
+
+    if (!canJoinSession(session)) {
+      throw new Error("This session is closed.");
     }
 
     const participantId = await ctx.db.insert("participants", {
