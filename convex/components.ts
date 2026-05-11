@@ -1,6 +1,8 @@
+import { Migrations } from "@convex-dev/migrations";
 import { HOUR, MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { Workpool } from "@convex-dev/workpool";
 import { components } from "./_generated/api";
+import type { DataModel } from "./_generated/dataModel";
 
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
   sessionJoin: { kind: "token bucket", rate: 20, period: MINUTE, capacity: 30, shards: 4 },
@@ -25,4 +27,8 @@ export const aiWorkpool = new Workpool(components.aiWorkpool, {
   maxParallelism: 4,
   retryActionsByDefault: true,
   defaultRetryBehavior: { maxAttempts: 3, initialBackoffMs: 1000, base: 2 },
+});
+
+export const migrations = new Migrations<DataModel>(components.migrations, {
+  defaultBatchSize: 50,
 });

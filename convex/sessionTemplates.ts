@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { createDefaultQuestionForSession } from "./sessionQuestions";
 
 const SESSION_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const TEMPLATE_LIMIT = 80;
@@ -386,6 +387,13 @@ export const createSessionFromTemplate = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    const session = await ctx.db.get(sessionId);
+
+    if (!session) {
+      throw new Error("Session was not created.");
+    }
+
+    await createDefaultQuestionForSession(ctx, session, now);
 
     for (const category of template.presetCategories) {
       await ctx.db.insert("categories", {
@@ -409,32 +417,33 @@ export const createSessionFromTemplate = mutation({
       targetId: template._id,
     });
 
-    const session = await ctx.db.get(sessionId);
+    const updatedSession = await ctx.db.get(sessionId);
 
-    if (!session) {
+    if (!updatedSession) {
       throw new Error("Session was not created.");
     }
 
     return {
-      id: session._id,
-      slug: session.slug,
-      joinCode: session.joinCode,
-      title: session.title,
-      openingPrompt: session.openingPrompt,
-      modePreset: session.modePreset,
-      phase: session.phase,
-      currentAct: session.currentAct,
-      visibilityMode: session.visibilityMode,
-      anonymityMode: session.anonymityMode,
-      responseSoftLimitWords: session.responseSoftLimitWords,
-      categorySoftCap: session.categorySoftCap,
-      critiqueToneDefault: session.critiqueToneDefault,
-      telemetryEnabled: session.telemetryEnabled,
-      fightMeEnabled: session.fightMeEnabled,
-      summaryGateEnabled: session.summaryGateEnabled,
+      id: updatedSession._id,
+      slug: updatedSession.slug,
+      joinCode: updatedSession.joinCode,
+      title: updatedSession.title,
+      openingPrompt: updatedSession.openingPrompt,
+      currentQuestionId: updatedSession.currentQuestionId,
+      modePreset: updatedSession.modePreset,
+      phase: updatedSession.phase,
+      currentAct: updatedSession.currentAct,
+      visibilityMode: updatedSession.visibilityMode,
+      anonymityMode: updatedSession.anonymityMode,
+      responseSoftLimitWords: updatedSession.responseSoftLimitWords,
+      categorySoftCap: updatedSession.categorySoftCap,
+      critiqueToneDefault: updatedSession.critiqueToneDefault,
+      telemetryEnabled: updatedSession.telemetryEnabled,
+      fightMeEnabled: updatedSession.fightMeEnabled,
+      summaryGateEnabled: updatedSession.summaryGateEnabled,
       participantCount: 0,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
+      createdAt: updatedSession.createdAt,
+      updatedAt: updatedSession.updatedAt,
     };
   },
 });

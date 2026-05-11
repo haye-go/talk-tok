@@ -2,6 +2,11 @@ import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import {
+  getCurrentQuestionForSession,
+  listQuestionsForSession,
+  toPublicQuestion,
+} from "./sessionQuestions";
 
 const MY_SUBMISSION_LIMIT = 60;
 const SESSION_SUBMISSION_LIMIT = 180;
@@ -106,6 +111,7 @@ function toSessionSnapshot(session: Doc<"sessions">) {
     joinCode: session.joinCode,
     title: session.title,
     openingPrompt: session.openingPrompt,
+    currentQuestionId: session.currentQuestionId,
     phase: session.phase,
     currentAct: session.currentAct,
     visibilityMode: session.visibilityMode,
@@ -252,6 +258,8 @@ export const overview = query({
     }
 
     const [
+      questions,
+      currentQuestion,
       mySubmissions,
       sessionSubmissions,
       categories,
@@ -265,6 +273,8 @@ export const overview = query({
       finalArtifacts,
       personalReports,
     ] = await Promise.all([
+      listQuestionsForSession(ctx, session._id),
+      getCurrentQuestionForSession(ctx, session),
       ctx.db
         .query("submissions")
         .withIndex("by_participant_and_created_at", (q) => q.eq("participantId", participant._id))
@@ -488,6 +498,9 @@ export const overview = query({
 
     return {
       session: toSessionSnapshot(session),
+      questions: questions.map(toPublicQuestion),
+      currentQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
+      selectedQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
       participant: toParticipant(participant),
       visibility: {
         mode: session.visibilityMode,

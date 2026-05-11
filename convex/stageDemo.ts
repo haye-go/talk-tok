@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { createDefaultQuestionForSession } from "./sessionQuestions";
 
 const FOOD_DEMO_SLUG = "best-food-for-a-hackathon-live";
 const RESET_CONFIRMATION = "RESET FOOD HACKATHON SESSION";
@@ -235,6 +236,9 @@ async function resetFoodSessionData(ctx: MutationCtx, sessionId: Id<"sessions">)
     perTable[table] = count;
     deleted += count;
   }
+  const questionCount = await deleteSessionQuestionsBySession(ctx, sessionId);
+  perTable.sessionQuestions = questionCount;
+  deleted += questionCount;
 
   return {
     deleted,
@@ -248,6 +252,28 @@ async function countBySession(ctx: QueryCtx, table: SessionScopedTable, sessionI
     await ctx.db
       .query(table)
       .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
+      .take(MAX_RESET_BATCH)
+  ).length;
+}
+
+async function deleteSessionQuestionsBySession(ctx: MutationCtx, sessionId: Id<"sessions">) {
+  const rows = await ctx.db
+    .query("sessionQuestions")
+    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+    .take(MAX_RESET_BATCH);
+
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+
+  return rows.length;
+}
+
+async function countSessionQuestionsBySession(ctx: QueryCtx, sessionId: Id<"sessions">) {
+  return (
+    await ctx.db
+      .query("sessionQuestions")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
       .take(MAX_RESET_BATCH)
   ).length;
 }
@@ -360,6 +386,7 @@ export const seedFoodHackathon = mutation({
         instructorPath: `/instructor/session/${existing.slug}`,
         participantCount: await countBySession(ctx, "participants", existing._id),
         categoryCount: await countBySession(ctx, "categories", existing._id),
+        questionCount: await countSessionQuestionsBySession(ctx, existing._id),
         warmStartIncluded: false,
         reused: true,
       };
@@ -392,6 +419,14 @@ export const seedFoodHackathon = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    const session = await ctx.db.get(sessionId);
+
+    if (!session) {
+      throw new Error("Stage demo session was not created.");
+    }
+
+    await createDefaultQuestionForSession(ctx, session, now);
+
     const categoryIdsBySlug = await seedCategories(ctx, sessionId, now);
 
     if (args.includeWarmStart) {
@@ -423,6 +458,7 @@ export const seedFoodHackathon = mutation({
       instructorPath: `/instructor/session/${FOOD_DEMO_SLUG}`,
       participantCount: args.includeWarmStart ? WARM_START_RESPONSES.length : 0,
       categoryCount: FOOD_CATEGORIES.length,
+      questionCount: 1,
       warmStartIncluded: Boolean(args.includeWarmStart),
       reused: false,
     };
@@ -450,6 +486,7 @@ export const getFoodHackathonSession = query({
       participantCount: await countBySession(ctx, "participants", session._id),
       submissionCount: await countBySession(ctx, "submissions", session._id),
       categoryCount: await countBySession(ctx, "categories", session._id),
+      questionCount: await countSessionQuestionsBySession(ctx, session._id),
       joinPath: `/join/${session.joinCode}`,
       instructorPath: `/instructor/session/${session.slug}`,
     };
@@ -483,6 +520,11 @@ export const resetFoodHackathonSession = mutation({
         visibilityMode: "private_until_released",
         updatedAt: Date.now(),
       });
+      const updatedSession = await ctx.db.get(session._id);
+
+      if (updatedSession) {
+        await createDefaultQuestionForSession(ctx, updatedSession);
+      }
     }
 
     return {

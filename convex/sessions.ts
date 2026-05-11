@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { createDefaultQuestionForSession } from "./sessionQuestions";
 
 const SESSION_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const MAX_SLUG_ATTEMPTS = 50;
@@ -137,6 +138,7 @@ function toPublicSession(session: Doc<"sessions">, participantCount?: number) {
     joinCode: session.joinCode,
     title: session.title,
     openingPrompt: session.openingPrompt,
+    currentQuestionId: session.currentQuestionId,
     modePreset: session.modePreset,
     phase: session.phase,
     currentAct: session.currentAct,
@@ -201,7 +203,15 @@ export const create = mutation({
       throw new Error("Session was not created.");
     }
 
-    return toPublicSession(session, 0);
+    await createDefaultQuestionForSession(ctx, session, now);
+
+    const updatedSession = await ctx.db.get(sessionId);
+
+    if (!updatedSession) {
+      throw new Error("Session was not created.");
+    }
+
+    return toPublicSession(updatedSession, 0);
   },
 });
 

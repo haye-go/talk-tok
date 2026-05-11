@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { getCurrentQuestionForSession } from "./sessionQuestions";
 
 const phaseValidator = v.union(
   v.literal("lobby"),
@@ -289,6 +290,16 @@ export const updateSettings = mutation({
     }
 
     await ctx.db.patch(session._id, patch);
+    if (patch.openingPrompt !== undefined) {
+      const currentQuestion = await getCurrentQuestionForSession(ctx, session);
+
+      if (currentQuestion) {
+        await ctx.db.patch(currentQuestion._id, {
+          prompt: patch.openingPrompt,
+          updatedAt: patch.updatedAt,
+        });
+      }
+    }
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
       actorType: "instructor",

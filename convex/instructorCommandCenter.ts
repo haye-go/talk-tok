@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import {
+  getCurrentQuestionForSession,
+  listQuestionsForSession,
+  toPublicQuestion,
+} from "./sessionQuestions";
 
 const PARTICIPANT_LIMIT = 300;
 const SUBMISSION_LIMIT = 240;
@@ -59,6 +64,7 @@ function toSessionSnapshot(session: Doc<"sessions">, participantCount: number) {
     joinCode: session.joinCode,
     title: session.title,
     openingPrompt: session.openingPrompt,
+    currentQuestionId: session.currentQuestionId,
     modePreset: session.modePreset,
     phase: session.phase,
     currentAct: session.currentAct,
@@ -177,6 +183,8 @@ export const overview = query({
 
     const now = Date.now();
     const [
+      questions,
+      currentQuestion,
       participants,
       submissions,
       categories,
@@ -188,6 +196,8 @@ export const overview = query({
       synthesisArtifacts,
       personalReports,
     ] = await Promise.all([
+      listQuestionsForSession(ctx, session._id),
+      getCurrentQuestionForSession(ctx, session),
       ctx.db
         .query("participants")
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
@@ -345,6 +355,9 @@ export const overview = query({
 
     return {
       session: toSessionSnapshot(session, participants.length),
+      questions: questions.map(toPublicQuestion),
+      currentQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
+      selectedQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
       caps: {
         participantsCapped: participants.length === PARTICIPANT_LIMIT,
         submissionsCapped: submissions.length === SUBMISSION_LIMIT,

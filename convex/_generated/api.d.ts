@@ -24,6 +24,7 @@ import type * as instructorControls from "../instructorControls.js";
 import type * as jobs from "../jobs.js";
 import type * as llm from "../llm.js";
 import type * as llmObservability from "../llmObservability.js";
+import type * as migrations from "../migrations.js";
 import type * as modelSettings from "../modelSettings.js";
 import type * as participantWorkspace from "../participantWorkspace.js";
 import type * as participants from "../participants.js";
@@ -34,6 +35,7 @@ import type * as protection from "../protection.js";
 import type * as reactions from "../reactions.js";
 import type * as recategorisation from "../recategorisation.js";
 import type * as semantic from "../semantic.js";
+import type * as sessionQuestions from "../sessionQuestions.js";
 import type * as sessionTemplates from "../sessionTemplates.js";
 import type * as sessions from "../sessions.js";
 import type * as stageDemo from "../stageDemo.js";
@@ -63,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   jobs: typeof jobs;
   llm: typeof llm;
   llmObservability: typeof llmObservability;
+  migrations: typeof migrations;
   modelSettings: typeof modelSettings;
   participantWorkspace: typeof participantWorkspace;
   participants: typeof participants;
@@ -73,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   reactions: typeof reactions;
   recategorisation: typeof recategorisation;
   semantic: typeof semantic;
+  sessionQuestions: typeof sessionQuestions;
   sessionTemplates: typeof sessionTemplates;
   sessions: typeof sessions;
   stageDemo: typeof stageDemo;
@@ -110,4 +114,5 @@ export declare const components: {
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
   aiWorkpool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"aiWorkpool">;
   actionCache: import("@convex-dev/action-cache/_generated/component.js").ComponentApi<"actionCache">;
+  migrations: import("@convex-dev/migrations/_generated/component.js").ComponentApi<"migrations">;
 };

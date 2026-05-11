@@ -7,6 +7,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { createDefaultQuestionForSession } from "./sessionQuestions";
 
 const DEMO_SLUG = "teach-anything-university-demo";
 const DEMO_JOIN_CODE = "SPARK";
@@ -223,6 +224,28 @@ async function countBySession(ctx: QueryCtx, table: SessionScopedTable, sessionI
   ).length;
 }
 
+async function deleteSessionQuestionsBySession(ctx: MutationCtx, sessionId: Id<"sessions">) {
+  const rows = await ctx.db
+    .query("sessionQuestions")
+    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+    .take(MAX_RESET_BATCH);
+
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+
+  return rows.length;
+}
+
+async function countSessionQuestionsBySession(ctx: QueryCtx, sessionId: Id<"sessions">) {
+  return (
+    await ctx.db
+      .query("sessionQuestions")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .take(MAX_RESET_BATCH)
+  ).length;
+}
+
 export const seed = mutation({
   args: {
     resetExisting: v.optional(v.boolean()),
@@ -278,6 +301,14 @@ export const seed = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    const session = await ctx.db.get(sessionId);
+
+    if (!session) {
+      throw new Error("Demo session was not created.");
+    }
+
+    await createDefaultQuestionForSession(ctx, session, now);
+
     const categoryIdsBySlug = new Map<string, Id<"categories">>();
     const categoryNamesBySlug = new Map<string, string>();
 
@@ -908,6 +939,9 @@ async function resetDemoSessionData(ctx: MutationCtx, sessionId: Id<"sessions">)
     perTable[table] = count;
     deleted += count;
   }
+  const questionCount = await deleteSessionQuestionsBySession(ctx, sessionId);
+  perTable.sessionQuestions = questionCount;
+  deleted += questionCount;
 
   return {
     deleted,
@@ -952,6 +986,11 @@ export const resetSession = mutation({
         currentAct: "submit",
         updatedAt: Date.now(),
       });
+      const updatedSession = await ctx.db.get(session._id);
+
+      if (updatedSession) {
+        await createDefaultQuestionForSession(ctx, updatedSession);
+      }
     }
 
     return {
@@ -1038,6 +1077,7 @@ export const health = query({
           participants: await countBySession(ctx, "participants", session._id),
           submissions: await countBySession(ctx, "submissions", session._id),
           categories: await countBySession(ctx, "categories", session._id),
+          questions: await countSessionQuestionsBySession(ctx, session._id),
           aiJobs: await countBySession(ctx, "aiJobs", session._id),
           llmCalls: await countBySession(ctx, "llmCalls", session._id),
           semanticEmbeddings: await countBySession(ctx, "semanticEmbeddings", session._id),

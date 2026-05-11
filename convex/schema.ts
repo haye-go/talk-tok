@@ -9,6 +9,7 @@ export default defineSchema({
     joinCode: v.string(),
     title: v.string(),
     openingPrompt: v.string(),
+    currentQuestionId: v.optional(v.id("sessionQuestions")),
     modePreset: v.union(
       v.literal("class_discussion"),
       v.literal("conference_qna"),
@@ -51,6 +52,32 @@ export default defineSchema({
   })
     .index("by_slug", ["slug"])
     .index("by_join_code", ["joinCode"]),
+
+  sessionQuestions: defineTable({
+    sessionId: v.id("sessions"),
+    slug: v.string(),
+    title: v.string(),
+    prompt: v.string(),
+    status: v.union(v.literal("draft"), v.literal("released"), v.literal("archived")),
+    isCurrent: v.boolean(),
+    contributionsOpen: v.boolean(),
+    peerResponsesVisible: v.boolean(),
+    categoryBoardVisible: v.boolean(),
+    categorySummariesVisible: v.boolean(),
+    synthesisVisible: v.boolean(),
+    personalReportsVisible: v.boolean(),
+    fightEnabled: v.boolean(),
+    repliesEnabled: v.boolean(),
+    upvotesEnabled: v.boolean(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    releasedAt: v.optional(timestamp),
+    archivedAt: v.optional(timestamp),
+  })
+    .index("by_sessionId", ["sessionId"])
+    .index("by_sessionId_and_slug", ["sessionId", "slug"])
+    .index("by_sessionId_and_status", ["sessionId", "status"])
+    .index("by_sessionId_and_isCurrent", ["sessionId", "isCurrent"]),
 
   participants: defineTable({
     sessionId: v.id("sessions"),
