@@ -17,11 +17,10 @@ describe("act state helpers", () => {
     expect(getPreviousActId("challenge")).toBe("discover");
   });
 
-  it("unlocks tabs by act", () => {
-    expect(isTabUnlockedForAct("submit", "main")).toBe(true);
-    expect(isTabUnlockedForAct("submit", "stream")).toBe(false);
-    expect(isTabUnlockedForAct("discover", "stream")).toBe(true);
-    expect(isTabUnlockedForAct("discover", "fight-me")).toBe(false);
-    expect(isTabUnlockedForAct("challenge", "fight-me")).toBe(true);
+  it("keeps learner tabs accessible across acts", () => {
+    expect(isTabUnlockedForAct("submit", "contribute")).toBe(true);
+    expect(isTabUnlockedForAct("submit", "explore")).toBe(true);
+    expect(isTabUnlockedForAct("discover", "fight")).toBe(true);
+    expect(isTabUnlockedForAct("challenge", "me")).toBe(true);
   });
 });

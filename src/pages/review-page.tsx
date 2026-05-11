@@ -69,7 +69,8 @@ export function ReviewPage() {
   if (report === null) {
     return (
       <ParticipantShell
-        myZone={
+        defaultTab="me"
+        me={
           <div className="grid place-items-center gap-4 py-8">
             <ChartBar size={32} className="text-[var(--c-success)]" />
             <p className="font-display text-sm font-medium text-[var(--c-ink)]">
@@ -94,7 +95,8 @@ export function ReviewPage() {
   if (report.status === "queued" || report.status === "processing") {
     return (
       <ParticipantShell
-        myZone={
+        defaultTab="me"
+        me={
           <div className="grid place-items-center gap-3 py-8">
             <CircleNotch size={28} className="animate-spin text-[var(--c-success)]" />
             <p className="font-display text-sm font-medium text-[var(--c-ink)]">
@@ -112,7 +114,8 @@ export function ReviewPage() {
   if (report.status === "error") {
     return (
       <ParticipantShell
-        myZone={
+        defaultTab="me"
+        me={
           <div className="grid gap-4">
             <ErrorState
               title="Report generation failed"
@@ -131,7 +134,8 @@ export function ReviewPage() {
 
   return (
     <ParticipantShell
-      myZone={
+      defaultTab="me"
+      me={
         <div className="grid gap-4">
           <div className="text-center">
             <ChartBar size={24} className="mx-auto mb-1 text-[var(--c-success)]" />

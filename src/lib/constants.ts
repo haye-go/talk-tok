@@ -15,7 +15,7 @@ import {
 } from "@phosphor-icons/react";
 
 export type ActId = "submit" | "discover" | "challenge" | "synthesize";
-export type TabId = "main" | "stream" | "fight-me" | "my-zone";
+export type TabId = "contribute" | "explore" | "fight" | "me";
 
 export interface ActDefinition {
   id: ActId;
@@ -61,10 +61,10 @@ export const ACTS: ActDefinition[] = [
 ];
 
 export const TABS: TabDefinition[] = [
-  { id: "main", label: "Main", icon: Crosshair },
-  { id: "stream", label: "Stream", icon: ChatCircleText },
-  { id: "fight-me", label: "Fight Me", icon: Lightning },
-  { id: "my-zone", label: "My Zone", icon: User },
+  { id: "contribute", label: "Contribute", icon: Crosshair },
+  { id: "explore", label: "Explore", icon: ChatCircleText },
+  { id: "fight", label: "Fight", icon: Lightning },
+  { id: "me", label: "Me", icon: User },
 ];
 
 export const INSTRUCTOR_NAV = [

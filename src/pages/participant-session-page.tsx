@@ -10,13 +10,9 @@ import {
   type ResponseComposerSubmit,
 } from "@/components/submission/response-composer";
 import { DiscoverAct } from "@/components/acts/discover-act";
-import { ChallengeAct } from "@/components/acts/challenge-act";
-import { SynthesizeAct } from "@/components/acts/synthesize-act";
 import { StreamTab } from "@/components/stream/stream-tab";
 import { MyZoneTab } from "@/components/myzone/my-zone-tab";
 import { FightHome } from "@/components/fight/fight-home";
-import { FightThread } from "@/components/fight/fight-thread";
-import { PresenceBar } from "@/components/stream/presence-bar";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
 import { Button } from "@/components/ui/button";
@@ -32,7 +28,7 @@ import {
   storeParticipant,
 } from "@/lib/client-identity";
 import { DEMO_SESSION_SLUG } from "@/lib/constants";
-import type { ActId, TabId } from "@/lib/constants";
+import type { TabId } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 
 export function ParticipantSessionPage() {
@@ -52,8 +48,11 @@ export function ParticipantSessionPage() {
     return getOrCreateClientKey();
   }, [sessionSlug]);
 
-  // Primary data source — one query for all participant state
-  const workspace = useParticipantWorkspace(sessionSlug, clientKey);
+  // Primary data source - one query for all participant state
+  const [selectedQuestionOverrideId, setSelectedQuestionOverrideId] = useState<
+    Id<"sessionQuestions"> | null
+  >(null);
+  const workspace = useParticipantWorkspace(sessionSlug, clientKey, selectedQuestionOverrideId);
 
   // Keep existing individual queries for join-gate and lobby (workspace returns null if not joined)
   const session = useQuery(api.sessions.getBySlug, { sessionSlug });
@@ -61,7 +60,6 @@ export function ParticipantSessionPage() {
     api.participants.restore,
     clientKey ? { sessionSlug, clientKey } : "skip",
   );
-  const lobby = useQuery(api.participants.listLobby, { sessionSlug });
   const positionShifts = useQuery(
     api.positionShifts.listMine,
     clientKey ? { sessionSlug, clientKey } : "skip",
@@ -77,10 +75,8 @@ export function ParticipantSessionPage() {
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>("main");
-  const [actOverride, setActOverride] = useState<{ baseAct: ActId; value: ActId } | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>("contribute");
   const touchedPresenceKey = useRef<string | null>(null);
-  const isDemoParticipant = sessionSlug === DEMO_SESSION_SLUG && clientKey?.startsWith("demo-");
 
   useEffect(() => {
     if (!participant || !clientKey) return;
@@ -127,6 +123,7 @@ export function ParticipantSessionPage() {
         sessionSlug,
         clientKey,
         body: sub.body,
+        questionId: workspace?.selectedQuestion?.id,
         kind: "initial",
         tone: (sub.tone as "gentle" | "direct" | "spicy" | "roast") ?? undefined,
         telemetry: sub.telemetry,
@@ -145,6 +142,7 @@ export function ParticipantSessionPage() {
         sessionSlug,
         clientKey,
         body: sub.body,
+        questionId: workspace?.selectedQuestion?.id,
         kind: "additional_point",
         parentSubmissionId: parentId,
         telemetry: sub.telemetry,
@@ -212,25 +210,58 @@ export function ParticipantSessionPage() {
     );
   }
 
-  // Workspace data (may still be loading after join gate passes)
   const ws = workspace;
-  const currentAct = ws?.session.currentAct ?? session.currentAct;
-  const visibleAct = actOverride?.baseAct === currentAct ? actOverride.value : currentAct;
-  const firstFeedback = ws?.feedbackBySubmission?.[0] ?? null;
-  const firstAssignment = ws?.assignmentsBySubmission?.[0] ?? null;
-  const firstInitialResponse = ws?.myZoneHistory.initialResponses?.[0] ?? null;
+  const selectedQuestion = ws?.selectedQuestion ?? ws?.currentQuestion ?? null;
+  const releasedQuestions = (ws?.questions ?? []).filter((question) => question.status === "released");
+  const matchesSelectedQuestion = (questionId?: Id<"sessionQuestions"> | null) =>
+    !selectedQuestion?.id || questionId === selectedQuestion.id;
+  const initialResponses =
+    ws?.myZoneHistory.initialResponses.filter((submission) =>
+      matchesSelectedQuestion(submission.questionId),
+    ) ?? [];
+  const followUpResponses =
+    ws?.myZoneHistory.followUpResponses.filter((submission) =>
+      matchesSelectedQuestion(submission.questionId),
+    ) ?? [];
+  const scopedSubmissionIds = new Set(
+    [...initialResponses, ...followUpResponses].map((submission) => submission.id),
+  );
+  const scopedFeedback =
+    ws?.feedbackBySubmission.filter((feedback) => scopedSubmissionIds.has(feedback.submissionId)) ??
+    [];
+  const scopedAssignments =
+    ws?.assignmentsBySubmission.filter((assignment) =>
+      matchesSelectedQuestion(assignment.questionId),
+    ) ?? [];
+  const scopedRecategorisationRequests =
+    ws?.recategorisationRequests.filter((request) => matchesSelectedQuestion(request.questionId)) ??
+    [];
+  const firstInitialResponse = initialResponses[0] ?? null;
+  const firstFeedback = firstInitialResponse
+    ? (scopedFeedback.find((feedback) => feedback.submissionId === firstInitialResponse.id) ?? null)
+    : null;
+  const firstAssignment = firstInitialResponse
+    ? (scopedAssignments.find((assignment) => assignment.submissionId === firstInitialResponse.id) ??
+      null)
+    : null;
   const firstRecategorisationRequest =
-    firstInitialResponse && ws?.recategorisationRequests
-      ? (ws.recategorisationRequests.find(
+    firstInitialResponse && scopedRecategorisationRequests
+      ? (scopedRecategorisationRequests.find(
           (request) => request.submissionId === firstInitialResponse.id,
         ) ?? null)
       : null;
-  const canUseFightMe = Boolean(clientKey && firstInitialResponse);
-
-  function handleActChange(actId: ActId) {
-    setActOverride({ baseAct: currentAct, value: actId });
-    setActiveTab("main");
-  }
+  const canSeeCategorySummary =
+    selectedQuestion?.categoryBoardVisible ??
+    selectedQuestion?.categorySummariesVisible ??
+    ws?.visibility.canSeeCategorySummary ??
+    false;
+  const canSeeRawPeerResponses =
+    selectedQuestion?.peerResponsesVisible ?? ws?.visibility.canSeeRawPeerResponses ?? false;
+  const canUseFight =
+    selectedQuestion?.fightEnabled ?? (ws?.session.fightMeEnabled ?? session.fightMeEnabled);
+  const contributionsOpen = selectedQuestion?.contributionsOpen ?? true;
+  const canUseFightMe = Boolean(clientKey && firstInitialResponse && canUseFight);
+  const selectedPrompt = selectedQuestion?.prompt ?? session.openingPrompt;
 
   const followUpComposer = followUpParentId ? (
     <Card
@@ -251,138 +282,126 @@ export function ParticipantSessionPage() {
     </Card>
   ) : null;
 
+  const questionHeader =
+    releasedQuestions.length > 0 ? (
+      <div className="border-b border-[var(--c-hairline)] bg-[var(--c-surface-soft)] px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {releasedQuestions.map((question) => {
+            const active = selectedQuestion?.id === question.id;
+
+            return (
+              <button
+                key={question.id}
+                type="button"
+                onClick={() => setSelectedQuestionOverrideId(question.isCurrent ? null : question.id)}
+                className={`rounded-pill border px-3 py-1 text-xs transition ${
+                  active
+                    ? "border-[var(--c-primary)] bg-[var(--c-primary)] text-[var(--c-on-primary)]"
+                    : "border-[var(--c-hairline)] bg-[var(--c-canvas)] text-[var(--c-ink)]"
+                }`}
+              >
+                {question.title}
+                {question.isCurrent ? " (current)" : ""}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-[11px] text-[var(--c-muted)]">
+          The current question is highlighted. Released questions stay browseable without locking the
+          rest of the interface.
+        </p>
+      </div>
+    ) : null;
+
   return (
     <ParticipantShell
       topBar={<DemoIdentityBar sessionSlug={sessionSlug} />}
-      currentActId={visibleAct}
+      questionHeader={questionHeader}
       activeTab={activeTab}
       onActiveTabChange={setActiveTab}
-      unlockAllTabs={Boolean(isDemoParticipant)}
-      canSelectActs
-      onActChange={handleActChange}
-      main={
+      contribute={
         <div className="grid gap-4">
           <div className="rounded-md bg-[var(--c-sig-cream)] p-3.5">
             <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--c-on-sig-light-body)]">
-              Discussion prompt
+              {selectedQuestion?.isCurrent ? "Current question" : "Released question"}
             </p>
             <p className="mt-1 text-sm font-medium leading-relaxed text-[var(--c-on-sig-light)]">
-              &ldquo;{session.openingPrompt}&rdquo;
+              &ldquo;{selectedPrompt}&rdquo;
             </p>
           </div>
-          {visibleAct === "submit" && (
-            <>
-              {submissionError && <InlineAlert tone="error">{submissionError}</InlineAlert>}
-              {firstInitialResponse ? (
-                <Card title="Your submitted response">
-                  <p className="text-sm leading-relaxed text-[var(--c-body)]">
-                    {firstInitialResponse.body}
-                  </p>
-                  <div className="mt-3 rounded-sm border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
-                    <p className="text-xs text-[var(--c-muted)]">
-                      Initial responses are locked after submission. Use Discover or My Zone to add
-                      a follow-up instead of editing the original response.
-                    </p>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => handleActChange("discover")}
-                    >
-                      Go to Discover
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => {
-                        setFollowUpParentId(firstInitialResponse.id);
-                        handleActChange("discover");
-                      }}
-                    >
-                      Add follow-up
-                    </Button>
-                  </div>
-                </Card>
-              ) : (
-                <ResponseComposer
-                  softWordLimit={session.responseSoftLimitWords}
-                  submitLabel="Submit response"
-                  onSubmit={(_text, _tone, submission) => handleSubmit(submission)}
-                />
-              )}
-              <p className="text-xs text-[var(--c-muted)]">Signed in as {participant.nickname}</p>
-            </>
+          {submissionError && <InlineAlert tone="error">{submissionError}</InlineAlert>}
+          {!contributionsOpen && !firstInitialResponse ? (
+            <Card title="Contributions are paused">
+              <p className="text-sm text-[var(--c-muted)]">
+                This question is browseable, but new contributions are closed until the instructor
+                reopens it.
+              </p>
+            </Card>
+          ) : firstInitialResponse ? (
+            <Card title="Your submitted response">
+              <p className="text-sm leading-relaxed text-[var(--c-body)]">
+                {firstInitialResponse.body}
+              </p>
+              <div className="mt-3 rounded-sm border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
+                <p className="text-xs text-[var(--c-muted)]">
+                  Your original post is locked after submission. Add a follow-up or compare it with
+                  the rest of the room from here.
+                </p>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" onClick={() => setActiveTab("explore")}>
+                  Go to Explore
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setFollowUpParentId(firstInitialResponse.id)}
+                >
+                  Add follow-up
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <ResponseComposer
+              softWordLimit={session.responseSoftLimitWords}
+              submitLabel="Submit response"
+              onSubmit={(_text, _tone, submission) => handleSubmit(submission)}
+            />
           )}
-          {visibleAct === "discover" && (
-            <>
-              <DiscoverAct
-                mySubmissionBody={firstInitialResponse?.body}
-                followUpResponses={ws?.myZoneHistory.followUpResponses}
-                feedback={firstFeedback}
-                categories={ws?.categorySummary}
-                assignment={firstAssignment}
-                recategorisationRequest={firstRecategorisationRequest}
-                onRequestRecategorisation={
-                  firstInitialResponse ? handleRequestRecategorisation : undefined
-                }
-                onAddFollowUp={
-                  firstInitialResponse
-                    ? () => setFollowUpParentId(firstInitialResponse.id)
-                    : undefined
-                }
-              />
-              {followUpComposer}
-            </>
-          )}
-          {visibleAct === "challenge" && (
-            <ChallengeAct
-              activeFollowUps={ws?.activeFollowUps}
-              fightMeEnabled={ws?.session.fightMeEnabled ?? session.fightMeEnabled}
-              summaryGateEnabled={ws?.session.summaryGateEnabled ?? false}
-              hasSynthesisArtifacts={
-                (ws?.synthesis?.publishedArtifacts?.length ?? 0) +
-                  (ws?.synthesis?.finalArtifacts?.length ?? 0) >
-                0
+          {firstInitialResponse && (
+            <DiscoverAct
+              mySubmissionBody={firstInitialResponse.body}
+              followUpResponses={followUpResponses}
+              feedback={firstFeedback}
+              categories={ws?.categorySummary}
+              assignment={firstAssignment}
+              recategorisationRequest={firstRecategorisationRequest}
+              onRequestRecategorisation={
+                firstInitialResponse ? handleRequestRecategorisation : undefined
               }
-              sessionSlug={sessionSlug}
-              clientKey={clientKey ?? undefined}
-              onNavigateToFightMe={() => setActiveTab("fight-me")}
+              onAddFollowUp={
+                firstInitialResponse ? () => setFollowUpParentId(firstInitialResponse.id) : undefined
+              }
             />
           )}
-          {visibleAct === "synthesize" && clientKey && (
-            <SynthesizeAct
-              publishedArtifacts={ws?.synthesis?.publishedArtifacts}
-              finalArtifacts={ws?.synthesis?.finalArtifacts}
-              personalReport={ws?.personalReport}
-              sessionSlug={sessionSlug}
-              clientKey={clientKey}
-              onNavigateToReport={() => (window.location.href = routes.sessionReview(sessionSlug))}
-            />
-          )}
+          {followUpComposer}
+          <p className="text-xs text-[var(--c-muted)]">Signed in as {participant.nickname}</p>
         </div>
       }
-      stream={
+      explore={
         <div className="grid gap-4">
-          {lobby && (
-            <PresenceBar
-              typing={lobby.aggregate.typing}
-              submitted={lobby.aggregate.submitted ?? 0}
-              idle={lobby.aggregate.idle}
-            />
-          )}
           <StreamTab
             peerResponses={ws?.recentPeerResponses}
             categories={ws?.categorySummary}
-            canSeeRawPeerResponses={ws?.visibility.canSeeRawPeerResponses}
-            canSeeCategorySummary={ws?.visibility.canSeeCategorySummary}
+            canSeeRawPeerResponses={canSeeRawPeerResponses}
+            canSeeCategorySummary={canSeeCategorySummary}
             sessionSlug={sessionSlug}
-            clientKey={clientKey ?? undefined}
+            clientKey={clientKey}
           />
         </div>
       }
-      fightMe={
-        canUseFightMe && clientKey ? (
+      fight={
+        canUseFightMe ? (
           <FightHome
             myFights={ws?.fightMe.mine ?? []}
             pendingIncoming={ws?.fightMe.pendingIncoming ?? []}
@@ -395,18 +414,28 @@ export function ParticipantSessionPage() {
               (window.location.href = routes.sessionFight(sessionSlug, fightSlug))
             }
           />
+        ) : canUseFight ? (
+          <Card title="Fight needs a contribution first">
+            <p className="text-sm text-[var(--c-muted)]">
+              Submit a response to this question before you open a Fight thread.
+            </p>
+          </Card>
         ) : (
-          <FightThread />
+          <Card title="Fight is unavailable">
+            <p className="text-sm text-[var(--c-muted)]">
+              The instructor has not enabled Fight for this question yet.
+            </p>
+          </Card>
         )
       }
-      myZone={
+      me={
         <div className="grid gap-4">
           <MyZoneTab
-            initialResponses={ws?.myZoneHistory.initialResponses}
-            followUpResponses={ws?.myZoneHistory.followUpResponses}
-            feedbackBySubmission={ws?.feedbackBySubmission}
-            assignmentsBySubmission={ws?.assignmentsBySubmission}
-            recategorisationRequests={ws?.recategorisationRequests}
+            initialResponses={initialResponses}
+            followUpResponses={followUpResponses}
+            feedbackBySubmission={scopedFeedback}
+            assignmentsBySubmission={scopedAssignments}
+            recategorisationRequests={scopedRecategorisationRequests}
             fightThreads={ws?.fightMe.mine}
             positionShifts={positionShifts ?? undefined}
             personalReport={ws?.personalReport}

@@ -18,13 +18,7 @@ export function getPreviousActId(actId: ActId): ActId {
 }
 
 export function isTabUnlockedForAct(actId: ActId, tabId: TabId) {
-  if (tabId === "main" || tabId === "my-zone") {
-    return true;
-  }
-
-  if (tabId === "stream") {
-    return actId !== "submit";
-  }
-
-  return actId === "challenge" || actId === "synthesize";
+  void actId;
+  void tabId;
+  return true;
 }

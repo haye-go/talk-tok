@@ -4,7 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ParticipantShell } from "@/components/layout/participant-shell";
 import { FightThread } from "@/components/fight/fight-thread";
-import { getOrCreateClientKey, isDemoClientKey } from "@/lib/client-identity";
+import { getOrCreateClientKey } from "@/lib/client-identity";
 
 export function FightPage() {
   const { sessionSlug, fightSlug } = useParams({
@@ -18,10 +18,8 @@ export function FightPage() {
 
   return (
     <ParticipantShell
-      currentActId="challenge"
-      defaultTab="fight-me"
-      unlockAllTabs={isDemoClientKey()}
-      fightMe={
+      defaultTab="fight"
+      fight={
         <FightThread
           sessionSlug={sessionSlug}
           fightSlug={fightSlug}
