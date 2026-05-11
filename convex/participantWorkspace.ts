@@ -352,6 +352,31 @@ export const overview = query({
         : currentQuestion;
 
     const selectedQuestionId = selectedQuestion?._id;
+    const synthesisVisible =
+      Boolean(selectedQuestion?.synthesisVisible) &&
+      session.visibilityMode !== "private_until_released";
+    const synthesisPublishedArtifacts = synthesisVisible
+      ? selectedQuestionId
+        ? await ctx.db
+            .query("synthesisArtifacts")
+            .withIndex("by_questionId_and_status", (q) =>
+              q.eq("questionId", selectedQuestionId).eq("status", "published"),
+            )
+            .order("desc")
+            .take(SYNTHESIS_ARTIFACT_LIMIT)
+        : publishedArtifacts
+      : [];
+    const synthesisFinalArtifacts = synthesisVisible
+      ? selectedQuestionId
+        ? await ctx.db
+            .query("synthesisArtifacts")
+            .withIndex("by_questionId_and_status", (q) =>
+              q.eq("questionId", selectedQuestionId).eq("status", "final"),
+            )
+            .order("desc")
+            .take(SYNTHESIS_ARTIFACT_LIMIT)
+        : finalArtifacts
+      : [];
     const activeCategories = categories.filter(
       (category) =>
         category.status === "active" &&
@@ -590,48 +615,43 @@ export const overview = query({
           : null,
       },
       synthesis: {
-        publishedArtifacts:
-          session.visibilityMode === "private_until_released"
-            ? []
-            : publishedArtifacts
-                .sort((a, b) => b.updatedAt - a.updatedAt)
-                .slice(0, SYNTHESIS_ARTIFACT_LIMIT)
-                .map((artifact) => ({
-                  id: artifact._id,
-                  categoryId: artifact.categoryId,
-                  kind: artifact.kind,
-                  status: artifact.status,
-                  title: artifact.title,
-                  summary: artifact.summary,
-                  keyPoints: artifact.keyPoints,
-                  uniqueInsights: artifact.uniqueInsights,
-                  opposingViews: artifact.opposingViews,
-                  generatedAt: artifact.generatedAt,
-                  publishedAt: artifact.publishedAt,
-                  finalizedAt: artifact.finalizedAt,
-                  updatedAt: artifact.updatedAt,
-                })),
-        finalArtifacts:
-          session.visibilityMode === "private_until_released"
-            ? []
-            : finalArtifacts
-                .sort((a, b) => b.updatedAt - a.updatedAt)
-                .slice(0, SYNTHESIS_ARTIFACT_LIMIT)
-                .map((artifact) => ({
-                  id: artifact._id,
-                  categoryId: artifact.categoryId,
-                  kind: artifact.kind,
-                  status: artifact.status,
-                  title: artifact.title,
-                  summary: artifact.summary,
-                  keyPoints: artifact.keyPoints,
-                  uniqueInsights: artifact.uniqueInsights,
-                  opposingViews: artifact.opposingViews,
-                  generatedAt: artifact.generatedAt,
-                  publishedAt: artifact.publishedAt,
-                  finalizedAt: artifact.finalizedAt,
-                  updatedAt: artifact.updatedAt,
-                })),
+        visible: synthesisVisible,
+        publishedArtifacts: synthesisPublishedArtifacts
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, SYNTHESIS_ARTIFACT_LIMIT)
+          .map((artifact) => ({
+            id: artifact._id,
+            categoryId: artifact.categoryId,
+            kind: artifact.kind,
+            status: artifact.status,
+            title: artifact.title,
+            summary: artifact.summary,
+            keyPoints: artifact.keyPoints,
+            uniqueInsights: artifact.uniqueInsights,
+            opposingViews: artifact.opposingViews,
+            generatedAt: artifact.generatedAt,
+            publishedAt: artifact.publishedAt,
+            finalizedAt: artifact.finalizedAt,
+            updatedAt: artifact.updatedAt,
+          })),
+        finalArtifacts: synthesisFinalArtifacts
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, SYNTHESIS_ARTIFACT_LIMIT)
+          .map((artifact) => ({
+            id: artifact._id,
+            categoryId: artifact.categoryId,
+            kind: artifact.kind,
+            status: artifact.status,
+            title: artifact.title,
+            summary: artifact.summary,
+            keyPoints: artifact.keyPoints,
+            uniqueInsights: artifact.uniqueInsights,
+            opposingViews: artifact.opposingViews,
+            generatedAt: artifact.generatedAt,
+            publishedAt: artifact.publishedAt,
+            finalizedAt: artifact.finalizedAt,
+            updatedAt: artifact.updatedAt,
+          })),
       },
       personalReport: personalReports[0]
         ? {

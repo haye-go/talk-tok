@@ -19,6 +19,7 @@ interface Artifact {
   error?: string | null;
   generatedAt?: number | null;
   publishedAt?: number | null;
+  finalizedAt?: number | null;
 }
 
 interface SynthesisArtifactCardProps {
@@ -44,6 +45,29 @@ const STATUS_TONE: Record<string, NonNullable<BadgeProps["tone"]>> = {
   archived: "neutral",
 };
 
+function statusDescription(status: string, isInstructor?: boolean) {
+  if (status === "draft") {
+    return "Draft is visible to instructors only. Publish it when learners should see it.";
+  }
+  if (status === "published") {
+    return isInstructor
+      ? "Published for learners, subject to this question's visibility controls."
+      : "Released by the instructor for this question.";
+  }
+  if (status === "final") {
+    return isInstructor
+      ? "Final version for learners, subject to this question's visibility controls."
+      : "Final version released by the instructor.";
+  }
+  if (status === "queued" || status === "processing") {
+    return "Generation is still running.";
+  }
+  if (status === "error") {
+    return "Generation failed. The error is shown below.";
+  }
+  return null;
+}
+
 export function SynthesisArtifactCard({
   artifact,
   sessionSlug,
@@ -52,6 +76,7 @@ export function SynthesisArtifactCard({
   const Icon = KIND_ICON[artifact.kind] ?? Sparkle;
   const tone = STATUS_TONE[artifact.status] ?? "neutral";
   const isGenerating = artifact.status === "queued" || artifact.status === "processing";
+  const helperText = statusDescription(artifact.status, isInstructor);
 
   const publish = useMutation(api.synthesis.publishArtifact);
   const finalize = useMutation(api.synthesis.finalizeArtifact);
@@ -82,6 +107,10 @@ export function SynthesisArtifactCard({
           {artifact.status.replace(/_/g, " ")}
         </Badge>
       </div>
+
+      {helperText ? (
+        <p className="mt-1 text-[10px] leading-relaxed text-[var(--c-muted)]">{helperText}</p>
+      ) : null}
 
       {artifact.summary && (
         <p className="mt-1.5 text-xs leading-relaxed text-[var(--c-body)]">{artifact.summary}</p>

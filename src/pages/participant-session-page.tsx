@@ -314,6 +314,10 @@ export function ParticipantSessionPage() {
     false;
   const canSeeRawPeerResponses =
     selectedQuestion?.peerResponsesVisible ?? ws?.visibility.canSeeRawPeerResponses ?? false;
+  const synthesisArtifacts = [
+    ...(ws?.synthesis.publishedArtifacts ?? []),
+    ...(ws?.synthesis.finalArtifacts ?? []),
+  ];
   const canUseFight =
     selectedQuestion?.fightEnabled ?? (ws?.session.fightMeEnabled ?? session.fightMeEnabled);
   const contributionsOpen = selectedQuestion?.contributionsOpen ?? true;
@@ -478,6 +482,9 @@ export function ParticipantSessionPage() {
           <StreamTab
             peerResponses={ws?.recentPeerResponses}
             categories={ws?.categorySummary}
+            synthesisArtifacts={synthesisArtifacts}
+            synthesisVisible={selectedQuestion?.synthesisVisible ?? false}
+            synthesisBlockedBySession={session.visibilityMode === "private_until_released"}
             canSeeRawPeerResponses={canSeeRawPeerResponses}
             canSeeCategorySummary={canSeeCategorySummary}
             repliesEnabled={repliesEnabled}

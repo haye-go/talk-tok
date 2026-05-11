@@ -77,7 +77,8 @@ export function ReviewPage() {
               No report generated yet
             </p>
             <p className="text-xs text-[var(--c-muted)]">
-              Generate your personal analysis to see how you contributed to the discussion.
+              Generate your private analysis for this session. This page is separate from the
+              instructor-controlled report release inside Me.
             </p>
             <Button
               style={{ background: "var(--c-success)", color: "white" }}
@@ -103,7 +104,8 @@ export function ReviewPage() {
               Generating your report...
             </p>
             <p className="text-xs text-[var(--c-muted)]">
-              AI is analyzing your contributions. This usually takes a few seconds.
+              AI is analyzing your contributions. This private report can exist before the
+              instructor releases report cards in the session view.
             </p>
           </div>
         }
@@ -142,6 +144,10 @@ export function ReviewPage() {
             <h2 className="font-display text-base font-medium text-[var(--c-ink)]">
               Your Personal Analysis
             </h2>
+            <p className="mt-1 text-xs text-[var(--c-muted)]">
+              Private report page. Instructor release controls determine whether this also appears
+              inside Me.
+            </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-4">

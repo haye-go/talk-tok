@@ -244,6 +244,7 @@ export function InstructorSessionPage() {
     followUps,
     synthesis,
     reports,
+    currentQuestion,
   } = overview;
 
   const joinPath = routes.join(session.joinCode);
@@ -479,6 +480,9 @@ export function InstructorSessionPage() {
   const latestClassSynthesis = synthesis?.latestClassSynthesis;
   const reportsSummary = reports?.summary as PersonalReportsSummary | undefined;
   const recentReports = reports?.recent ?? [];
+  const synthesisReleasedForQuestion = currentQuestion?.synthesisVisible ?? false;
+  const reportsReleasedForQuestion = currentQuestion?.personalReportsVisible ?? false;
+  const sessionPrivateVisibility = session.visibilityMode === "private_until_released";
   const jobRows = (aiJobs ?? overview.jobs.latest) as AiJobRecord[];
   const latestJobFor = (type: JobType) => jobRows.find((job) => job.type === type) ?? null;
   const latestCategorisationJob = latestJobFor("categorisation");
@@ -986,6 +990,19 @@ export function InstructorSessionPage() {
 
           {/* Synthesis Dashboard */}
           <Card title="Synthesis">
+            <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
+              Draft artifacts are instructor-only. Published and final artifacts are learner-facing
+              only when synthesis is released for the current question
+              {sessionPrivateVisibility ? " and session visibility is no longer private." : "."}
+            </p>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              <Badge tone={synthesisReleasedForQuestion ? "success" : "warning"}>
+                {synthesisReleasedForQuestion ? "Synthesis released" : "Synthesis hidden"}
+              </Badge>
+              {sessionPrivateVisibility ? (
+                <Badge tone="warning">Session visibility private</Badge>
+              ) : null}
+            </div>
             {artifactCounts && (
               <div className="mb-3 grid grid-cols-4 gap-2">
                 <MetricTile label="Draft" value={String(artifactCounts.draft ?? 0)} />
@@ -1069,6 +1086,15 @@ export function InstructorSessionPage() {
 
           {/* Personal Reports */}
           <Card title="Personal Reports">
+            <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
+              Reports can be generated before they are released. Learners may use their private
+              report page, while this question view shows report cards only after release.
+            </p>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              <Badge tone={reportsReleasedForQuestion ? "success" : "warning"}>
+                {reportsReleasedForQuestion ? "Reports released" : "Reports hidden in Me"}
+              </Badge>
+            </div>
             {reportsSummary && (
               <div className="mb-3 grid grid-cols-4 gap-2">
                 <MetricTile label="Total" value={String(reportsSummary.total ?? 0)} />

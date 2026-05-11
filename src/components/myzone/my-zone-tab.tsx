@@ -145,9 +145,30 @@ export function MyZoneTab({
       </div>
 
       {!personalReportsVisible ? (
-        <Card title="Personal report not released">
+        <Card
+          title={
+            personalReport?.status === "success"
+              ? "Personal report generated, not released here"
+              : "Personal report not released"
+          }
+          action={
+            onViewReport ? (
+              <button
+                type="button"
+                onClick={onViewReport}
+                className="text-[10px] text-[var(--c-link)] underline"
+              >
+                Open report page
+              </button>
+            ) : null
+          }
+        >
           <p className="text-sm text-[var(--c-muted)]">
-            The instructor has not released personal reports for this question yet.
+            {personalReport?.status === "success"
+              ? "Your private report exists. The instructor has not released report cards into this question view yet."
+              : personalReport?.status === "queued" || personalReport?.status === "processing"
+                ? "Your private report is generating. It will stay separate from this question view until the instructor releases reports."
+                : "The instructor has not released personal reports for this question yet. You can still use the private report page."}
           </p>
         </Card>
       ) : personalReport?.status === "success" ? (

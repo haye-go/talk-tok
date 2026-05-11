@@ -7,6 +7,7 @@ import {
   ResponseComposer,
   type ResponseComposerSubmit,
 } from "@/components/submission/response-composer";
+import { SynthesisArtifactCard } from "@/components/synthesis/synthesis-artifact-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -36,9 +37,26 @@ interface CategorySummary {
   assignmentCount: number;
 }
 
+interface SynthesisArtifact {
+  id: Id<"synthesisArtifacts">;
+  categoryId?: Id<"categories"> | null;
+  kind: string;
+  status: string;
+  title: string;
+  summary?: string | null;
+  keyPoints?: string[];
+  uniqueInsights?: string[];
+  opposingViews?: string[];
+  generatedAt?: number | null;
+  publishedAt?: number | null;
+}
+
 interface StreamTabProps {
   peerResponses?: PeerResponse[];
   categories?: CategorySummary[];
+  synthesisArtifacts?: SynthesisArtifact[];
+  synthesisVisible?: boolean;
+  synthesisBlockedBySession?: boolean;
   canSeeRawPeerResponses?: boolean;
   canSeeCategorySummary?: boolean;
   repliesEnabled?: boolean;
@@ -58,6 +76,9 @@ interface StreamTabProps {
 export function StreamTab({
   peerResponses,
   categories,
+  synthesisArtifacts,
+  synthesisVisible = false,
+  synthesisBlockedBySession = false,
   canSeeRawPeerResponses = true,
   canSeeCategorySummary = true,
   repliesEnabled = true,
@@ -83,6 +104,7 @@ export function StreamTab({
 
   const cats = categories ?? [];
   const responses: PeerResponse[] = peerResponses ?? [];
+  const artifacts = synthesisArtifacts ?? [];
   const submissionIds = responses.map((response) => response.id);
   const reactionState = useQuery(
     api.reactions.listForSubmissions,
@@ -191,6 +213,28 @@ export function StreamTab({
           ) : null}
         </div>
       ) : null}
+
+      <Card title="Class synthesis">
+        {!synthesisVisible ? (
+          <p className="text-sm text-[var(--c-muted)]">
+            The instructor has not released synthesis for this question yet.
+          </p>
+        ) : synthesisBlockedBySession ? (
+          <p className="text-sm text-[var(--c-muted)]">
+            Synthesis is released for this question, but the session is still in private visibility.
+          </p>
+        ) : artifacts.length === 0 ? (
+          <p className="text-sm text-[var(--c-muted)]">
+            No synthesis has been generated for this question yet.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {artifacts.map((artifact) => (
+              <SynthesisArtifactCard key={artifact.id} artifact={artifact} sessionSlug={sessionSlug ?? ""} />
+            ))}
+          </div>
+        )}
+      </Card>
 
       {!canSeeRawPeerResponses ? (
         <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-4 text-center">
