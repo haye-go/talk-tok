@@ -83,7 +83,7 @@ export function FeedbackCard({
     >
       <div className="mb-1.5 font-display text-xs font-semibold text-[var(--c-sig-coral)]">
         <Fire size={12} weight="fill" className="mr-1 inline" />
-        Your AI Feedback{toneDisplay ? ` · ${toneDisplay}` : ""}
+        Your AI Feedback{toneDisplay ? ` - ${toneDisplay}` : ""}
       </div>
 
       {originalityBand && (
