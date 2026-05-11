@@ -316,6 +316,8 @@ export function ParticipantSessionPage() {
   const canUseFight =
     selectedQuestion?.fightEnabled ?? (ws?.session.fightMeEnabled ?? session.fightMeEnabled);
   const contributionsOpen = selectedQuestion?.contributionsOpen ?? true;
+  const repliesEnabled = selectedQuestion?.repliesEnabled ?? false;
+  const upvotesEnabled = selectedQuestion?.upvotesEnabled ?? false;
   const canUseFightMe = Boolean(clientKey && primaryContribution && canUseFight);
   const selectedPrompt = selectedQuestion?.prompt ?? session.openingPrompt;
 
@@ -477,8 +479,17 @@ export function ParticipantSessionPage() {
             categories={ws?.categorySummary}
             canSeeRawPeerResponses={canSeeRawPeerResponses}
             canSeeCategorySummary={canSeeCategorySummary}
+            repliesEnabled={repliesEnabled}
+            upvotesEnabled={upvotesEnabled}
+            fightEnabled={canUseFight}
+            selectedQuestionId={selectedQuestion?.id}
+            softWordLimit={session.responseSoftLimitWords}
             sessionSlug={sessionSlug}
             clientKey={clientKey}
+            mySubmissionId={primaryContribution?.id}
+            onFightCreated={(fightSlug) =>
+              (window.location.href = routes.sessionFight(sessionSlug, fightSlug))
+            }
           />
         </div>
       }

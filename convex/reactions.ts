@@ -160,6 +160,52 @@ export const listForSubmission = query({
   },
 });
 
+export const listForSubmissions = query({
+  args: {
+    sessionSlug: v.string(),
+    submissionIds: v.array(v.id("submissions")),
+    clientKey: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      return null;
+    }
+
+    const participant = args.clientKey
+      ? await getParticipantByClientKey(ctx, session._id, args.clientKey)
+      : null;
+    const uniqueSubmissionIds = [...new Set(args.submissionIds)].slice(0, 50);
+    const results = [];
+
+    for (const submissionId of uniqueSubmissionIds) {
+      const submission = await ctx.db.get(submissionId);
+
+      if (!submission || submission.sessionId !== session._id) {
+        continue;
+      }
+
+      const rows = await ctx.db
+        .query("reactions")
+        .withIndex("by_submission", (q) => q.eq("submissionId", submissionId))
+        .take(REACTION_LIMIT);
+
+      results.push({
+        submissionId,
+        counts: countReactions(rows),
+        myReactions: participant
+          ? rows
+              .filter((row) => row.participantId === participant._id)
+              .map((row) => row.kind)
+          : [],
+      });
+    }
+
+    return results;
+  },
+});
+
 export const listForSession = query({
   args: {
     sessionSlug: v.string(),
