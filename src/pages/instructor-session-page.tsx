@@ -159,6 +159,8 @@ interface CategoryDriftSlice {
 export function InstructorSessionPage() {
   const { sessionSlug } = useParams({ from: "/instructor/session/$sessionSlug" });
   const overview = useInstructorOverview(sessionSlug);
+  const activeQuestionId = overview?.currentQuestion?.id;
+  const questionScopedArgs = activeQuestionId ? { sessionSlug, questionId: activeQuestionId } : { sessionSlug };
   const triggerCategorisation = useMutation(api.categorisation.triggerForSession);
   const updatePhase = useMutation(api.instructorControls.updatePhase);
   const updateVisibility = useMutation(api.instructorControls.updateVisibility);
@@ -176,11 +178,11 @@ export function InstructorSessionPage() {
   });
   const decideRecategorisation = useMutation(api.recategorisation.decide);
 
-  const semanticStatus = useQuery(api.semantic.getSemanticStatus, { sessionSlug });
-  const noveltyRadar = useQuery(api.semantic.getNoveltyRadar, { sessionSlug });
-  const categoryDrift = useQuery(api.semantic.getCategoryDrift, { sessionSlug });
-  const argumentGraph = useQuery(api.argumentMap.getVisualizationGraph, { sessionSlug });
-  const aiJobs = useQuery(api.jobs.listForSession, { sessionSlug, limit: 80 });
+  const semanticStatus = useQuery(api.semantic.getSemanticStatus, questionScopedArgs);
+  const noveltyRadar = useQuery(api.semantic.getNoveltyRadar, questionScopedArgs);
+  const categoryDrift = useQuery(api.semantic.getCategoryDrift, questionScopedArgs);
+  const argumentGraph = useQuery(api.argumentMap.getVisualizationGraph, questionScopedArgs);
+  const aiJobs = useQuery(api.jobs.listForSession, { ...questionScopedArgs, limit: 80 });
 
   const queueEmbeddings = useMutation(api.semantic.queueEmbeddingsForSession);
   const refreshSignals = useMutation(api.semantic.refreshSignalsForSession);
@@ -318,14 +320,18 @@ export function InstructorSessionPage() {
     if (kind === "opposing_views") {
       setGeneratingOpposing(true);
       try {
-        await generateClassSynthesis({ sessionSlug, kind: "opposing_views" });
+        await generateClassSynthesis({
+          sessionSlug,
+          kind: "opposing_views",
+          questionId: activeQuestionId,
+        });
       } finally {
         setGeneratingOpposing(false);
       }
     } else {
       setGeneratingClass(true);
       try {
-        await generateClassSynthesis({ sessionSlug });
+        await generateClassSynthesis({ sessionSlug, questionId: activeQuestionId });
       } finally {
         setGeneratingClass(false);
       }
@@ -336,7 +342,7 @@ export function InstructorSessionPage() {
     setReportGenerationError(null);
     setGeneratingReports(true);
     try {
-      await generateReports({ sessionSlug });
+      await generateReports({ sessionSlug, questionId: activeQuestionId });
     } catch (cause) {
       setReportGenerationError(
         cause instanceof Error ? cause.message : "Could not generate reports.",
@@ -351,7 +357,7 @@ export function InstructorSessionPage() {
     setCategorisationMessage(null);
     setTriggeringCategorisation(true);
     try {
-      const job = await triggerCategorisation({ sessionSlug });
+      const job = await triggerCategorisation({ sessionSlug, questionId: activeQuestionId });
       setCategorisationMessage(`Categorisation ${job?.status ?? "queued"}.`);
     } catch (cause) {
       setCategorisationError(
@@ -379,6 +385,7 @@ export function InstructorSessionPage() {
     try {
       await createCategory({
         sessionSlug,
+        questionId: activeQuestionId,
         name: addCategoryName,
         description: addCategoryDescription || undefined,
       });
@@ -433,6 +440,7 @@ export function InstructorSessionPage() {
     try {
       await createFollowUp({
         sessionSlug,
+        questionId: activeQuestionId,
         title: `Follow-up: ${activeCategories.find((category) => category.id === categoryId)?.name ?? "Category"}`,
         prompt: followUpPrompt,
         targetMode: "categories",
@@ -451,7 +459,7 @@ export function InstructorSessionPage() {
   async function handleQueueEmbeddings() {
     setEmbeddingQueued(true);
     try {
-      await queueEmbeddings({ sessionSlug });
+      await queueEmbeddings({ sessionSlug, questionId: activeQuestionId });
     } finally {
       setEmbeddingQueued(false);
     }
@@ -460,7 +468,7 @@ export function InstructorSessionPage() {
   async function handleGenerateArgMap() {
     setArgMapQueued(true);
     try {
-      await generateArgMap({ sessionSlug });
+      await generateArgMap({ sessionSlug, questionId: activeQuestionId });
     } finally {
       setArgMapQueued(false);
     }
@@ -856,6 +864,7 @@ export function InstructorSessionPage() {
         <div className="grid gap-3">
           <QuestionManagerPanel
             session={session}
+            currentQuestion={overview.currentQuestion}
             metrics={{
               submitted: responses.total,
               categories: activeCategories.length,
@@ -866,7 +875,10 @@ export function InstructorSessionPage() {
             onSettingsSave={handleSettingsSave}
           />
 
-          <AiJobStatusPanel items={aiJobStatusItems} />
+          <AiJobStatusPanel
+            items={aiJobStatusItems}
+            contextLabel={overview.currentQuestion?.title ?? "the current question"}
+          />
 
           {pendingRecatRequests && pendingRecatRequests.length > 0 && (
             <Card title="Recategorisation Requests">
@@ -1221,7 +1233,7 @@ export function InstructorSessionPage() {
                 size="sm"
                 variant="secondary"
                 className="flex-1"
-                onClick={() => void refreshSignals({ sessionSlug })}
+                onClick={() => void refreshSignals({ sessionSlug, questionId: activeQuestionId })}
               >
                 Refresh Signals
               </Button>

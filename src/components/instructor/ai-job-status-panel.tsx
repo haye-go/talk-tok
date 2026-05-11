@@ -14,11 +14,15 @@ export interface AiJobStatusItem {
 
 interface AiJobStatusPanelProps {
   items: AiJobStatusItem[];
+  contextLabel?: string;
 }
 
-export function AiJobStatusPanel({ items }: AiJobStatusPanelProps) {
+export function AiJobStatusPanel({ items, contextLabel }: AiJobStatusPanelProps) {
   return (
     <Card title="AI Workflow Status">
+      {contextLabel ? (
+        <p className="mb-3 text-xs text-[var(--c-muted)]">Showing jobs for {contextLabel}.</p>
+      ) : null}
       <div className="grid gap-2">
         {items.map((item) => (
           <div

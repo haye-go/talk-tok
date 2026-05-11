@@ -251,6 +251,7 @@ export const generateMine = mutation({
 export const generateForSession = mutation({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     participantIds: v.optional(v.array(v.id("participants"))),
     forceRegenerate: v.optional(v.boolean()),
   },
@@ -281,7 +282,7 @@ export const generateForSession = mutation({
           .withIndex("by_session", (q) => q.eq("sessionId", session._id))
           .take(REPORT_PARTICIPANT_LIMIT);
     const reports = [];
-    const questionId = await resolveQuestionIdForWrite(ctx, session);
+    const questionId = await resolveQuestionIdForWrite(ctx, session, args.questionId);
 
     for (const participant of participants) {
       if (

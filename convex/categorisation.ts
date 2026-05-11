@@ -251,6 +251,7 @@ export const triggerForSession = mutation({
     const now = Date.now();
     const jobId = await ctx.db.insert("aiJobs", {
       sessionId: session._id,
+      questionId,
       type: "categorisation",
       status: "queued",
       requestedBy: "instructor",
@@ -259,6 +260,7 @@ export const triggerForSession = mutation({
     });
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId,
       actorType: "instructor",
       action: "categorisation.triggered",
       targetType: "aiJob",

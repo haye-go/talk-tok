@@ -25,6 +25,12 @@ function getSessionControlsKey(session: SessionControlSnapshot) {
 
 interface QuestionManagerPanelProps {
   session: SessionControlSnapshot & { joinCode: string };
+  currentQuestion?: {
+    title: string;
+    prompt: string;
+    status: string;
+    isCurrent: boolean;
+  } | null;
   metrics: {
     submitted: number;
     categories: number;
@@ -37,14 +43,20 @@ interface QuestionManagerPanelProps {
 
 export function QuestionManagerPanel({
   session,
+  currentQuestion,
   metrics,
   onVisibilityChange,
   onSettingsSave,
 }: QuestionManagerPanelProps) {
   return (
     <div className="grid gap-3">
-      <Card title="Current Prompt" eyebrow={session.joinCode}>
-        <p className="text-sm leading-relaxed text-[var(--c-body)]">{session.openingPrompt}</p>
+      <Card title={currentQuestion?.title ?? "Current Question"} eyebrow={session.joinCode}>
+        <p className="text-sm leading-relaxed text-[var(--c-body)]">
+          {currentQuestion?.prompt ?? session.openingPrompt}
+        </p>
+        <p className="mt-2 text-[10px] text-[var(--c-muted)]">
+          AI controls target this question unless a panel explicitly says otherwise.
+        </p>
       </Card>
 
       <SessionControlsCard
