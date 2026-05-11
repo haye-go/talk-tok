@@ -1,6 +1,7 @@
 import { CircleNotch, Fire, Timer, WarningCircle } from "@phosphor-icons/react";
 import { OriginalitySlider } from "@/components/feedback/originality-slider";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 const ORIGINALITY_PCT: Record<string, number> = {
   common: 0.25,
@@ -21,6 +22,8 @@ interface FeedbackCardProps {
   nextQuestion?: string | null;
   error?: string | null;
   telemetryLabel?: string;
+  onRetry?: () => void;
+  retrying?: boolean;
 }
 
 function bandLabel(band?: string | null) {
@@ -40,6 +43,8 @@ export function FeedbackCard({
   nextQuestion,
   error,
   telemetryLabel,
+  onRetry,
+  retrying = false,
 }: FeedbackCardProps) {
   if (status === "queued" || status === "processing") {
     return (
@@ -64,11 +69,23 @@ export function FeedbackCard({
         style={{ borderLeft: "3px solid var(--c-error)" }}
       >
         <WarningCircle size={18} className="text-[var(--c-error)]" />
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="font-display text-xs font-medium text-[var(--c-ink)]">Feedback failed</p>
           <p className="text-[10px] text-[var(--c-muted)]">
             {error ?? "An error occurred. Try again later."}
           </p>
+          {onRetry ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mt-2"
+              onClick={onRetry}
+              disabled={retrying}
+            >
+              {retrying ? "Retrying..." : "Retry feedback"}
+            </Button>
+          ) : null}
         </div>
       </div>
     );

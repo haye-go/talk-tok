@@ -69,16 +69,20 @@ export function ParticipantSessionPage() {
   const touchPresence = useMutation(api.participants.touchPresence);
   const submitAndQueue = useMutation(api.participantWorkspace.submitAndQueueFeedback);
   const createSubmission = useMutation(api.submissions.create);
+  const retryFeedback = useMutation(api.aiFeedback.retryFailed);
   const requestRecategorisation = useMutation(api.recategorisation.request);
 
   const [nicknameDraft, setNicknameDraft] = useState<string | null>(null);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [feedbackQueueWarning, setFeedbackQueueWarning] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
   const [showAdditionalComposer, setShowAdditionalComposer] = useState(false);
   const [expandedContributionId, setExpandedContributionId] = useState<Id<"submissions"> | null>(
     null,
   );
+  const [retryingFeedbackSubmissionId, setRetryingFeedbackSubmissionId] =
+    useState<Id<"submissions"> | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("contribute");
   const touchedPresenceKey = useRef<string | null>(null);
 
@@ -122,8 +126,9 @@ export function ParticipantSessionPage() {
   async function handleSubmit(sub: ResponseComposerSubmit) {
     if (!clientKey) return;
     setSubmissionError(null);
+    setFeedbackQueueWarning(null);
     try {
-      await submitAndQueue({
+      const result = await submitAndQueue({
         sessionSlug,
         clientKey,
         body: sub.body,
@@ -132,6 +137,12 @@ export function ParticipantSessionPage() {
         tone: (sub.tone as "gentle" | "direct" | "spicy" | "roast") ?? undefined,
         telemetry: sub.telemetry,
       });
+      if (!result.feedbackQueued) {
+        setFeedbackQueueWarning(
+          result.feedbackQueueError ??
+            "Your response was saved, but AI feedback could not be queued.",
+        );
+      }
     } catch (cause) {
       setSubmissionError(cause instanceof Error ? cause.message : "Could not submit response.");
       throw cause;
@@ -141,8 +152,9 @@ export function ParticipantSessionPage() {
   async function handleAddAnotherPoint(sub: ResponseComposerSubmit) {
     if (!clientKey) return;
     setSubmissionError(null);
+    setFeedbackQueueWarning(null);
     try {
-      await submitAndQueue({
+      const result = await submitAndQueue({
         sessionSlug,
         clientKey,
         body: sub.body,
@@ -151,6 +163,12 @@ export function ParticipantSessionPage() {
         tone: (sub.tone as "gentle" | "direct" | "spicy" | "roast") ?? undefined,
         telemetry: sub.telemetry,
       });
+      if (!result.feedbackQueued) {
+        setFeedbackQueueWarning(
+          result.feedbackQueueError ??
+            "Your response was saved, but AI feedback could not be queued.",
+        );
+      }
       setShowAdditionalComposer(false);
     } catch (cause) {
       setSubmissionError(cause instanceof Error ? cause.message : "Could not add another point.");
@@ -175,6 +193,25 @@ export function ParticipantSessionPage() {
     } catch (cause) {
       setSubmissionError(cause instanceof Error ? cause.message : "Could not submit follow-up.");
       throw cause;
+    }
+  }
+
+  async function handleRetryFeedback(submissionId: Id<"submissions">) {
+    if (!clientKey) return;
+    setFeedbackQueueWarning(null);
+    setRetryingFeedbackSubmissionId(submissionId);
+    try {
+      await retryFeedback({
+        sessionSlug,
+        clientKey,
+        submissionId,
+      });
+    } catch (cause) {
+      setFeedbackQueueWarning(
+        cause instanceof Error ? cause.message : "Could not retry feedback generation.",
+      );
+    } finally {
+      setRetryingFeedbackSubmissionId(null);
     }
   }
 
@@ -394,6 +431,11 @@ export function ParticipantSessionPage() {
           </div>
 
           {submissionError ? <InlineAlert tone="error">{submissionError}</InlineAlert> : null}
+          {feedbackQueueWarning ? (
+            <InlineAlert tone="warning">
+              {feedbackQueueWarning} Open analysis on the saved contribution to retry feedback.
+            </InlineAlert>
+          ) : null}
 
           {!contributionsOpen && topLevelContributions.length === 0 ? (
             <Card title="Contributions are paused">
@@ -467,6 +509,8 @@ export function ParticipantSessionPage() {
                   onAddFollowUp={() => setFollowUpParentId(submission.id)}
                   onViewExplore={() => setActiveTab("explore")}
                   onStartFight={canUseFight ? () => setActiveTab("fight") : undefined}
+                  onRetryFeedback={() => handleRetryFeedback(submission.id)}
+                  feedbackRetrying={retryingFeedbackSubmissionId === submission.id}
                 >
                   {followUpParentId === submission.id ? followUpComposer : null}
                 </ContributionThreadCard>

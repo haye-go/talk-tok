@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -65,6 +65,8 @@ type PublicFeedbackResult = {
 type SubmitAndQueueFeedbackResult = {
   submission: PublicSubmissionResult;
   feedback: PublicFeedbackResult;
+  feedbackQueued: boolean;
+  feedbackQueueError?: string;
 };
 
 function normalizeSessionSlug(value: string) {
@@ -171,6 +173,7 @@ function toFeedback(feedback: Doc<"submissionFeedback">) {
   return {
     id: feedback._id,
     submissionId: feedback.submissionId,
+    participantId: feedback.participantId,
     status: feedback.status,
     tone: feedback.tone,
     reasoningBand: feedback.reasoningBand,
@@ -740,16 +743,73 @@ export const submitAndQueueFeedback = mutation({
       followUpPromptId: args.followUpPromptId,
       telemetry: args.telemetry,
     });
-    const feedback: PublicFeedbackResult = await ctx.runMutation(
-      api.aiFeedback.enqueueForSubmission,
-      {
-        sessionSlug: args.sessionSlug,
-        clientKey: args.clientKey,
-        submissionId: submission.id,
-        tone: args.tone,
-      },
-    );
+    try {
+      const feedback: PublicFeedbackResult = await ctx.runMutation(
+        api.aiFeedback.enqueueForSubmission,
+        {
+          sessionSlug: args.sessionSlug,
+          clientKey: args.clientKey,
+          submissionId: submission.id,
+          tone: args.tone,
+        },
+      );
 
-    return { submission, feedback };
+      return { submission, feedback, feedbackQueued: true };
+    } catch (cause) {
+      const session = await ctx.db.get(submission.sessionId);
+      const now = Date.now();
+      const feedbackId = await ctx.db.insert("submissionFeedback", {
+        sessionId: submission.sessionId,
+        submissionId: submission.id,
+        participantId: submission.participantId,
+        status: "error",
+        tone: args.tone ?? session?.critiqueToneDefault ?? "direct",
+        error:
+          cause instanceof Error
+            ? cause.message
+            : "The contribution was saved, but feedback could not be queued.",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await ctx.db.insert("aiJobs", {
+        sessionId: submission.sessionId,
+        questionId: submission.questionId,
+        submissionId: submission.id,
+        type: "feedback",
+        status: "error",
+        requestedBy: "participant",
+        error:
+          cause instanceof Error
+            ? cause.message
+            : "The contribution was saved, but feedback could not be queued.",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      const feedback = await ctx.db.get(feedbackId);
+
+      if (!feedback) {
+        throw cause;
+      }
+
+      await ctx.runMutation(internal.audit.record, {
+        sessionId: submission.sessionId,
+        questionId: submission.questionId,
+        actorType: "participant",
+        actorParticipantId: submission.participantId,
+        action: "feedback.queue_failed",
+        targetType: "submissionFeedback",
+        targetId: feedbackId,
+        metadataJson: { submissionId: submission.id },
+      });
+
+      return {
+        submission,
+        feedback: toFeedback(feedback),
+        feedbackQueued: false,
+        feedbackQueueError: feedback.error,
+      };
+    }
   },
 });

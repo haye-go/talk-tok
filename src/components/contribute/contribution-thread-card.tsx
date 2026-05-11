@@ -73,6 +73,8 @@ export interface ContributionThreadCardProps {
   onAddFollowUp?: () => void;
   onViewExplore?: () => void;
   onStartFight?: () => void;
+  onRetryFeedback?: () => Promise<void> | void;
+  feedbackRetrying?: boolean;
   children?: ReactNode;
 }
 
@@ -102,6 +104,8 @@ export function ContributionThreadCard({
   onAddFollowUp,
   onViewExplore,
   onStartFight,
+  onRetryFeedback,
+  feedbackRetrying = false,
   children,
 }: ContributionThreadCardProps) {
   const [showRecatForm, setShowRecatForm] = useState(false);
@@ -198,6 +202,8 @@ export function ContributionThreadCard({
               improvement={feedback.improvement}
               nextQuestion={feedback.nextQuestion}
               error={feedback.error}
+              onRetry={feedback.status === "error" ? onRetryFeedback : undefined}
+              retrying={feedbackRetrying}
             />
           ) : (
             <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
