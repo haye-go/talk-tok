@@ -8,6 +8,8 @@ export interface AiJobStatusItem {
   status: string;
   detail: string;
   tone: AiJobTone;
+  error?: string | null;
+  updatedAt?: number | null;
 }
 
 interface AiJobStatusPanelProps {
@@ -26,6 +28,18 @@ export function AiJobStatusPanel({ items }: AiJobStatusPanelProps) {
             <div>
               <p className="text-xs font-medium text-[var(--c-ink)]">{item.label}</p>
               <p className="mt-0.5 text-[11px] leading-4 text-[var(--c-muted)]">{item.detail}</p>
+              {item.error ? (
+                <p className="mt-1 text-[11px] leading-4 text-[var(--c-error)]">{item.error}</p>
+              ) : null}
+              {item.updatedAt ? (
+                <p className="mt-1 text-[10px] text-[var(--c-muted)]">
+                  Updated{" "}
+                  {new Date(item.updatedAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              ) : null}
             </div>
             <Badge tone={item.tone} className="shrink-0 text-[9px]">
               {item.status}

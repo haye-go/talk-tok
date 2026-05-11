@@ -65,6 +65,61 @@ function formatReportTime(value?: number | null) {
   });
 }
 
+type JobStatus = "queued" | "processing" | "success" | "error";
+type JobType =
+  | "question_baseline"
+  | "feedback"
+  | "categorisation"
+  | "moderation"
+  | "synthesis"
+  | "fight_challenge"
+  | "fight_debrief"
+  | "personal_report"
+  | "argument_map";
+
+interface AiJobRecord {
+  id: Id<"aiJobs">;
+  questionId?: Id<"sessionQuestions">;
+  submissionId?: Id<"submissions">;
+  type: JobType;
+  status: JobStatus;
+  requestedBy: "system" | "instructor" | "participant";
+  progressTotal?: number;
+  progressDone?: number;
+  error?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface EmbeddingJobRecord {
+  status: JobStatus;
+  progressTotal?: number;
+  progressDone?: number;
+  error?: string;
+  updatedAt: number;
+}
+
+function isBusyStatus(status?: string) {
+  return status === "queued" || status === "processing";
+}
+
+function jobTone(job?: { status: string } | null, fallback: AiJobStatusItem["tone"] = "neutral") {
+  if (!job) return fallback;
+  if (job.status === "error") return "error";
+  if (isBusyStatus(job.status)) return "warning";
+  return "success";
+}
+
+function progressDetail(job?: { status: string; progressDone?: number; progressTotal?: number } | null) {
+  if (!job) return null;
+
+  if (typeof job.progressDone === "number") {
+    return `${job.progressDone}/${job.progressTotal ?? "?"} complete`;
+  }
+
+  return `Last ${job.status}`;
+}
+
 interface PersonalReportsSummary {
   total?: number;
   success?: number;
@@ -125,6 +180,7 @@ export function InstructorSessionPage() {
   const noveltyRadar = useQuery(api.semantic.getNoveltyRadar, { sessionSlug });
   const categoryDrift = useQuery(api.semantic.getCategoryDrift, { sessionSlug });
   const argumentGraph = useQuery(api.argumentMap.getVisualizationGraph, { sessionSlug });
+  const aiJobs = useQuery(api.jobs.listForSession, { sessionSlug, limit: 80 });
 
   const queueEmbeddings = useMutation(api.semantic.queueEmbeddingsForSession);
   const refreshSignals = useMutation(api.semantic.refreshSignalsForSession);
@@ -415,22 +471,32 @@ export function InstructorSessionPage() {
   const latestClassSynthesis = synthesis?.latestClassSynthesis;
   const reportsSummary = reports?.summary as PersonalReportsSummary | undefined;
   const recentReports = reports?.recent ?? [];
-  const latestCategorisationJob = overview.jobs.latest.find((job) => job.type === "categorisation");
+  const jobRows = (aiJobs ?? overview.jobs.latest) as AiJobRecord[];
+  const latestJobFor = (type: JobType) => jobRows.find((job) => job.type === type) ?? null;
+  const latestCategorisationJob = latestJobFor("categorisation");
+  const latestSynthesisJob = latestJobFor("synthesis");
+  const latestReportJob = latestJobFor("personal_report");
+  const latestBaselineJob = latestJobFor("question_baseline");
+  const latestArgumentMapJob =
+    (semanticStatus?.latestArgumentMapJob as AiJobRecord | null | undefined) ??
+    latestJobFor("argument_map");
+  const latestEmbeddingJob =
+    (semanticStatus?.latestJob as EmbeddingJobRecord | null | undefined) ?? null;
   const categorisationBusy =
-    triggeringCategorisation ||
-    latestCategorisationJob?.status === "queued" ||
-    latestCategorisationJob?.status === "processing";
+    triggeringCategorisation || isBusyStatus(latestCategorisationJob?.status);
+  const reportBusy = generatingReports || isBusyStatus(latestReportJob?.status);
+  const embeddingBusy = embeddingQueued || isBusyStatus(latestEmbeddingJob?.status);
+  const argMapBusy = argMapQueued || isBusyStatus(latestArgumentMapJob?.status);
   const studentActivity = activity.filter((event) => event.actorType === "participant");
   const aiJobStatusItems: AiJobStatusItem[] = [
     {
       label: "Categorisation",
       status: latestCategorisationJob?.status ?? (responses.uncategorized > 0 ? "idle" : "ready"),
       detail:
-        latestCategorisationJob && typeof latestCategorisationJob.progressDone === "number"
-          ? `${latestCategorisationJob.progressDone}/${latestCategorisationJob.progressTotal ?? "?"} complete`
-          : responses.uncategorized > 0
-            ? `${responses.uncategorized} uncategorized responses waiting`
-            : "No uncategorized responses",
+        progressDetail(latestCategorisationJob) ??
+        (responses.uncategorized > 0
+          ? `${responses.uncategorized} uncategorized responses waiting`
+          : "No uncategorized responses"),
       tone:
         latestCategorisationJob?.status === "error"
           ? "error"
@@ -439,30 +505,77 @@ export function InstructorSessionPage() {
             : responses.uncategorized > 0
               ? "neutral"
               : "success",
+      error: latestCategorisationJob?.error,
+      updatedAt: latestCategorisationJob?.updatedAt,
+    },
+    {
+      label: "Synthesis",
+      status: latestSynthesisJob?.status ?? "idle",
+      detail:
+        progressDetail(latestSynthesisJob) ??
+        (artifactCounts
+          ? `${artifactCounts.draft ?? 0} draft, ${artifactCounts.published ?? 0} published, ${artifactCounts.final ?? 0} final`
+          : "No synthesis artifacts generated yet"),
+      tone: jobTone(
+        latestSynthesisJob,
+        artifactCounts?.draft || artifactCounts?.published || artifactCounts?.final
+          ? "sky"
+          : "neutral",
+      ),
+      error: latestSynthesisJob?.error,
+      updatedAt: latestSynthesisJob?.updatedAt,
     },
     {
       label: "Personal reports",
-      status: generatingReports ? "processing" : reportGenerationError ? "error" : "ready",
-      detail: reportsSummary
-        ? `${reportsSummary.success ?? 0} ready, ${(reportsSummary.queued ?? 0) + (reportsSummary.processing ?? 0)} in flight`
-        : "No reports generated yet",
-      tone: reportGenerationError ? "error" : generatingReports ? "warning" : "sky",
+      status: latestReportJob?.status ?? (generatingReports ? "processing" : "idle"),
+      detail:
+        progressDetail(latestReportJob) ??
+        (reportsSummary
+          ? `${reportsSummary.success ?? 0} ready, ${(reportsSummary.queued ?? 0) + (reportsSummary.processing ?? 0)} in flight`
+          : "No reports generated yet"),
+      tone: reportGenerationError
+        ? "error"
+        : jobTone(latestReportJob, reportBusy ? "warning" : "sky"),
+      error: latestReportJob?.error ?? reportGenerationError,
+      updatedAt: latestReportJob?.updatedAt,
+    },
+    {
+      label: "Question baseline",
+      status: latestBaselineJob?.status ?? "idle",
+      detail: progressDetail(latestBaselineJob) ?? "No recent baseline job",
+      tone: jobTone(latestBaselineJob),
+      error: latestBaselineJob?.error,
+      updatedAt: latestBaselineJob?.updatedAt,
     },
     {
       label: "Embeddings and signals",
-      status: embeddingQueued ? "queueing" : semanticStatus ? "ready" : "idle",
-      detail: semanticStatus
-        ? `${semanticStatus.embeddingCount} embeddings, ${semanticStatus.signalCount} signals`
-        : "Semantic status not available yet",
-      tone: embeddingQueued ? "warning" : semanticStatus?.embeddingCount ? "success" : "neutral",
+      status: latestEmbeddingJob?.status ?? (embeddingQueued ? "queued" : "idle"),
+      detail:
+        progressDetail(latestEmbeddingJob) ??
+        (semanticStatus
+          ? `${semanticStatus.embeddingCount} embeddings, ${semanticStatus.signalCount} signals`
+          : "Semantic status not available yet"),
+      tone: jobTone(
+        latestEmbeddingJob,
+        embeddingBusy ? "warning" : semanticStatus?.embeddingCount ? "success" : "neutral",
+      ),
+      error: latestEmbeddingJob?.error,
+      updatedAt: latestEmbeddingJob?.updatedAt,
     },
     {
       label: "Argument map",
-      status: argMapQueued ? "queueing" : argumentGraph ? "ready" : "idle",
-      detail: argumentGraph
-        ? `${argumentGraph.nodes.length} nodes, ${argumentGraph.edges.length} edges`
-        : "No argument graph generated yet",
-      tone: argMapQueued ? "warning" : argumentGraph ? "success" : "neutral",
+      status: latestArgumentMapJob?.status ?? (argMapQueued ? "queued" : "idle"),
+      detail:
+        progressDetail(latestArgumentMapJob) ??
+        (argumentGraph
+          ? `${argumentGraph.nodes.length} nodes, ${argumentGraph.edges.length} edges`
+          : "No argument graph generated yet"),
+      tone: jobTone(
+        latestArgumentMapJob,
+        argMapBusy ? "warning" : argumentGraph ? "success" : "neutral",
+      ),
+      error: latestArgumentMapJob?.error,
+      updatedAt: latestArgumentMapJob?.updatedAt,
     },
   ];
 
@@ -955,9 +1068,9 @@ export function InstructorSessionPage() {
               size="sm"
               className="w-full"
               onClick={handleGenerateReports}
-              disabled={generatingReports}
+              disabled={reportBusy}
             >
-              {generatingReports ? (
+              {reportBusy ? (
                 <>
                   <CircleNotch size={12} className="mr-1 inline animate-spin" />
                   Generating...
@@ -1093,9 +1206,9 @@ export function InstructorSessionPage() {
                 variant="secondary"
                 className="flex-1"
                 onClick={handleQueueEmbeddings}
-                disabled={embeddingQueued}
+                disabled={embeddingBusy}
               >
-                {embeddingQueued ? (
+                {embeddingBusy ? (
                   <>
                     <CircleNotch size={12} className="mr-1 inline animate-spin" />
                     Queued
@@ -1117,9 +1230,9 @@ export function InstructorSessionPage() {
                 variant="secondary"
                 className="flex-1"
                 onClick={handleGenerateArgMap}
-                disabled={argMapQueued}
+                disabled={argMapBusy}
               >
-                {argMapQueued ? (
+                {argMapBusy ? (
                   <>
                     <CircleNotch size={12} className="mr-1 inline animate-spin" />
                     Queued
