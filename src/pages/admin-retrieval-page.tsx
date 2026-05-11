@@ -11,6 +11,13 @@ export function AdminRetrievalPage() {
       description="Embedding model, context window, and reindex controls."
     >
       <div className="grid gap-4">
+        <Card title="Status">
+          <p className="text-sm text-[var(--c-muted)]">
+            This page is currently a read-only planning surface. Retrieval settings shown here are
+            not persisted yet, and reindex remains a pending wiring task.
+          </p>
+        </Card>
+
         <Card title="Context Configuration">
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Recent-message limit" type="number" defaultValue="10" />
@@ -48,8 +55,8 @@ export function AdminRetrievalPage() {
             Rebuild embeddings for all submissions in the current session. This is a background
             operation.
           </p>
-          <Button variant="secondary" icon={<ArrowsClockwise size={14} />}>
-            Trigger Reindex
+          <Button variant="secondary" icon={<ArrowsClockwise size={14} />} disabled>
+            Pending wiring
           </Button>
         </Card>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -33,6 +33,7 @@ import { routes } from "@/lib/routes";
 
 export function ParticipantSessionPage() {
   const { sessionSlug } = useParams({ from: "/session/$sessionSlug" });
+  const navigate = useNavigate();
   const clientKey = useMemo(() => {
     const demoClientKey = new URLSearchParams(window.location.search).get("demoClientKey");
 
@@ -228,7 +229,7 @@ export function ParticipantSessionPage() {
           <Button
             type="button"
             className="mt-4 w-full"
-            onClick={() => (window.location.href = routes.join(session.joinCode))}
+            onClick={() => void navigate({ to: routes.join(session.joinCode) })}
           >
             Join with nickname
           </Button>
@@ -488,7 +489,7 @@ export function ParticipantSessionPage() {
             clientKey={clientKey}
             mySubmissionId={primaryContribution?.id}
             onFightCreated={(fightSlug) =>
-              (window.location.href = routes.sessionFight(sessionSlug, fightSlug))
+              void navigate({ to: routes.sessionFight(sessionSlug, fightSlug) })
             }
           />
         </div>
@@ -504,7 +505,7 @@ export function ParticipantSessionPage() {
             clientKey={clientKey}
             mySubmissionId={primaryContribution?.id}
             onNavigateToThread={(fightSlug) =>
-              (window.location.href = routes.sessionFight(sessionSlug, fightSlug))
+              void navigate({ to: routes.sessionFight(sessionSlug, fightSlug) })
             }
           />
         ) : canUseFight ? (
@@ -535,9 +536,9 @@ export function ParticipantSessionPage() {
             personalReportsVisible={selectedQuestion?.personalReportsVisible ?? false}
             loading={ws === undefined}
             onViewFight={(fightSlug) =>
-              (window.location.href = routes.sessionFight(sessionSlug, fightSlug))
+              void navigate({ to: routes.sessionFight(sessionSlug, fightSlug) })
             }
-            onViewReport={() => (window.location.href = routes.sessionReview(sessionSlug))}
+            onViewReport={() => void navigate({ to: routes.sessionReview(sessionSlug) })}
           />
           <Card title="Nickname">
             <form className="grid gap-3" onSubmit={handleNicknameSubmit}>

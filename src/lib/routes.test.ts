@@ -5,6 +5,7 @@ describe("routes", () => {
   it("builds readable participant routes", () => {
     expect(routes.joinEntry()).toBe("/join");
     expect(routes.join("spark")).toBe("/join/SPARK");
+    expect(routes.demoPersonas()).toBe("/demo/personas");
     expect(routes.session("ethics-ai-healthcare")).toBe("/session/ethics-ai-healthcare");
     expect(routes.sessionFight("ethics-ai-healthcare", "liability-gap")).toBe(
       "/session/ethics-ai-healthcare/fight/liability-gap",
@@ -21,6 +22,7 @@ describe("routes", () => {
     expect(routes.instructorProjector("ethics-ai-healthcare")).toBe(
       "/instructor/session/ethics-ai-healthcare/projector",
     );
+    expect(routes.instructorAdminDemo()).toBe("/instructor/admin/demo");
   });
 
   it("trims accidental slashes from route segments", () => {

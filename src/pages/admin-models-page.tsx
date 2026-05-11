@@ -15,6 +15,13 @@ export function AdminModelsPage() {
       description="Manage LLM providers, model assignments, and pricing metadata."
     >
       <div className="grid gap-4">
+        <Card title="Status">
+          <p className="text-sm text-[var(--c-muted)]">
+            This screen is currently read-only. Model settings are loaded from Convex, but editing
+            and reassignment flows are not exposed here yet.
+          </p>
+        </Card>
+
         {models === undefined && <LoadingState label="Loading model settings..." />}
 
         {models && models.length === 0 && (
@@ -43,8 +50,8 @@ export function AdminModelsPage() {
                         {model.model}
                       </p>
                       <p className="text-[10px] text-[var(--c-muted)]">
-                        {model.provider} · {model.enabled ? "enabled" : "disabled"}
-                        {model.features.length > 0 && ` · ${model.features.join(", ")}`}
+                        {model.provider} - {model.enabled ? "enabled" : "disabled"}
+                        {model.features.length > 0 && ` - ${model.features.join(", ")}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

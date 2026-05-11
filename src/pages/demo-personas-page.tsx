@@ -1,8 +1,9 @@
 import { ArrowLeft, ArrowRight, UserCircle } from "@phosphor-icons/react";
+import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/state/loading-state";
 import { ErrorState } from "@/components/state/error-state";
@@ -10,6 +11,7 @@ import { setDemoClientKey, storeParticipant } from "@/lib/client-identity";
 import { routes } from "@/lib/routes";
 
 export function DemoPersonasPage() {
+  const navigate = useNavigate();
   const data = useQuery(api.demo.listDemoPersonas);
 
   if (data === undefined) {
@@ -33,18 +35,17 @@ export function DemoPersonasPage() {
 
   const { session, personas } = data;
 
-  function handlePickPersona(persona: (typeof personas)[number]) {
+  async function handlePickPersona(persona: (typeof personas)[number]) {
     setDemoClientKey(persona.demoClientKey);
     storeParticipant({
       sessionSlug: session.slug,
       participantSlug: persona.participantSlug,
       nickname: persona.nickname,
     });
-  }
-
-  function personaHref(persona: (typeof personas)[number]) {
-    const params = new URLSearchParams({ demoClientKey: persona.demoClientKey });
-    return `${routes.session(session.slug)}?${params.toString()}`;
+    await navigate({
+      to: routes.session(session.slug),
+      search: { demoClientKey: persona.demoClientKey },
+    });
   }
 
   return (
@@ -104,23 +105,25 @@ export function DemoPersonasPage() {
                   </Badge>
                 </div>
               </div>
-              <ButtonLink
-                href={personaHref(p)}
+              <Button
                 size="sm"
                 className="mt-3 w-full"
                 icon={<ArrowRight size={12} />}
-                onClick={() => handlePickPersona(p)}
+                onClick={() => void handlePickPersona(p)}
               >
                 Enter as {p.nickname}
-              </ButtonLink>
+              </Button>
             </Card>
           ))}
         </div>
 
         <div className="border-t border-[var(--c-hairline)] pt-4">
-          <ButtonLink href={routes.join(session.joinCode)} variant="secondary">
+          <Button
+            variant="secondary"
+            onClick={() => void navigate({ to: routes.join(session.joinCode) })}
+          >
             Join as yourself instead
-          </ButtonLink>
+          </Button>
         </div>
       </div>
     </main>

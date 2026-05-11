@@ -10,6 +10,12 @@ import { routes } from "@/lib/routes";
 export function ProjectorPage() {
   const { sessionSlug } = useParams({ from: "/instructor/session/$sessionSlug/projector" });
   const session = useQuery(api.sessions.getBySlug, { sessionSlug });
+  const questionState = useQuery(api.sessionQuestions.listForSession, { sessionSlug });
+  const currentQuestionId = questionState?.currentQuestion?.id;
+  const categories = useQuery(
+    api.categoryManagement.listForSession,
+    currentQuestionId ? { sessionSlug, questionId: currentQuestionId } : { sessionSlug },
+  );
 
   if (session === undefined) {
     return (
@@ -40,6 +46,9 @@ export function ProjectorPage() {
       joinCode={session.joinCode}
       joinUrl={joinUrl}
       currentAct={session.currentAct}
+      currentQuestionTitle={questionState?.currentQuestion?.title ?? null}
+      currentQuestionPrompt={questionState?.currentQuestion?.prompt ?? null}
+      categoryNames={categories?.map((category) => category.name) ?? []}
       qrCode={<QRCodeSVG value={joinUrl} size={220} />}
     />
   );

@@ -7,6 +7,9 @@ export interface ProjectorShellProps {
   joinCode: string;
   joinUrl: string;
   currentAct: string;
+  currentQuestionTitle?: string | null;
+  currentQuestionPrompt?: string | null;
+  categoryNames?: string[];
   qrCode?: ReactNode;
 }
 
@@ -15,6 +18,9 @@ export function ProjectorShell({
   joinCode,
   joinUrl,
   currentAct,
+  currentQuestionTitle,
+  currentQuestionPrompt,
+  categoryNames,
   qrCode,
 }: ProjectorShellProps) {
   return (
@@ -30,11 +36,34 @@ export function ProjectorShell({
           ) : null}
         </section>
         <div className="grid gap-6 md:grid-cols-2">
-          <Card title="Top Categories" className="text-xl">
-            Categories appear after categorisation starts in Phase 03.
+          <Card title={currentQuestionTitle ?? "Current Question"} className="text-xl">
+            {currentQuestionPrompt ? (
+              <p className="text-base leading-relaxed text-[var(--c-body)]">
+                {currentQuestionPrompt}
+              </p>
+            ) : (
+              <p className="text-base text-[var(--c-muted)]">
+                No current question is active for this session yet.
+              </p>
+            )}
           </Card>
-          <Card title="Current Act" className="text-xl">
-            {currentAct}: live session state.
+          <Card title="Visible Categories" className="text-xl">
+            {categoryNames && categoryNames.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {categoryNames.map((categoryName) => (
+                  <Badge key={categoryName} tone="sky">
+                    {categoryName}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-base text-[var(--c-muted)]">
+                No active categories are visible for the current question yet.
+              </p>
+            )}
+          </Card>
+          <Card title="Session State" className="text-xl md:col-span-2">
+            <p className="text-base text-[var(--c-body)]">{currentAct}: live session state.</p>
           </Card>
         </div>
       </div>

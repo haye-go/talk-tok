@@ -7,10 +7,12 @@ Routes must use readable words and short codes. Do not expose Convex document ID
 | Route                                        | Surface     | Purpose                                               |
 | -------------------------------------------- | ----------- | ----------------------------------------------------- |
 | `/`                                          | Public      | Entry and foundation preview                          |
+| `/join`                                      | Participant | Join-code entry screen                                |
 | `/join/:sessionCode`                         | Participant | QR/session-code join flow                             |
 | `/session/:sessionSlug`                      | Participant | Main participant session shell                        |
 | `/session/:sessionSlug/fight/:fightSlug`     | Participant | Fight Me thread                                       |
 | `/session/:sessionSlug/review`               | Participant | End-of-session personal review                        |
+| `/demo/personas`                             | Public      | Demo persona chooser                                  |
 | `/instructor`                                | Instructor  | Instructor session dashboard                          |
 | `/instructor/session/new`                    | Instructor  | Create/edit session shell                             |
 | `/instructor/session/:sessionSlug`           | Instructor  | Live command center                                   |
@@ -21,6 +23,7 @@ Routes must use readable words and short codes. Do not expose Convex document ID
 | `/instructor/admin/retrieval`                | Admin       | Retrieval/context controls                            |
 | `/instructor/admin/protection`               | Admin       | Rate limits, moderation, telemetry, budget guardrails |
 | `/instructor/admin/observability`            | Admin       | LLM usage, costs, latency, errors                     |
+| `/instructor/admin/demo`                     | Admin       | Demo seed and reset controls                          |
 
 ## Implementation Notes
 

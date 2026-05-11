@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { QrCode } from "@phosphor-icons/react";
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ErrorState } from "@/components/state/error-state";
@@ -18,6 +18,7 @@ import { normalizeSessionCode } from "@/lib/session-slug";
 
 export function JoinPage() {
   const { sessionCode } = useParams({ from: "/join/$sessionCode" });
+  const navigate = useNavigate();
   const normalizedCode = normalizeSessionCode(sessionCode);
   const session = useQuery(api.sessions.getByJoinCode, { sessionCode: normalizedCode });
   const joinSession = useMutation(api.participants.join);
@@ -46,7 +47,7 @@ export function JoinPage() {
         nickname: result.participant.nickname,
       });
 
-      window.location.href = routes.session(result.session.slug);
+      await navigate({ to: routes.session(result.session.slug) });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not join the session.");
     } finally {

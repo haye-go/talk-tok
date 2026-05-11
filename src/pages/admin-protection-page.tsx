@@ -13,6 +13,13 @@ export function AdminProtectionPage() {
       description="Rate limits, moderation, telemetry, and budget guardrails."
     >
       <div className="grid gap-4">
+        <Card title="Status">
+          <p className="text-sm text-[var(--c-muted)]">
+            This screen is currently read-only. It reflects protection settings already in Convex,
+            but editing flows are not exposed here yet.
+          </p>
+        </Card>
+
         {settings === undefined && <LoadingState label="Loading protection settings..." />}
 
         {settings && settings.length === 0 && (
