@@ -495,6 +495,12 @@ export function InstructorSessionPage() {
   const reportBusy = generatingReports || isBusyStatus(latestReportJob?.status);
   const embeddingBusy = embeddingQueued || isBusyStatus(latestEmbeddingJob?.status);
   const argMapBusy = argMapQueued || isBusyStatus(latestArgumentMapJob?.status);
+  const embeddingCount = semanticStatus?.embeddingCount ?? 0;
+  const noveltyCount = semanticStatus?.noveltyCount ?? 0;
+  const argumentLinkCount = semanticStatus?.argumentLinkCount ?? 0;
+  const hasEmbeddings = embeddingCount > 0;
+  const hasNoveltySignals = noveltyCount > 0;
+  const hasArgumentLinks = argumentLinkCount > 0;
   const studentActivity = activity.filter((event) => event.actorType === "participant");
   const aiJobStatusItems: AiJobStatusItem[] = [
     {
@@ -1187,60 +1193,76 @@ export function InstructorSessionPage() {
             </div>
           </Card>
 
-          {/* Semantic Analysis */}
-          <Card title="Semantic Analysis">
-            {semanticStatus && (
-              <div className="mb-3 grid grid-cols-3 gap-2">
-                <MetricTile label="Embeddings" value={String(semanticStatus.embeddingCount)} />
-                <MetricTile label="Signals" value={String(semanticStatus.signalCount)} />
-                <MetricTile label="Arg Links" value={String(semanticStatus.argumentLinkCount)} />
+          <div className="grid gap-3 md:grid-cols-2">
+            <Card title="Embeddings">
+              {semanticStatus && (
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <MetricTile label="Stored" value={String(embeddingCount)} />
+                  <MetricTile label="Submissions" value={String(semanticStatus.submissionCount)} />
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={handleQueueEmbeddings}
+                  disabled={embeddingBusy}
+                >
+                  {embeddingBusy ? (
+                    <>
+                      <CircleNotch size={12} className="mr-1 inline animate-spin" />
+                      Queued
+                    </>
+                  ) : (
+                    "Generate Embeddings"
+                  )}
+                </Button>
               </div>
-            )}
+            </Card>
 
-            {semanticStatus?.readiness.missingPrerequisites.length
-              ? semanticStatus.readiness.missingPrerequisites.length > 0 && (
-                  <div className="mb-3 rounded-md bg-[var(--c-surface-soft)] p-2">
-                    <p className="text-[10px] font-medium text-[var(--c-sig-mustard)]">
-                      Missing prerequisites:
-                    </p>
-                    {semanticStatus.readiness.missingPrerequisites.map((p) => (
-                      <p key={p} className="text-[10px] text-[var(--c-muted)]">
-                        • {p}
-                      </p>
-                    ))}
-                  </div>
-                )
-              : null}
-
-            <div className="flex gap-2">
+            <Card title="Novelty Signals">
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <MetricTile label="Signals" value={String(noveltyCount)} />
+                <MetricTile label="Ready" value={hasNoveltySignals ? "Yes" : "No"} />
+              </div>
+              <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
+                Refresh recomputes novelty from existing embeddings. It does not create missing
+                embeddings.
+              </p>
+              {!hasEmbeddings ? (
+                <p className="text-xs text-[var(--c-sig-mustard)]">
+                  Generate embeddings before refreshing novelty signals.
+                </p>
+              ) : null}
               <Button
                 size="sm"
                 variant="secondary"
-                className="flex-1"
-                onClick={handleQueueEmbeddings}
-                disabled={embeddingBusy}
-              >
-                {embeddingBusy ? (
-                  <>
-                    <CircleNotch size={12} className="mr-1 inline animate-spin" />
-                    Queued
-                  </>
-                ) : (
-                  "Generate Embeddings"
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="flex-1"
+                className="mt-3 w-full"
                 onClick={() => void refreshSignals({ sessionSlug, questionId: activeQuestionId })}
+                disabled={!hasEmbeddings}
               >
                 Refresh Signals
               </Button>
+            </Card>
+
+            <Card title="Argument Map Readiness">
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <MetricTile label="Links" value={String(argumentLinkCount)} />
+                <MetricTile label="Ready" value={hasArgumentLinks ? "Yes" : "No"} />
+              </div>
+              <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
+                Argument links are generated from responses, categories, and synthesis artifacts for
+                the current question.
+              </p>
+              {latestArgumentMapJob?.error ? (
+                <p className="text-xs text-[var(--c-error)]">{latestArgumentMapJob.error}</p>
+              ) : null}
               <Button
                 size="sm"
                 variant="secondary"
-                className="flex-1"
+                className="mt-3 w-full"
                 onClick={handleGenerateArgMap}
                 disabled={argMapBusy}
               >
@@ -1250,11 +1272,25 @@ export function InstructorSessionPage() {
                     Queued
                   </>
                 ) : (
-                  "Argument Map"
+                  "Generate Argument Map"
                 )}
               </Button>
-            </div>
-          </Card>
+            </Card>
+
+            <Card title="Category Drift Readiness">
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <MetricTile label="Slices" value={String(categoryDrift?.slices.length ?? 0)} />
+                <MetricTile
+                  label="Transitions"
+                  value={String(categoryDrift?.transitions.length ?? 0)}
+                />
+              </div>
+              <p className="text-xs leading-5 text-[var(--c-muted)]">
+                Drift is deterministic analysis over categorised initial and follow-up responses. It
+                becomes useful after categorisation and follow-up rounds exist.
+              </p>
+            </Card>
+          </div>
 
           {/* Novelty Radar */}
           {semanticStatus?.readiness.canShowNoveltyRadar && noveltyRadar && (
