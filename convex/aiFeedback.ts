@@ -162,6 +162,7 @@ export const enqueueForSubmission = mutation({
     const now = Date.now();
     const isRetry = Boolean(existing && existing.status === "error");
     const tone = args.tone ?? session.critiqueToneDefault;
+    const questionId = submission.questionId;
     const feedbackId =
       existing?._id ??
       (await ctx.db.insert("submissionFeedback", {
@@ -185,6 +186,7 @@ export const enqueueForSubmission = mutation({
 
     const jobId = await ctx.db.insert("aiJobs", {
       sessionId: session._id,
+      questionId,
       submissionId: submission._id,
       type: "feedback",
       status: "queued",
@@ -194,6 +196,7 @@ export const enqueueForSubmission = mutation({
     });
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId,
       actorType: "participant",
       actorParticipantId: participant._id,
       action: isRetry ? "feedback.retry_queued" : "feedback.queued",
@@ -249,6 +252,8 @@ export const retryFailed = mutation({
     }
 
     const now = Date.now();
+    const submission = await ctx.db.get(args.submissionId);
+    const questionId = submission?.questionId;
     await ctx.db.patch(feedback._id, {
       status: "queued",
       tone: args.tone ?? feedback.tone,
@@ -258,6 +263,7 @@ export const retryFailed = mutation({
 
     const jobId = await ctx.db.insert("aiJobs", {
       sessionId: session._id,
+      questionId,
       submissionId: args.submissionId,
       type: "feedback",
       status: "queued",
@@ -267,6 +273,7 @@ export const retryFailed = mutation({
     });
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId,
       actorType: "participant",
       actorParticipantId: participant._id,
       action: "feedback.retry_queued",
@@ -331,7 +338,21 @@ export const loadFeedbackContext = internalQuery({
       throw new Error("Feedback context is incomplete.");
     }
 
-    return { feedback, session, submission };
+    const questionId = submission.questionId;
+    const question = questionId ? await ctx.db.get(questionId) : null;
+    const baseline =
+      questionId && question?.sessionId === session._id
+        ? await ctx.db
+            .query("questionBaselines")
+            .withIndex("by_questionId_and_status", (q) =>
+              q.eq("questionId", questionId).eq("status", "ready"),
+            )
+            .order("desc")
+            .take(1)
+            .then((rows) => rows[0] ?? null)
+        : null;
+
+    return { feedback, session, submission, question, baseline };
   },
 });
 
@@ -415,17 +436,26 @@ export const generateForFeedback = internalAction({
     await ctx.runMutation(internal.aiFeedback.markProcessing, args);
 
     try {
-      const { feedback, session, submission } = await ctx.runQuery(
+      const { feedback, session, submission, question, baseline } = await ctx.runQuery(
         internal.aiFeedback.loadFeedbackContext,
         { feedbackId: args.feedbackId },
       );
       const result = await ctx.runAction(internal.llm.runJson, {
         sessionId: session._id,
+        questionId: submission.questionId,
         feature: "feedback",
         promptKey: "feedback.private.v1",
         variables: {
           sessionTitle: session.title,
-          openingPrompt: session.openingPrompt,
+          openingPrompt: question?.prompt ?? session.openingPrompt,
+          baselineJson: JSON.stringify(
+            baseline
+              ? {
+                  summary: baseline.summary,
+                  baselineText: baseline.baselineText,
+                }
+              : null,
+          ),
           tone: feedback.tone,
           wordCount: submission.wordCount,
           inputTelemetry: formatInputTelemetry(submission),

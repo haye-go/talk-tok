@@ -32,6 +32,8 @@ import type * as personalReports from "../personalReports.js";
 import type * as positionShifts from "../positionShifts.js";
 import type * as promptTemplates from "../promptTemplates.js";
 import type * as protection from "../protection.js";
+import type * as questionBaselines from "../questionBaselines.js";
+import type * as questionScope from "../questionScope.js";
 import type * as reactions from "../reactions.js";
 import type * as recategorisation from "../recategorisation.js";
 import type * as semantic from "../semantic.js";
@@ -73,6 +75,8 @@ declare const fullApi: ApiFromModules<{
   positionShifts: typeof positionShifts;
   promptTemplates: typeof promptTemplates;
   protection: typeof protection;
+  questionBaselines: typeof questionBaselines;
+  questionScope: typeof questionScope;
   reactions: typeof reactions;
   recategorisation: typeof recategorisation;
   semantic: typeof semantic;

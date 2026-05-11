@@ -11,6 +11,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
+import { resolveQuestionForRead, resolveQuestionIdForWrite } from "./questionScope";
 
 type EntityType = Doc<"argumentLinks">["sourceEntityType"];
 type LinkType = Doc<"argumentLinks">["linkType"];
@@ -133,6 +134,7 @@ function artifactText(artifact: Doc<"synthesisArtifacts">) {
 function toLink(row: Doc<"argumentLinks">) {
   return {
     id: row._id,
+    questionId: row.questionId,
     sourceEntityType: row.sourceEntityType,
     sourceEntityId: row.sourceEntityId,
     targetEntityType: row.targetEntityType,
@@ -169,6 +171,7 @@ function nodeKey(entityType: EntityType, entityId: string) {
 export const generateForSession = mutation({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     refreshExisting: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -178,8 +181,10 @@ export const generateForSession = mutation({
       throw new Error("Session not found.");
     }
 
+    const questionId = await resolveQuestionIdForWrite(ctx, session, args.questionId);
+
     await rateLimiter.limit(ctx, "heavyAiAction", {
-      key: `argument-map:${session._id}`,
+      key: `argument-map:${session._id}:${questionId}`,
       throws: true,
     });
 
@@ -195,6 +200,7 @@ export const generateForSession = mutation({
     const now = Date.now();
     const jobId = await ctx.db.insert("aiJobs", {
       sessionId: session._id,
+      questionId,
       type: "argument_map",
       status: "queued",
       requestedBy: "instructor",
@@ -204,6 +210,7 @@ export const generateForSession = mutation({
 
     await ctx.db.insert("auditEvents", {
       sessionId: session._id,
+      questionId,
       actorType: "instructor",
       action: "argument_map.generate_requested",
       targetType: "aiJob",
@@ -215,7 +222,7 @@ export const generateForSession = mutation({
     await aiWorkpool.enqueueAction(
       ctx,
       internal.argumentMap.runGenerateForSession,
-      { jobId, refreshExisting: Boolean(args.refreshExisting) },
+      { jobId, refreshExisting: args.refreshExisting ?? true },
       { name: "argumentMap.runGenerateForSession", retry: true },
     );
 
@@ -240,26 +247,48 @@ export const loadArgumentContext = internalQuery({
       throw new Error("Session not found for argument map job.");
     }
 
-    const [categories, submissions, artifacts, assignments] = await Promise.all([
-      ctx.db
-        .query("categories")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(CATEGORY_LIMIT),
-      ctx.db
-        .query("submissions")
-        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-        .order("asc")
-        .take(SUBMISSION_LIMIT),
-      ctx.db
-        .query("synthesisArtifacts")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .order("desc")
-        .take(ARTIFACT_LIMIT),
-      ctx.db
-        .query("submissionCategories")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(SUBMISSION_LIMIT * 2),
-    ]);
+    const question = job.questionId ? await ctx.db.get(job.questionId) : null;
+    const [categories, submissions, artifacts, assignments] = job.questionId
+      ? await Promise.all([
+          ctx.db
+            .query("categories")
+            .withIndex("by_questionId", (q) => q.eq("questionId", job.questionId))
+            .take(CATEGORY_LIMIT),
+          ctx.db
+            .query("submissions")
+            .withIndex("by_questionId_and_createdAt", (q) => q.eq("questionId", job.questionId))
+            .order("asc")
+            .take(SUBMISSION_LIMIT),
+          ctx.db
+            .query("synthesisArtifacts")
+            .withIndex("by_questionId", (q) => q.eq("questionId", job.questionId))
+            .order("desc")
+            .take(ARTIFACT_LIMIT),
+          ctx.db
+            .query("submissionCategories")
+            .withIndex("by_questionId", (q) => q.eq("questionId", job.questionId))
+            .take(SUBMISSION_LIMIT * 2),
+        ])
+      : await Promise.all([
+          ctx.db
+            .query("categories")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(CATEGORY_LIMIT),
+          ctx.db
+            .query("submissions")
+            .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+            .order("asc")
+            .take(SUBMISSION_LIMIT),
+          ctx.db
+            .query("synthesisArtifacts")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(ARTIFACT_LIMIT),
+          ctx.db
+            .query("submissionCategories")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(SUBMISSION_LIMIT * 2),
+        ]);
     const categoryBySubmission = new Map(
       assignments.map((assignment) => [assignment.submissionId, assignment.categoryId]),
     );
@@ -269,7 +298,7 @@ export const loadArgumentContext = internalQuery({
       session: {
         id: session._id,
         title: session.title,
-        openingPrompt: session.openingPrompt,
+        openingPrompt: question?.prompt ?? session.openingPrompt,
       },
       categories: categories
         .filter((category) => category.status === "active")
@@ -341,19 +370,25 @@ export const markJobError = internalMutation({
 export const applyGeneratedLinks = internalMutation({
   args: {
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     jobId: v.id("aiJobs"),
     refreshExisting: v.boolean(),
     links: v.array(generatedLinkValidator),
   },
   handler: async (ctx, args) => {
     if (args.refreshExisting) {
-      const existing = await ctx.db
-        .query("argumentLinks")
-        .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
-        .take(LINK_LIMIT);
+      const existing = args.questionId
+        ? await ctx.db
+            .query("argumentLinks")
+            .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
+            .take(LINK_LIMIT)
+        : await ctx.db
+            .query("argumentLinks")
+            .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+            .take(LINK_LIMIT);
 
       for (const link of existing) {
-        if (link.source === "llm") {
+        if (link.sessionId === args.sessionId && link.source === "llm") {
           await ctx.db.delete(link._id);
         }
       }
@@ -365,6 +400,7 @@ export const applyGeneratedLinks = internalMutation({
     for (const link of args.links.slice(0, LINK_LIMIT)) {
       await ctx.db.insert("argumentLinks", {
         sessionId: args.sessionId,
+        questionId: args.questionId,
         sourceEntityType: link.sourceEntityType,
         sourceEntityId: link.sourceEntityId,
         targetEntityType: link.targetEntityType,
@@ -410,6 +446,7 @@ export const runGenerateForSession = internalAction({
 
       const result = await ctx.runAction(internal.llm.runJson, {
         sessionId: context.job.sessionId,
+        questionId: context.job.questionId,
         feature: "argument_map",
         promptKey: "argument_map.session.v1",
         variables: {
@@ -456,6 +493,7 @@ export const runGenerateForSession = internalAction({
 
       const applied = await ctx.runMutation(internal.argumentMap.applyGeneratedLinks, {
         sessionId: context.job.sessionId,
+        questionId: context.job.questionId,
         jobId: args.jobId,
         refreshExisting: args.refreshExisting,
         links,
@@ -477,6 +515,7 @@ export const runGenerateForSession = internalAction({
 export const listLinksForSession = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
@@ -485,19 +524,28 @@ export const listLinksForSession = query({
       return null;
     }
 
-    const rows = await ctx.db
-      .query("argumentLinks")
-      .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-      .order("desc")
-      .take(LINK_LIMIT);
+    const question = await resolveQuestionForRead(ctx, session, args.questionId);
+    const rows =
+      args.questionId && question
+        ? await ctx.db
+            .query("argumentLinks")
+            .withIndex("by_questionId", (q) => q.eq("questionId", question._id))
+            .order("desc")
+            .take(LINK_LIMIT)
+        : await ctx.db
+            .query("argumentLinks")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(LINK_LIMIT);
 
-    return rows.map(toLink);
+    return rows.filter((row) => row.sessionId === session._id).map(toLink);
   },
 });
 
 export const getGraph = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
@@ -506,35 +554,65 @@ export const getGraph = query({
       return null;
     }
 
+    const question = await resolveQuestionForRead(ctx, session, args.questionId);
+    const questionId = args.questionId ? question?._id : undefined;
     const [categories, submissions, participants, artifacts, assignments, links] =
       await Promise.all([
-        ctx.db
-          .query("categories")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .take(CATEGORY_LIMIT),
-        ctx.db
-          .query("submissions")
-          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(SUBMISSION_LIMIT),
+        questionId
+          ? ctx.db
+              .query("categories")
+              .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+              .take(CATEGORY_LIMIT)
+          : ctx.db
+              .query("categories")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .take(CATEGORY_LIMIT),
+        questionId
+          ? ctx.db
+              .query("submissions")
+              .withIndex("by_questionId_and_createdAt", (q) => q.eq("questionId", questionId))
+              .order("desc")
+              .take(SUBMISSION_LIMIT)
+          : ctx.db
+              .query("submissions")
+              .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+              .order("desc")
+              .take(SUBMISSION_LIMIT),
         ctx.db
           .query("participants")
           .withIndex("by_session", (q) => q.eq("sessionId", session._id))
           .take(SUBMISSION_LIMIT),
-        ctx.db
-          .query("synthesisArtifacts")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(ARTIFACT_LIMIT),
-        ctx.db
-          .query("submissionCategories")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .take(SUBMISSION_LIMIT * 2),
-        ctx.db
-          .query("argumentLinks")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(LINK_LIMIT),
+        questionId
+          ? ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+              .order("desc")
+              .take(ARTIFACT_LIMIT)
+          : ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .order("desc")
+              .take(ARTIFACT_LIMIT),
+        questionId
+          ? ctx.db
+              .query("submissionCategories")
+              .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+              .take(SUBMISSION_LIMIT * 2)
+          : ctx.db
+              .query("submissionCategories")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .take(SUBMISSION_LIMIT * 2),
+        questionId
+          ? ctx.db
+              .query("argumentLinks")
+              .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+              .order("desc")
+              .take(LINK_LIMIT)
+          : ctx.db
+              .query("argumentLinks")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .order("desc")
+              .take(LINK_LIMIT),
       ]);
     const participantsById = new Map(
       participants.map((participant) => [participant._id, participant]),
@@ -593,6 +671,7 @@ export const getGraph = query({
 export const getVisualizationGraph = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
@@ -601,35 +680,65 @@ export const getVisualizationGraph = query({
       return null;
     }
 
+    const question = await resolveQuestionForRead(ctx, session, args.questionId);
+    const questionId = args.questionId ? question?._id : undefined;
     const [categories, submissions, participants, artifacts, assignments, links, reactions] =
       await Promise.all([
-        ctx.db
-          .query("categories")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .take(CATEGORY_LIMIT),
-        ctx.db
-          .query("submissions")
-          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(SUBMISSION_LIMIT),
+        questionId
+          ? ctx.db
+              .query("categories")
+              .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+              .take(CATEGORY_LIMIT)
+          : ctx.db
+              .query("categories")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .take(CATEGORY_LIMIT),
+        questionId
+          ? ctx.db
+              .query("submissions")
+              .withIndex("by_questionId_and_createdAt", (q) => q.eq("questionId", questionId))
+              .order("desc")
+              .take(SUBMISSION_LIMIT)
+          : ctx.db
+              .query("submissions")
+              .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+              .order("desc")
+              .take(SUBMISSION_LIMIT),
         ctx.db
           .query("participants")
           .withIndex("by_session", (q) => q.eq("sessionId", session._id))
           .take(SUBMISSION_LIMIT),
-        ctx.db
-          .query("synthesisArtifacts")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(ARTIFACT_LIMIT),
-        ctx.db
-          .query("submissionCategories")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .take(SUBMISSION_LIMIT * 2),
-        ctx.db
-          .query("argumentLinks")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(LINK_LIMIT),
+        questionId
+          ? ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+              .order("desc")
+              .take(ARTIFACT_LIMIT)
+          : ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .order("desc")
+              .take(ARTIFACT_LIMIT),
+        questionId
+          ? ctx.db
+              .query("submissionCategories")
+              .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+              .take(SUBMISSION_LIMIT * 2)
+          : ctx.db
+              .query("submissionCategories")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .take(SUBMISSION_LIMIT * 2),
+        questionId
+          ? ctx.db
+              .query("argumentLinks")
+              .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+              .order("desc")
+              .take(LINK_LIMIT)
+          : ctx.db
+              .query("argumentLinks")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .order("desc")
+              .take(LINK_LIMIT),
         ctx.db
           .query("reactions")
           .withIndex("by_session", (q) => q.eq("sessionId", session._id))

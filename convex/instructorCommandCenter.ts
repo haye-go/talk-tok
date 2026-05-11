@@ -23,6 +23,7 @@ type PresenceState = "typing" | "submitted" | "idle" | "offline";
 type InputPattern = "composed_gradually" | "likely_pasted" | "mixed" | "unknown";
 type JobStatus = "queued" | "processing" | "success" | "error";
 type JobType =
+  | "question_baseline"
   | "feedback"
   | "categorisation"
   | "moderation"
@@ -121,6 +122,7 @@ function emptyStatusCounts(): Record<JobStatus, number> {
 
 function emptyJobSummary(): Record<JobType, Record<JobStatus, number>> {
   return {
+    question_baseline: emptyStatusCounts(),
     feedback: emptyStatusCounts(),
     categorisation: emptyStatusCounts(),
     moderation: emptyStatusCounts(),

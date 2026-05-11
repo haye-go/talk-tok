@@ -36,6 +36,7 @@ const DEFAULT_MODELS = [
       "fight_debrief",
       "personal_report",
       "argument_map",
+      "question_baseline",
     ],
     inputCostPerMillion: 2,
     cachedInputCostPerMillion: 0.5,

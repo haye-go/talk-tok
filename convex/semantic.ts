@@ -11,6 +11,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
+import { resolveQuestionForRead, resolveQuestionIdForWrite } from "./questionScope";
 
 type EntityType = Doc<"semanticEmbeddings">["entityType"];
 type SemanticTarget = {
@@ -102,6 +103,7 @@ function toEmbedding(row: Doc<"semanticEmbeddings">) {
   return {
     id: row._id,
     sessionId: row.sessionId,
+    questionId: row.questionId,
     entityType: row.entityType,
     entityId: row.entityId,
     contentHash: row.contentHash,
@@ -117,6 +119,7 @@ function toSignal(row: Doc<"semanticSignals">) {
   return {
     id: row._id,
     sessionId: row.sessionId,
+    questionId: row.questionId,
     submissionId: row.submissionId,
     participantId: row.participantId,
     categoryId: row.categoryId,
@@ -157,6 +160,7 @@ function average(values: number[]) {
 export const queueEmbeddingsForSession = mutation({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     entityTypes: v.optional(v.array(entityTypeValidator)),
   },
   handler: async (ctx, args) => {
@@ -166,8 +170,10 @@ export const queueEmbeddingsForSession = mutation({
       throw new Error("Session not found.");
     }
 
+    const questionId = await resolveQuestionIdForWrite(ctx, session, args.questionId);
+
     await rateLimiter.limit(ctx, "heavyAiAction", {
-      key: `embedding:${session._id}`,
+      key: `embedding:${session._id}:${questionId}`,
       throws: true,
     });
 
@@ -184,6 +190,7 @@ export const queueEmbeddingsForSession = mutation({
     const entityTypes = args.entityTypes ?? ["submission", "synthesisArtifact", "category"];
     const jobId = await ctx.db.insert("semanticEmbeddingJobs", {
       sessionId: session._id,
+      questionId,
       status: "queued",
       requestedBy: "instructor",
       entityTypes,
@@ -219,14 +226,21 @@ export const loadEmbeddingJobContext = internalQuery({
       throw new Error("Session not found for semantic embedding job.");
     }
 
+    const question = job.questionId ? await ctx.db.get(job.questionId) : null;
     const targets: SemanticTarget[] = [];
 
     if (job.entityTypes.includes("submission")) {
-      const submissions = await ctx.db
-        .query("submissions")
-        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-        .order("asc")
-        .take(ENTITY_LIMIT);
+      const submissions = job.questionId
+        ? await ctx.db
+            .query("submissions")
+            .withIndex("by_questionId_and_createdAt", (q) => q.eq("questionId", job.questionId))
+            .order("asc")
+            .take(ENTITY_LIMIT)
+        : await ctx.db
+            .query("submissions")
+            .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+            .order("asc")
+            .take(ENTITY_LIMIT);
 
       for (const submission of submissions) {
         if (submission.kind === "fight_me_turn") {
@@ -242,11 +256,17 @@ export const loadEmbeddingJobContext = internalQuery({
     }
 
     if (job.entityTypes.includes("synthesisArtifact")) {
-      const artifacts = await ctx.db
-        .query("synthesisArtifacts")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .order("desc")
-        .take(ENTITY_LIMIT);
+      const artifacts = job.questionId
+        ? await ctx.db
+            .query("synthesisArtifacts")
+            .withIndex("by_questionId", (q) => q.eq("questionId", job.questionId))
+            .order("desc")
+            .take(ENTITY_LIMIT)
+        : await ctx.db
+            .query("synthesisArtifacts")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(ENTITY_LIMIT);
 
       for (const artifact of artifacts) {
         targets.push({
@@ -258,10 +278,15 @@ export const loadEmbeddingJobContext = internalQuery({
     }
 
     if (job.entityTypes.includes("category")) {
-      const categories = await ctx.db
-        .query("categories")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(ENTITY_LIMIT);
+      const categories = job.questionId
+        ? await ctx.db
+            .query("categories")
+            .withIndex("by_questionId", (q) => q.eq("questionId", job.questionId))
+            .take(ENTITY_LIMIT)
+        : await ctx.db
+            .query("categories")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(ENTITY_LIMIT);
 
       for (const category of categories) {
         targets.push({
@@ -272,7 +297,7 @@ export const loadEmbeddingJobContext = internalQuery({
       }
     }
 
-    return { job, session, targets: targets.filter((target) => target.text.trim()) };
+    return { job, session, question, targets: targets.filter((target) => target.text.trim()) };
   },
 });
 
@@ -294,6 +319,7 @@ export const markEmbeddingJobProcessing = internalMutation({
 export const upsertEmbedding = internalMutation({
   args: {
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     entityType: entityTypeValidator,
     entityId: v.string(),
     contentHash: v.string(),
@@ -303,7 +329,7 @@ export const upsertEmbedding = internalMutation({
     embedding: v.array(v.number()),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db
+    const rows = await ctx.db
       .query("semanticEmbeddings")
       .withIndex("by_entity_and_hash", (q) =>
         q
@@ -311,15 +337,42 @@ export const upsertEmbedding = internalMutation({
           .eq("entityId", args.entityId)
           .eq("contentHash", args.contentHash),
       )
-      .unique();
+      .take(10);
+    const existing = rows.find(
+      (row) =>
+        row.sessionId === args.sessionId &&
+        (!args.questionId || !row.questionId || row.questionId === args.questionId),
+    );
 
     if (existing) {
-      await ctx.db.patch(existing._id, { updatedAt: Date.now() });
+      await ctx.db.patch(existing._id, {
+        questionId: existing.questionId ?? args.questionId,
+        updatedAt: Date.now(),
+      });
       return existing._id;
+    }
+
+    if (args.entityType === "category" || args.entityType === "synthesisArtifact") {
+      const staleRows = await ctx.db
+        .query("semanticEmbeddings")
+        .withIndex("by_entity", (q) =>
+          q.eq("entityType", args.entityType).eq("entityId", args.entityId),
+        )
+        .take(20);
+
+      for (const staleRow of staleRows) {
+        if (
+          staleRow.sessionId === args.sessionId &&
+          (!args.questionId || !staleRow.questionId || staleRow.questionId === args.questionId)
+        ) {
+          await ctx.db.delete(staleRow._id);
+        }
+      }
     }
 
     return await ctx.db.insert("semanticEmbeddings", {
       sessionId: args.sessionId,
+      questionId: args.questionId,
       entityType: args.entityType,
       entityId: args.entityId,
       contentHash: args.contentHash,
@@ -384,11 +437,13 @@ export const runEmbeddingJob = internalAction({
         const contentHash = await hashText(target.text);
         const result = await ctx.runAction(internal.llm.embedText, {
           sessionId: session._id,
+          questionId: job.questionId,
           text: target.text.slice(0, 8000),
         });
 
         await ctx.runMutation(internal.semantic.upsertEmbedding, {
           sessionId: session._id,
+          questionId: job.questionId,
           entityType: target.entityType,
           entityId: target.entityId,
           contentHash,
@@ -400,7 +455,10 @@ export const runEmbeddingJob = internalAction({
         progressDone += 1;
       }
 
-      await ctx.runMutation(internal.semantic.refreshNoveltySignals, { sessionId: session._id });
+      await ctx.runMutation(internal.semantic.refreshNoveltySignals, {
+        sessionId: session._id,
+        questionId: job.questionId,
+      });
       await ctx.runMutation(internal.semantic.markEmbeddingJobSuccess, {
         jobId: job._id,
         progressDone,
@@ -418,20 +476,35 @@ export const runEmbeddingJob = internalAction({
 export const refreshNoveltySignals = internalMutation({
   args: {
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
-    const embeddings = await ctx.db
-      .query("semanticEmbeddings")
-      .withIndex("by_session_and_entity_type", (q) =>
-        q.eq("sessionId", args.sessionId).eq("entityType", "submission"),
-      )
-      .take(ENTITY_LIMIT);
-    const existing = await ctx.db
-      .query("semanticSignals")
-      .withIndex("by_session_and_signal_type", (q) =>
-        q.eq("sessionId", args.sessionId).eq("signalType", "novelty"),
-      )
-      .take(SIGNAL_LIMIT);
+    const embeddings = args.questionId
+      ? await ctx.db
+          .query("semanticEmbeddings")
+          .withIndex("by_questionId_and_entity_type", (q) =>
+            q.eq("questionId", args.questionId).eq("entityType", "submission"),
+          )
+          .take(ENTITY_LIMIT)
+      : await ctx.db
+          .query("semanticEmbeddings")
+          .withIndex("by_session_and_entity_type", (q) =>
+            q.eq("sessionId", args.sessionId).eq("entityType", "submission"),
+          )
+          .take(ENTITY_LIMIT);
+    const existing = args.questionId
+      ? await ctx.db
+          .query("semanticSignals")
+          .withIndex("by_questionId_and_signal_type", (q) =>
+            q.eq("questionId", args.questionId).eq("signalType", "novelty"),
+          )
+          .take(SIGNAL_LIMIT)
+      : await ctx.db
+          .query("semanticSignals")
+          .withIndex("by_session_and_signal_type", (q) =>
+            q.eq("sessionId", args.sessionId).eq("signalType", "novelty"),
+          )
+          .take(SIGNAL_LIMIT);
 
     for (const signal of existing) {
       await ctx.db.delete(signal._id);
@@ -460,6 +533,7 @@ export const refreshNoveltySignals = internalMutation({
 
       await ctx.db.insert("semanticSignals", {
         sessionId: args.sessionId,
+        questionId: args.questionId,
         submissionId: submission?._id,
         participantId: submission?.participantId,
         signalType: "novelty",
@@ -485,6 +559,7 @@ export const refreshNoveltySignals = internalMutation({
 export const listEmbeddingsForSession = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     entityType: v.optional(entityTypeValidator),
   },
   handler: async (ctx, args) => {
@@ -494,25 +569,39 @@ export const listEmbeddingsForSession = query({
       return null;
     }
 
-    const rows = args.entityType
-      ? await ctx.db
-          .query("semanticEmbeddings")
-          .withIndex("by_session_and_entity_type", (q) =>
-            q.eq("sessionId", session._id).eq("entityType", args.entityType!),
-          )
-          .take(EMBEDDING_LIMIT)
-      : await ctx.db
-          .query("semanticEmbeddings")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .take(EMBEDDING_LIMIT);
+    const rows =
+      args.questionId && args.entityType
+        ? await ctx.db
+            .query("semanticEmbeddings")
+            .withIndex("by_questionId_and_entity_type", (q) =>
+              q.eq("questionId", args.questionId).eq("entityType", args.entityType!),
+            )
+            .take(EMBEDDING_LIMIT)
+        : args.questionId
+          ? await ctx.db
+              .query("semanticEmbeddings")
+              .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
+              .take(EMBEDDING_LIMIT)
+          : args.entityType
+            ? await ctx.db
+                .query("semanticEmbeddings")
+                .withIndex("by_session_and_entity_type", (q) =>
+                  q.eq("sessionId", session._id).eq("entityType", args.entityType!),
+                )
+                .take(EMBEDDING_LIMIT)
+            : await ctx.db
+                .query("semanticEmbeddings")
+                .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+                .take(EMBEDDING_LIMIT);
 
-    return rows.map(toEmbedding);
+    return rows.filter((row) => row.sessionId === session._id).map(toEmbedding);
   },
 });
 
 export const getSemanticStatus = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
@@ -521,34 +610,65 @@ export const getSemanticStatus = query({
       return null;
     }
 
-    const [jobs, embeddings, signals, argumentLinks, aiJobs, submissions] = await Promise.all([
-      ctx.db
-        .query("semanticEmbeddingJobs")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .order("desc")
-        .take(20),
-      ctx.db
-        .query("semanticEmbeddings")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(EMBEDDING_LIMIT),
-      ctx.db
-        .query("semanticSignals")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(SIGNAL_LIMIT),
-      ctx.db
-        .query("argumentLinks")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(SIGNAL_LIMIT),
-      ctx.db
-        .query("aiJobs")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .order("desc")
-        .take(80),
-      ctx.db
-        .query("submissions")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(ENTITY_LIMIT),
-    ]);
+    const question = await resolveQuestionForRead(ctx, session, args.questionId);
+    const questionId = args.questionId ? question?._id : undefined;
+    const [jobs, embeddings, signals, argumentLinks, aiJobs, submissions] = questionId
+      ? await Promise.all([
+          ctx.db
+            .query("semanticEmbeddingJobs")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .order("desc")
+            .take(20),
+          ctx.db
+            .query("semanticEmbeddings")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .take(EMBEDDING_LIMIT),
+          ctx.db
+            .query("semanticSignals")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .take(SIGNAL_LIMIT),
+          ctx.db
+            .query("argumentLinks")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .take(SIGNAL_LIMIT),
+          ctx.db
+            .query("aiJobs")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .order("desc")
+            .take(80),
+          ctx.db
+            .query("submissions")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .take(ENTITY_LIMIT),
+        ])
+      : await Promise.all([
+          ctx.db
+            .query("semanticEmbeddingJobs")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(20),
+          ctx.db
+            .query("semanticEmbeddings")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(EMBEDDING_LIMIT),
+          ctx.db
+            .query("semanticSignals")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(SIGNAL_LIMIT),
+          ctx.db
+            .query("argumentLinks")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(SIGNAL_LIMIT),
+          ctx.db
+            .query("aiJobs")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(80),
+          ctx.db
+            .query("submissions")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(ENTITY_LIMIT),
+        ]);
     const latestArgumentMapJob = aiJobs.find((job) => job.type === "argument_map") ?? null;
     const missingPrerequisites = [
       embeddings.length === 0 ? "embeddings" : null,
@@ -586,6 +706,7 @@ export const getSemanticStatus = query({
 export const refreshSignalsForSession = mutation({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args): Promise<{ inserted: number }> => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
@@ -594,13 +715,16 @@ export const refreshSignalsForSession = mutation({
       throw new Error("Session not found.");
     }
 
+    const question = await resolveQuestionForRead(ctx, session, args.questionId);
+
     await rateLimiter.limit(ctx, "heavyAiAction", {
-      key: `semantic-refresh:${session._id}`,
+      key: `semantic-refresh:${session._id}:${question?._id ?? "session"}`,
       throws: true,
     });
 
     return await ctx.runMutation(internal.semantic.refreshNoveltySignals, {
       sessionId: session._id,
+      questionId: question?._id,
     });
   },
 });
@@ -608,6 +732,7 @@ export const refreshSignalsForSession = mutation({
 export const getNoveltyRadar = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
@@ -616,31 +741,57 @@ export const getNoveltyRadar = query({
       return null;
     }
 
+    const question = await resolveQuestionForRead(ctx, session, args.questionId);
+    const questionId = args.questionId ? question?._id : undefined;
     const [signals, submissions, participants, categories, assignments] = await Promise.all([
-      ctx.db
-        .query("semanticSignals")
-        .withIndex("by_session_and_signal_type", (q) =>
-          q.eq("sessionId", session._id).eq("signalType", "novelty"),
-        )
-        .order("desc")
-        .take(SIGNAL_LIMIT),
-      ctx.db
-        .query("submissions")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(ENTITY_LIMIT),
+      questionId
+        ? ctx.db
+            .query("semanticSignals")
+            .withIndex("by_questionId_and_signal_type", (q) =>
+              q.eq("questionId", questionId).eq("signalType", "novelty"),
+            )
+            .order("desc")
+            .take(SIGNAL_LIMIT)
+        : ctx.db
+            .query("semanticSignals")
+            .withIndex("by_session_and_signal_type", (q) =>
+              q.eq("sessionId", session._id).eq("signalType", "novelty"),
+            )
+            .order("desc")
+            .take(SIGNAL_LIMIT),
+      questionId
+        ? ctx.db
+            .query("submissions")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .take(ENTITY_LIMIT)
+        : ctx.db
+            .query("submissions")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(ENTITY_LIMIT),
       ctx.db
         .query("participants")
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
         .take(ENTITY_LIMIT),
-      ctx.db
-        .query("categories")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(CATEGORY_LIMIT),
-      ctx.db
-        .query("submissionCategories")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .order("desc")
-        .take(ENTITY_LIMIT * 2),
+      questionId
+        ? ctx.db
+            .query("categories")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .take(CATEGORY_LIMIT)
+        : ctx.db
+            .query("categories")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(CATEGORY_LIMIT),
+      questionId
+        ? ctx.db
+            .query("submissionCategories")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .order("desc")
+            .take(ENTITY_LIMIT * 2)
+        : ctx.db
+            .query("submissionCategories")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(ENTITY_LIMIT * 2),
     ]);
     const participantsById = new Map(
       participants.map((participant, index) => [participant._id, { participant, index }]),
@@ -743,6 +894,7 @@ export const getNoveltyRadar = query({
 export const getCategoryDrift = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
@@ -751,25 +903,49 @@ export const getCategoryDrift = query({
       return null;
     }
 
+    const question = await resolveQuestionForRead(ctx, session, args.questionId);
+    const questionId = args.questionId ? question?._id : undefined;
     const [categories, followUps, submissions, assignments, positionShifts] = await Promise.all([
-      ctx.db
-        .query("categories")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(CATEGORY_LIMIT),
-      ctx.db
-        .query("followUpPrompts")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(FOLLOW_UP_LIMIT),
-      ctx.db
-        .query("submissions")
-        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-        .order("asc")
-        .take(ENTITY_LIMIT),
-      ctx.db
-        .query("submissionCategories")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .order("desc")
-        .take(ENTITY_LIMIT * 2),
+      questionId
+        ? ctx.db
+            .query("categories")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .take(CATEGORY_LIMIT)
+        : ctx.db
+            .query("categories")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(CATEGORY_LIMIT),
+      questionId
+        ? ctx.db
+            .query("followUpPrompts")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .take(FOLLOW_UP_LIMIT)
+        : ctx.db
+            .query("followUpPrompts")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(FOLLOW_UP_LIMIT),
+      questionId
+        ? ctx.db
+            .query("submissions")
+            .withIndex("by_questionId_and_createdAt", (q) => q.eq("questionId", questionId))
+            .order("asc")
+            .take(ENTITY_LIMIT)
+        : ctx.db
+            .query("submissions")
+            .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+            .order("asc")
+            .take(ENTITY_LIMIT),
+      questionId
+        ? ctx.db
+            .query("submissionCategories")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .order("desc")
+            .take(ENTITY_LIMIT * 2)
+        : ctx.db
+            .query("submissionCategories")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(ENTITY_LIMIT * 2),
       ctx.db
         .query("positionShiftEvents")
         .withIndex("by_session", (q) => q.eq("sessionId", session._id))
@@ -925,6 +1101,7 @@ export const getCategoryDrift = query({
 export const listSignalsForSession = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     signalType: v.optional(signalTypeValidator),
   },
   handler: async (ctx, args) => {
@@ -934,21 +1111,36 @@ export const listSignalsForSession = query({
       return null;
     }
 
-    const rows = args.signalType
-      ? await ctx.db
-          .query("semanticSignals")
-          .withIndex("by_session_and_signal_type", (q) =>
-            q.eq("sessionId", session._id).eq("signalType", args.signalType!),
-          )
-          .order("desc")
-          .take(SIGNAL_LIMIT)
-      : await ctx.db
-          .query("semanticSignals")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(SIGNAL_LIMIT);
+    const rows =
+      args.questionId && args.signalType
+        ? await ctx.db
+            .query("semanticSignals")
+            .withIndex("by_questionId_and_signal_type", (q) =>
+              q.eq("questionId", args.questionId).eq("signalType", args.signalType!),
+            )
+            .order("desc")
+            .take(SIGNAL_LIMIT)
+        : args.questionId
+          ? await ctx.db
+              .query("semanticSignals")
+              .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
+              .order("desc")
+              .take(SIGNAL_LIMIT)
+          : args.signalType
+            ? await ctx.db
+                .query("semanticSignals")
+                .withIndex("by_session_and_signal_type", (q) =>
+                  q.eq("sessionId", session._id).eq("signalType", args.signalType!),
+                )
+                .order("desc")
+                .take(SIGNAL_LIMIT)
+            : await ctx.db
+                .query("semanticSignals")
+                .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+                .order("desc")
+                .take(SIGNAL_LIMIT);
 
-    return rows.map(toSignal);
+    return rows.filter((row) => row.sessionId === session._id).map(toSignal);
   },
 });
 

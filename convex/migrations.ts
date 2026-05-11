@@ -108,6 +108,121 @@ async function ensureDefaultQuestionForSession(
   return questionId;
 }
 
+async function questionIdFromSubmission(
+  ctx: GenericMutationCtx<DataModel>,
+  submissionId: Id<"submissions">,
+  sessionId: Id<"sessions">,
+) {
+  const submission = await ctx.db.get(submissionId);
+
+  return submission?.sessionId === sessionId ? submission.questionId : undefined;
+}
+
+async function questionIdFromCategory(
+  ctx: GenericMutationCtx<DataModel>,
+  categoryId: Id<"categories">,
+  sessionId: Id<"sessions">,
+) {
+  const category = await ctx.db.get(categoryId);
+
+  return category?.sessionId === sessionId ? category.questionId : undefined;
+}
+
+async function questionIdFromSynthesisArtifact(
+  ctx: GenericMutationCtx<DataModel>,
+  artifactId: Id<"synthesisArtifacts">,
+  sessionId: Id<"sessions">,
+) {
+  const artifact = await ctx.db.get(artifactId);
+
+  if (!artifact || artifact.sessionId !== sessionId) {
+    return undefined;
+  }
+
+  if (artifact.questionId) {
+    return artifact.questionId;
+  }
+
+  if (artifact.categoryId) {
+    return await questionIdFromCategory(ctx, artifact.categoryId, sessionId);
+  }
+
+  return undefined;
+}
+
+async function questionIdFromFollowUpPrompt(
+  ctx: GenericMutationCtx<DataModel>,
+  promptId: Id<"followUpPrompts">,
+  sessionId: Id<"sessions">,
+) {
+  const prompt = await ctx.db.get(promptId);
+
+  return prompt?.sessionId === sessionId ? prompt.questionId : undefined;
+}
+
+async function questionIdFromSemanticEntity(
+  ctx: GenericMutationCtx<DataModel>,
+  sessionId: Id<"sessions">,
+  entityType: Doc<"semanticEmbeddings">["entityType"],
+  entityId: string,
+) {
+  if (entityType === "submission") {
+    return await questionIdFromSubmission(ctx, entityId as Id<"submissions">, sessionId);
+  }
+
+  if (entityType === "category") {
+    return await questionIdFromCategory(ctx, entityId as Id<"categories">, sessionId);
+  }
+
+  if (entityType === "synthesisArtifact") {
+    return await questionIdFromSynthesisArtifact(
+      ctx,
+      entityId as Id<"synthesisArtifacts">,
+      sessionId,
+    );
+  }
+
+  if (entityType === "followUpPrompt") {
+    return await questionIdFromFollowUpPrompt(ctx, entityId as Id<"followUpPrompts">, sessionId);
+  }
+
+  return undefined;
+}
+
+async function questionIdFromArgumentEntity(
+  ctx: GenericMutationCtx<DataModel>,
+  sessionId: Id<"sessions">,
+  entityType: Doc<"argumentLinks">["sourceEntityType"],
+  entityId: string,
+) {
+  if (entityType === "submission") {
+    return await questionIdFromSubmission(ctx, entityId as Id<"submissions">, sessionId);
+  }
+
+  if (entityType === "category") {
+    return await questionIdFromCategory(ctx, entityId as Id<"categories">, sessionId);
+  }
+
+  if (entityType === "synthesisArtifact") {
+    return await questionIdFromSynthesisArtifact(
+      ctx,
+      entityId as Id<"synthesisArtifacts">,
+      sessionId,
+    );
+  }
+
+  return undefined;
+}
+
+async function defaultQuestionIdForSessionId(
+  ctx: GenericMutationCtx<DataModel>,
+  sessionId: Id<"sessions">,
+) {
+  const session = await ctx.db.get(sessionId);
+
+  return session ? await ensureDefaultQuestionForSession(ctx, session) : undefined;
+}
+
 export const backfillDefaultSessionQuestions = migrations.define({
   table: "sessions",
   batchSize: 25,
@@ -291,6 +406,261 @@ export const backfillRecategorizationRequestQuestionIds = migrations.define({
     return {
       questionId: await ensureDefaultQuestionForSession(ctx, session),
     };
+  },
+});
+
+export const backfillSynthesisArtifactQuestionIds = migrations.define({
+  table: "synthesisArtifacts",
+  batchSize: 50,
+  migrateOne: async (ctx, artifact) => {
+    if (artifact.questionId) {
+      return;
+    }
+
+    if (artifact.categoryId) {
+      const categoryQuestionId = await questionIdFromCategory(
+        ctx,
+        artifact.categoryId,
+        artifact.sessionId,
+      );
+
+      if (categoryQuestionId) {
+        return { questionId: categoryQuestionId };
+      }
+    }
+
+    const questionId = await defaultQuestionIdForSessionId(ctx, artifact.sessionId);
+
+    return questionId ? { questionId } : undefined;
+  },
+});
+
+export const backfillSynthesisQuoteQuestionIds = migrations.define({
+  table: "synthesisQuotes",
+  batchSize: 50,
+  migrateOne: async (ctx, quote) => {
+    if (quote.questionId) {
+      return;
+    }
+
+    const artifactQuestionId = await questionIdFromSynthesisArtifact(
+      ctx,
+      quote.artifactId,
+      quote.sessionId,
+    );
+
+    if (artifactQuestionId) {
+      return { questionId: artifactQuestionId };
+    }
+
+    const submissionQuestionId = await questionIdFromSubmission(
+      ctx,
+      quote.submissionId,
+      quote.sessionId,
+    );
+
+    if (submissionQuestionId) {
+      return { questionId: submissionQuestionId };
+    }
+
+    const questionId = await defaultQuestionIdForSessionId(ctx, quote.sessionId);
+
+    return questionId ? { questionId } : undefined;
+  },
+});
+
+export const backfillSemanticEmbeddingJobQuestionIds = migrations.define({
+  table: "semanticEmbeddingJobs",
+  batchSize: 50,
+  migrateOne: async (ctx, job) => {
+    if (job.questionId) {
+      return;
+    }
+
+    const questionId = await defaultQuestionIdForSessionId(ctx, job.sessionId);
+
+    return questionId ? { questionId } : undefined;
+  },
+});
+
+export const backfillSemanticEmbeddingQuestionIds = migrations.define({
+  table: "semanticEmbeddings",
+  batchSize: 50,
+  migrateOne: async (ctx, embedding) => {
+    if (embedding.questionId) {
+      return;
+    }
+
+    const questionId = await questionIdFromSemanticEntity(
+      ctx,
+      embedding.sessionId,
+      embedding.entityType,
+      embedding.entityId,
+    );
+
+    return questionId ? { questionId } : undefined;
+  },
+});
+
+export const backfillSemanticSignalQuestionIds = migrations.define({
+  table: "semanticSignals",
+  batchSize: 50,
+  migrateOne: async (ctx, signal) => {
+    if (signal.questionId) {
+      return;
+    }
+
+    if (signal.submissionId) {
+      const submissionQuestionId = await questionIdFromSubmission(
+        ctx,
+        signal.submissionId,
+        signal.sessionId,
+      );
+
+      if (submissionQuestionId) {
+        return { questionId: submissionQuestionId };
+      }
+    }
+
+    if (signal.categoryId) {
+      const categoryQuestionId = await questionIdFromCategory(
+        ctx,
+        signal.categoryId,
+        signal.sessionId,
+      );
+
+      if (categoryQuestionId) {
+        return { questionId: categoryQuestionId };
+      }
+    }
+
+    if (signal.sourceEmbeddingId) {
+      const embedding = await ctx.db.get(signal.sourceEmbeddingId);
+
+      if (embedding?.questionId && embedding.sessionId === signal.sessionId) {
+        return { questionId: embedding.questionId };
+      }
+    }
+
+    const questionId = await defaultQuestionIdForSessionId(ctx, signal.sessionId);
+
+    return questionId ? { questionId } : undefined;
+  },
+});
+
+export const backfillArgumentLinkQuestionIds = migrations.define({
+  table: "argumentLinks",
+  batchSize: 50,
+  migrateOne: async (ctx, link) => {
+    if (link.questionId) {
+      return;
+    }
+
+    const sourceQuestionId = await questionIdFromArgumentEntity(
+      ctx,
+      link.sessionId,
+      link.sourceEntityType,
+      link.sourceEntityId,
+    );
+
+    if (sourceQuestionId) {
+      return { questionId: sourceQuestionId };
+    }
+
+    const targetQuestionId = await questionIdFromArgumentEntity(
+      ctx,
+      link.sessionId,
+      link.targetEntityType,
+      link.targetEntityId,
+    );
+
+    if (targetQuestionId) {
+      return { questionId: targetQuestionId };
+    }
+
+    const questionId = await defaultQuestionIdForSessionId(ctx, link.sessionId);
+
+    return questionId ? { questionId } : undefined;
+  },
+});
+
+export const backfillAiJobQuestionIds = migrations.define({
+  table: "aiJobs",
+  batchSize: 50,
+  migrateOne: async (ctx, job) => {
+    if (job.questionId) {
+      return;
+    }
+
+    if (job.submissionId) {
+      const submissionQuestionId = await questionIdFromSubmission(
+        ctx,
+        job.submissionId,
+        job.sessionId,
+      );
+
+      if (submissionQuestionId) {
+        return { questionId: submissionQuestionId };
+      }
+    }
+
+    if (
+      job.type === "categorisation" ||
+      job.type === "synthesis" ||
+      job.type === "personal_report" ||
+      job.type === "argument_map"
+    ) {
+      const questionId = await defaultQuestionIdForSessionId(ctx, job.sessionId);
+
+      return questionId ? { questionId } : undefined;
+    }
+  },
+});
+
+export const backfillLlmCallQuestionIds = migrations.define({
+  table: "llmCalls",
+  batchSize: 50,
+  migrateOne: async (ctx, call) => {
+    if (call.questionId || !call.sessionId) {
+      return;
+    }
+
+    if (
+      call.feature === "feedback" ||
+      call.feature === "categorisation" ||
+      call.feature === "synthesis" ||
+      call.feature === "personal_report" ||
+      call.feature === "argument_map" ||
+      call.feature === "embedding" ||
+      call.feature === "question_baseline"
+    ) {
+      const questionId = await defaultQuestionIdForSessionId(ctx, call.sessionId);
+
+      return questionId ? { questionId } : undefined;
+    }
+  },
+});
+
+export const backfillAuditEventQuestionIds = migrations.define({
+  table: "auditEvents",
+  batchSize: 50,
+  migrateOne: async (ctx, event) => {
+    if (event.questionId || !event.sessionId) {
+      return;
+    }
+
+    if (
+      event.action.startsWith("feedback.") ||
+      event.action.startsWith("categorisation.") ||
+      event.action.startsWith("synthesis.") ||
+      event.action.startsWith("semantic.") ||
+      event.action.startsWith("argument_map.") ||
+      event.action.startsWith("personal_report.")
+    ) {
+      const questionId = await defaultQuestionIdForSessionId(ctx, event.sessionId);
+
+      return questionId ? { questionId } : undefined;
+    }
   },
 });
 

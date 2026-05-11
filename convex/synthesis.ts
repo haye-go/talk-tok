@@ -11,6 +11,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
+import { resolveQuestionForRead, resolveQuestionIdForWrite } from "./questionScope";
 
 type JsonRecord = Record<string, unknown>;
 type ArtifactKind = Doc<"synthesisArtifacts">["kind"];
@@ -85,6 +86,7 @@ function toArtifact(artifact: Doc<"synthesisArtifacts">, quoteCount = 0) {
   return {
     id: artifact._id,
     sessionId: artifact.sessionId,
+    questionId: artifact.questionId,
     categoryId: artifact.categoryId,
     kind: artifact.kind,
     status: artifact.status,
@@ -111,6 +113,7 @@ function toQuote(quote: Doc<"synthesisQuotes">) {
   return {
     id: quote._id,
     artifactId: quote.artifactId,
+    questionId: quote.questionId,
     submissionId: quote.submissionId,
     participantId: quote.participantId,
     quote: quote.quote,
@@ -138,6 +141,7 @@ async function createQueuedArtifact(
   ctx: MutationCtx,
   args: {
     session: Doc<"sessions">;
+    questionId?: Id<"sessionQuestions">;
     categoryId?: Id<"categories">;
     kind: ArtifactKind;
     requestedBy: "instructor" | "system";
@@ -147,29 +151,69 @@ async function createQueuedArtifact(
   const now = Date.now();
   const jobId = await ctx.db.insert("aiJobs", {
     sessionId: args.session._id,
+    questionId: args.questionId,
     type: "synthesis",
     status: "queued",
     requestedBy: args.requestedBy,
     createdAt: now,
     updatedAt: now,
   });
-  const artifactId = await ctx.db.insert("synthesisArtifacts", {
-    sessionId: args.session._id,
-    categoryId: args.categoryId,
-    kind: args.kind,
-    status: "queued",
-    title: args.title,
-    keyPoints: [],
-    uniqueInsights: [],
-    opposingViews: [],
-    sourceCounts: {},
-    aiJobId: jobId,
-    createdAt: now,
-    updatedAt: now,
-  });
+  const reusableArtifacts = args.questionId
+    ? await ctx.db
+        .query("synthesisArtifacts")
+        .withIndex("by_questionId_and_kind", (q) =>
+          q.eq("questionId", args.questionId).eq("kind", args.kind),
+        )
+        .order("desc")
+        .take(20)
+    : await ctx.db
+        .query("synthesisArtifacts")
+        .withIndex("by_session_and_kind", (q) =>
+          q.eq("sessionId", args.session._id).eq("kind", args.kind),
+        )
+        .order("desc")
+        .take(20);
+  const reusableArtifact = reusableArtifacts.find(
+    (artifact) =>
+      artifact.sessionId === args.session._id &&
+      artifact.categoryId === args.categoryId &&
+      (artifact.status === "queued" ||
+        artifact.status === "processing" ||
+        artifact.status === "draft" ||
+        artifact.status === "error"),
+  );
+  const artifactId =
+    reusableArtifact?._id ??
+    (await ctx.db.insert("synthesisArtifacts", {
+      sessionId: args.session._id,
+      questionId: args.questionId,
+      categoryId: args.categoryId,
+      kind: args.kind,
+      status: "queued",
+      title: args.title,
+      keyPoints: [],
+      uniqueInsights: [],
+      opposingViews: [],
+      sourceCounts: {},
+      aiJobId: jobId,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+  if (reusableArtifact) {
+    await ctx.db.patch(reusableArtifact._id, {
+      questionId: reusableArtifact.questionId ?? args.questionId,
+      status: "queued",
+      title: args.title,
+      aiJobId: jobId,
+      error: undefined,
+      updatedAt: now,
+    });
+  }
 
   await ctx.runMutation(internal.audit.record, {
     sessionId: args.session._id,
+    questionId: args.questionId,
     actorType: args.requestedBy,
     action: `synthesis.${args.kind}.queued`,
     targetType: "synthesisArtifact",
@@ -194,8 +238,10 @@ export const generateCategorySummary = mutation({
       throw new Error("Category not found in this session.");
     }
 
+    const questionId = category.questionId ?? (await resolveQuestionIdForWrite(ctx, session));
+
     await rateLimiter.limit(ctx, "heavyAiAction", {
-      key: `synthesis:${session._id}`,
+      key: `synthesis:${session._id}:${questionId}`,
       throws: true,
     });
     const budget = await ctx.runQuery(internal.budget.checkSessionBudget, {
@@ -229,6 +275,7 @@ export const generateCategorySummary = mutation({
 
     const { artifactId, jobId } = await createQueuedArtifact(ctx, {
       session,
+      questionId,
       categoryId: category._id,
       kind: "category_summary",
       requestedBy: "instructor",
@@ -256,6 +303,7 @@ export const generateClassSynthesis = mutation({
         v.literal("final_summary"),
       ),
     ),
+    questionId: v.optional(v.id("sessionQuestions")),
     forceRegenerate: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -265,8 +313,11 @@ export const generateClassSynthesis = mutation({
       throw new Error("Session not found.");
     }
 
+    const kind = args.kind ?? "class_synthesis";
+    const questionId = await resolveQuestionIdForWrite(ctx, session, args.questionId);
+
     await rateLimiter.limit(ctx, "heavyAiAction", {
-      key: `synthesis:${session._id}`,
+      key: `synthesis:${session._id}:${questionId}`,
       throws: true,
     });
     const budget = await ctx.runQuery(internal.budget.checkSessionBudget, {
@@ -278,15 +329,18 @@ export const generateClassSynthesis = mutation({
       throw new Error("AI budget hard stop is active for this session.");
     }
 
-    const kind = args.kind ?? "class_synthesis";
-
     if (!args.forceRegenerate) {
       const existing = await ctx.db
         .query("synthesisArtifacts")
-        .withIndex("by_session_and_kind", (q) => q.eq("sessionId", session._id).eq("kind", kind))
+        .withIndex("by_questionId_and_kind", (q) => q.eq("questionId", questionId).eq("kind", kind))
         .order("desc")
         .take(10)
-        .then((rows) => rows.find((row) => row.status !== "error" && row.status !== "archived"));
+        .then((rows) =>
+          rows.find(
+            (row) =>
+              row.sessionId === session._id && row.status !== "error" && row.status !== "archived",
+          ),
+        );
 
       if (existing) {
         return toArtifact(existing);
@@ -301,6 +355,7 @@ export const generateClassSynthesis = mutation({
           : "Class Synthesis";
     const { artifactId, jobId } = await createQueuedArtifact(ctx, {
       session,
+      questionId,
       kind,
       requestedBy: "instructor",
       title,
@@ -342,6 +397,7 @@ export const publishArtifact = mutation({
     });
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId: artifact.questionId,
       actorType: "instructor",
       action: "synthesis.published",
       targetType: "synthesisArtifact",
@@ -378,6 +434,7 @@ export const finalizeArtifact = mutation({
     });
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId: artifact.questionId,
       actorType: "instructor",
       action: "synthesis.finalized",
       targetType: "synthesisArtifact",
@@ -408,6 +465,7 @@ export const archiveArtifact = mutation({
     });
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId: artifact.questionId,
       actorType: "instructor",
       action: "synthesis.archived",
       targetType: "synthesisArtifact",
@@ -422,6 +480,7 @@ export const archiveArtifact = mutation({
 export const listForSession = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     status: v.optional(
       v.union(
         v.literal("queued"),
@@ -442,23 +501,49 @@ export const listForSession = query({
       return null;
     }
 
-    const artifacts = args.status
-      ? await ctx.db
-          .query("synthesisArtifacts")
-          .withIndex("by_session_and_status", (q) =>
-            q.eq("sessionId", session._id).eq("status", args.status!),
-          )
-          .order("desc")
-          .take(ARTIFACT_LIMIT)
-      : await ctx.db
-          .query("synthesisArtifacts")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(ARTIFACT_LIMIT);
+    if (args.questionId) {
+      const question = await ctx.db.get(args.questionId);
+
+      if (!question || question.sessionId !== session._id) {
+        throw new Error("Question not found in this session.");
+      }
+    }
+
+    const artifacts =
+      args.questionId && args.status
+        ? await ctx.db
+            .query("synthesisArtifacts")
+            .withIndex("by_questionId_and_status", (q) =>
+              q.eq("questionId", args.questionId).eq("status", args.status!),
+            )
+            .order("desc")
+            .take(ARTIFACT_LIMIT)
+        : args.questionId
+          ? await ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
+              .order("desc")
+              .take(ARTIFACT_LIMIT)
+          : args.status
+            ? await ctx.db
+                .query("synthesisArtifacts")
+                .withIndex("by_session_and_status", (q) =>
+                  q.eq("sessionId", session._id).eq("status", args.status!),
+                )
+                .order("desc")
+                .take(ARTIFACT_LIMIT)
+            : await ctx.db
+                .query("synthesisArtifacts")
+                .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+                .order("desc")
+                .take(ARTIFACT_LIMIT);
 
     return await Promise.all(
       artifacts
-        .filter((artifact) => !args.kind || artifact.kind === args.kind)
+        .filter(
+          (artifact) =>
+            artifact.sessionId === session._id && (!args.kind || artifact.kind === args.kind),
+        )
         .map((artifact) => artifactWithQuotes(ctx, artifact)),
     );
   },
@@ -467,6 +552,7 @@ export const listForSession = query({
 export const listPublishedForParticipant = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
@@ -479,22 +565,41 @@ export const listPublishedForParticipant = query({
       return [];
     }
 
-    const [published, final] = await Promise.all([
-      ctx.db
-        .query("synthesisArtifacts")
-        .withIndex("by_session_and_status", (q) =>
-          q.eq("sessionId", session._id).eq("status", "published"),
-        )
-        .order("desc")
-        .take(ARTIFACT_LIMIT),
-      ctx.db
-        .query("synthesisArtifacts")
-        .withIndex("by_session_and_status", (q) =>
-          q.eq("sessionId", session._id).eq("status", "final"),
-        )
-        .order("desc")
-        .take(ARTIFACT_LIMIT),
-    ]);
+    const question = await resolveQuestionForRead(ctx, session, args.questionId);
+    const [published, final] =
+      question && args.questionId
+        ? await Promise.all([
+            ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_questionId_and_status", (q) =>
+                q.eq("questionId", question._id).eq("status", "published"),
+              )
+              .order("desc")
+              .take(ARTIFACT_LIMIT),
+            ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_questionId_and_status", (q) =>
+                q.eq("questionId", question._id).eq("status", "final"),
+              )
+              .order("desc")
+              .take(ARTIFACT_LIMIT),
+          ])
+        : await Promise.all([
+            ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_session_and_status", (q) =>
+                q.eq("sessionId", session._id).eq("status", "published"),
+              )
+              .order("desc")
+              .take(ARTIFACT_LIMIT),
+            ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_session_and_status", (q) =>
+                q.eq("sessionId", session._id).eq("status", "final"),
+              )
+              .order("desc")
+              .take(ARTIFACT_LIMIT),
+          ]);
 
     return await Promise.all(
       [...published, ...final]
@@ -537,26 +642,48 @@ export const loadArtifactContext = internalQuery({
       throw new Error("Synthesis session not found.");
     }
 
-    const categories = await ctx.db
-      .query("categories")
-      .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-      .take(CATEGORY_LIMIT);
+    const question = artifact.questionId ? await ctx.db.get(artifact.questionId) : null;
+    const categories = artifact.questionId
+      ? await ctx.db
+          .query("categories")
+          .withIndex("by_questionId", (q) => q.eq("questionId", artifact.questionId))
+          .take(CATEGORY_LIMIT)
+      : await ctx.db
+          .query("categories")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .take(CATEGORY_LIMIT);
     const category = artifact.categoryId ? await ctx.db.get(artifact.categoryId) : null;
-    const categorySummaries = await ctx.db
-      .query("synthesisArtifacts")
-      .withIndex("by_session_and_kind", (q) =>
-        q.eq("sessionId", session._id).eq("kind", "category_summary"),
-      )
-      .order("desc")
-      .take(60);
+    const categorySummaries = artifact.questionId
+      ? await ctx.db
+          .query("synthesisArtifacts")
+          .withIndex("by_questionId_and_kind", (q) =>
+            q.eq("questionId", artifact.questionId).eq("kind", "category_summary"),
+          )
+          .order("desc")
+          .take(60)
+      : await ctx.db
+          .query("synthesisArtifacts")
+          .withIndex("by_session_and_kind", (q) =>
+            q.eq("sessionId", session._id).eq("kind", "category_summary"),
+          )
+          .order("desc")
+          .take(60);
     const submissions =
       artifact.kind === "category_summary" && category
-        ? await loadCategorySubmissions(ctx, artifact.sessionId, category._id)
-        : await ctx.db
-            .query("submissions")
-            .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-            .order("asc")
-            .take(SYNTHESIS_SUBMISSION_LIMIT);
+        ? await loadCategorySubmissions(ctx, artifact.sessionId, category._id, artifact.questionId)
+        : artifact.questionId
+          ? await ctx.db
+              .query("submissions")
+              .withIndex("by_questionId_and_createdAt", (q) =>
+                q.eq("questionId", artifact.questionId),
+              )
+              .order("asc")
+              .take(SYNTHESIS_SUBMISSION_LIMIT)
+          : await ctx.db
+              .query("submissions")
+              .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+              .order("asc")
+              .take(SYNTHESIS_SUBMISSION_LIMIT);
 
     const participantIds = new Set(submissions.map((submission) => submission.participantId));
     const participants = new Map<Id<"participants">, Doc<"participants">>();
@@ -572,6 +699,7 @@ export const loadArtifactContext = internalQuery({
     return {
       artifact,
       session,
+      question,
       category,
       categories,
       categorySummaries: categorySummaries.filter((row) => row.status !== "archived"),
@@ -585,6 +713,7 @@ async function loadCategorySubmissions(
   ctx: QueryCtx,
   sessionId: Id<"sessions">,
   categoryId: Id<"categories">,
+  questionId?: Id<"sessionQuestions">,
 ) {
   const assignments = await ctx.db
     .query("submissionCategories")
@@ -593,6 +722,10 @@ async function loadCategorySubmissions(
   const submissions = [];
 
   for (const assignment of assignments) {
+    if (questionId && assignment.questionId && assignment.questionId !== questionId) {
+      continue;
+    }
+
     const submission = await ctx.db.get(assignment.submissionId);
 
     if (submission && submission.sessionId === sessionId) {
@@ -666,6 +799,7 @@ export const markArtifactSuccess = internalMutation({
       await ctx.db.insert("synthesisQuotes", {
         artifactId: artifact._id,
         sessionId: artifact.sessionId,
+        questionId: artifact.questionId,
         ...quote,
         createdAt: now,
       });
@@ -719,6 +853,7 @@ export const generateArtifact = internalAction({
       const {
         artifact,
         session,
+        question,
         category,
         categories,
         categorySummaries,
@@ -741,11 +876,12 @@ export const generateArtifact = internalAction({
             : "synthesis.class.v1";
       const result = await ctx.runAction(internal.llm.runJson, {
         sessionId: session._id,
+        questionId: artifact.questionId,
         feature: "synthesis",
         promptKey,
         variables: {
           sessionTitle: session.title,
-          openingPrompt: session.openingPrompt,
+          openingPrompt: question?.prompt ?? session.openingPrompt,
           categoryJson: category
             ? JSON.stringify({
                 id: category._id,

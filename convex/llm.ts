@@ -183,6 +183,7 @@ export const loadModelForFeature = internalQuery({
 export const createCall = internalMutation({
   args: {
     sessionId: v.optional(v.id("sessions")),
+    questionId: v.optional(v.id("sessionQuestions")),
     feature: v.string(),
     provider: v.string(),
     model: v.string(),
@@ -192,6 +193,7 @@ export const createCall = internalMutation({
   handler: async (ctx, args) => {
     return await ctx.db.insert("llmCalls", {
       sessionId: args.sessionId,
+      questionId: args.questionId,
       feature: args.feature,
       provider: args.provider,
       model: args.model,
@@ -252,6 +254,7 @@ export const markCallError = internalMutation({
 export const runJson = internalAction({
   args: {
     sessionId: v.optional(v.id("sessions")),
+    questionId: v.optional(v.id("sessionQuestions")),
     feature: v.string(),
     promptKey: v.string(),
     modelKey: v.optional(v.string()),
@@ -284,6 +287,7 @@ export const runJson = internalAction({
     });
     const llmCallId: Id<"llmCalls"> = await ctx.runMutation(internal.llm.createCall, {
       sessionId: args.sessionId,
+      questionId: args.questionId,
       feature: args.feature,
       provider: runtime.modelSetting.provider,
       model: runtime.modelSetting.model,
@@ -384,6 +388,7 @@ export const runJson = internalAction({
 export const embedText = internalAction({
   args: {
     sessionId: v.optional(v.id("sessions")),
+    questionId: v.optional(v.id("sessionQuestions")),
     text: v.string(),
     modelKey: v.optional(v.string()),
   },
@@ -418,6 +423,7 @@ export const embedText = internalAction({
     };
     const llmCallId: Id<"llmCalls"> = await ctx.runMutation(internal.llm.createCall, {
       sessionId: args.sessionId,
+      questionId: args.questionId,
       feature: "embedding",
       provider: modelSetting.provider,
       model: modelSetting.model,

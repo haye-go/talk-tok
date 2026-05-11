@@ -79,6 +79,29 @@ export default defineSchema({
     .index("by_sessionId_and_status", ["sessionId", "status"])
     .index("by_sessionId_and_isCurrent", ["sessionId", "isCurrent"]),
 
+  questionBaselines: defineTable({
+    sessionId: v.id("sessions"),
+    questionId: v.id("sessionQuestions"),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("ready"),
+      v.literal("error"),
+    ),
+    promptTemplateKey: v.optional(v.string()),
+    provider: v.optional(v.string()),
+    model: v.optional(v.string()),
+    baselineText: v.optional(v.string()),
+    summary: v.optional(v.string()),
+    generatedAt: v.optional(timestamp),
+    error: v.optional(v.string()),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_questionId", ["questionId"])
+    .index("by_sessionId", ["sessionId"])
+    .index("by_questionId_and_status", ["questionId", "status"]),
+
   participants: defineTable({
     sessionId: v.id("sessions"),
     participantSlug: v.string(),
@@ -233,6 +256,7 @@ export default defineSchema({
 
   semanticEmbeddingJobs: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     status: v.union(
       v.literal("queued"),
       v.literal("processing"),
@@ -256,10 +280,12 @@ export default defineSchema({
     updatedAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_session_and_status", ["sessionId", "status"]),
 
   semanticEmbeddings: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     entityType: v.union(
       v.literal("submission"),
       v.literal("synthesisArtifact"),
@@ -277,17 +303,20 @@ export default defineSchema({
     updatedAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_session_and_entity_type", ["sessionId", "entityType"])
+    .index("by_questionId_and_entity_type", ["questionId", "entityType"])
     .index("by_entity", ["entityType", "entityId"])
     .index("by_entity_and_hash", ["entityType", "entityId", "contentHash"])
     .vectorIndex("by_embedding", {
       vectorField: "embedding",
       dimensions: 1536,
-      filterFields: ["sessionId", "entityType"],
+      filterFields: ["sessionId", "questionId", "entityType"],
     }),
 
   semanticSignals: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     submissionId: v.optional(v.id("submissions")),
     participantId: v.optional(v.id("participants")),
     categoryId: v.optional(v.id("categories")),
@@ -309,12 +338,15 @@ export default defineSchema({
     updatedAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_session_and_signal_type", ["sessionId", "signalType"])
+    .index("by_questionId_and_signal_type", ["questionId", "signalType"])
     .index("by_submission", ["submissionId"])
     .index("by_category", ["categoryId"]),
 
   argumentLinks: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     sourceEntityType: v.union(
       v.literal("submission"),
       v.literal("category"),
@@ -345,7 +377,9 @@ export default defineSchema({
     updatedAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_session_and_link_type", ["sessionId", "linkType"])
+    .index("by_questionId_and_linkType", ["questionId", "linkType"])
     .index("by_source_entity", ["sourceEntityType", "sourceEntityId"])
     .index("by_target_entity", ["targetEntityType", "targetEntityId"]),
 
@@ -521,6 +555,7 @@ export default defineSchema({
 
   synthesisArtifacts: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     categoryId: v.optional(v.id("categories")),
     kind: v.union(
       v.literal("category_summary"),
@@ -555,13 +590,17 @@ export default defineSchema({
     updatedAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_session_and_status", ["sessionId", "status"])
+    .index("by_questionId_and_status", ["questionId", "status"])
     .index("by_session_and_kind", ["sessionId", "kind"])
+    .index("by_questionId_and_kind", ["questionId", "kind"])
     .index("by_category", ["categoryId"]),
 
   synthesisQuotes: defineTable({
     artifactId: v.id("synthesisArtifacts"),
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     submissionId: v.id("submissions"),
     participantId: v.id("participants"),
     quote: v.string(),
@@ -579,6 +618,7 @@ export default defineSchema({
   })
     .index("by_artifact", ["artifactId"])
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_submission", ["submissionId"]),
 
   personalReports: defineTable({
@@ -687,8 +727,10 @@ export default defineSchema({
 
   aiJobs: defineTable({
     sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
     submissionId: v.optional(v.id("submissions")),
     type: v.union(
+      v.literal("question_baseline"),
       v.literal("feedback"),
       v.literal("categorisation"),
       v.literal("moderation"),
@@ -712,6 +754,7 @@ export default defineSchema({
     updatedAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_session_and_status", ["sessionId", "status"])
     .index("by_session_and_type", ["sessionId", "type"])
     .index("by_type_and_status", ["type", "status"])
@@ -736,6 +779,7 @@ export default defineSchema({
 
   llmCalls: defineTable({
     sessionId: v.optional(v.id("sessions")),
+    questionId: v.optional(v.id("sessionQuestions")),
     feature: v.string(),
     provider: v.string(),
     model: v.string(),
@@ -753,6 +797,7 @@ export default defineSchema({
     createdAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_session_and_created_at", ["sessionId", "createdAt"])
     .index("by_status", ["status"])
     .index("by_feature", ["feature"]),
@@ -775,6 +820,7 @@ export default defineSchema({
 
   auditEvents: defineTable({
     sessionId: v.optional(v.id("sessions")),
+    questionId: v.optional(v.id("sessionQuestions")),
     actorType: v.union(v.literal("system"), v.literal("participant"), v.literal("instructor")),
     actorParticipantId: v.optional(v.id("participants")),
     action: v.string(),
@@ -784,6 +830,7 @@ export default defineSchema({
     createdAt: timestamp,
   })
     .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
     .index("by_session_and_created_at", ["sessionId", "createdAt"])
     .index("by_action_and_created_at", ["action", "createdAt"]),
 });

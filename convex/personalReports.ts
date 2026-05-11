@@ -11,6 +11,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
+import { resolveQuestionForRead, resolveQuestionIdForWrite } from "./questionScope";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -138,6 +139,7 @@ async function queueReport(
   ctx: MutationCtx,
   args: {
     sessionId: Id<"sessions">;
+    questionId?: Id<"sessionQuestions">;
     participantId: Id<"participants">;
     requestedBy: "participant" | "instructor" | "system";
     forceRegenerate?: boolean;
@@ -162,6 +164,7 @@ async function queueReport(
     }));
   const jobId = await ctx.db.insert("aiJobs", {
     sessionId: args.sessionId,
+    questionId: args.questionId,
     type: "personal_report",
     status: "queued",
     requestedBy: args.requestedBy,
@@ -222,8 +225,10 @@ export const generateMine = mutation({
       throw new Error("AI budget hard stop is active for this session.");
     }
 
+    const questionId = await resolveQuestionIdForWrite(ctx, session);
     const report = await queueReport(ctx, {
       sessionId: session._id,
+      questionId,
       participantId: participant._id,
       requestedBy: "participant",
       forceRegenerate: args.forceRegenerate,
@@ -231,6 +236,7 @@ export const generateMine = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId,
       actorType: "participant",
       actorParticipantId: participant._id,
       action: "personal_report.queued",
@@ -275,6 +281,7 @@ export const generateForSession = mutation({
           .withIndex("by_session", (q) => q.eq("sessionId", session._id))
           .take(REPORT_PARTICIPANT_LIMIT);
     const reports = [];
+    const questionId = await resolveQuestionIdForWrite(ctx, session);
 
     for (const participant of participants) {
       if (
@@ -289,6 +296,7 @@ export const generateForSession = mutation({
         toReport(
           await queueReport(ctx, {
             sessionId: session._id,
+            questionId,
             participantId: participant._id,
             requestedBy: "instructor",
             forceRegenerate: args.forceRegenerate,
@@ -299,6 +307,7 @@ export const generateForSession = mutation({
 
     await ctx.runMutation(internal.audit.record, {
       sessionId: session._id,
+      questionId,
       actorType: "instructor",
       action: "personal_report.batch_queued",
       targetType: "personalReports",
@@ -394,16 +403,27 @@ export const loadReportContext = internalQuery({
       throw new Error("Personal report context is incomplete.");
     }
 
-    const submissions = await ctx.db
-      .query("submissions")
-      .withIndex("by_participant_and_created_at", (q) => q.eq("participantId", participant._id))
-      .order("asc")
-      .take(REPORT_SUBMISSION_LIMIT);
-    const feedback = await ctx.db
+    const question = await resolveQuestionForRead(ctx, session);
+    const submissions = question
+      ? await ctx.db
+          .query("submissions")
+          .withIndex("by_participant_and_questionId", (q) =>
+            q.eq("participantId", participant._id).eq("questionId", question._id),
+          )
+          .order("asc")
+          .take(REPORT_SUBMISSION_LIMIT)
+      : await ctx.db
+          .query("submissions")
+          .withIndex("by_participant_and_created_at", (q) => q.eq("participantId", participant._id))
+          .order("asc")
+          .take(REPORT_SUBMISSION_LIMIT);
+    const submissionIds = new Set(submissions.map((submission) => submission._id));
+    const feedbackRows = await ctx.db
       .query("submissionFeedback")
       .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
       .order("desc")
       .take(REPORT_SUBMISSION_LIMIT);
+    const feedback = feedbackRows.filter((row) => submissionIds.has(row.submissionId));
     const assignments = [];
 
     for (const submission of submissions) {
@@ -411,8 +431,12 @@ export const loadReportContext = internalQuery({
         .query("submissionCategories")
         .withIndex("by_submission", (q) => q.eq("submissionId", submission._id))
         .order("desc")
-        .take(1)
-        .then((rows) => rows[0] ?? null);
+        .take(8)
+        .then(
+          (rows) =>
+            rows.find((row) => !question || !row.questionId || row.questionId === question._id) ??
+            null,
+        );
 
       if (!assignment) {
         continue;
@@ -430,6 +454,16 @@ export const loadReportContext = internalQuery({
       });
     }
 
+    const baseline = question
+      ? await ctx.db
+          .query("questionBaselines")
+          .withIndex("by_questionId_and_status", (q) =>
+            q.eq("questionId", question._id).eq("status", "ready"),
+          )
+          .order("desc")
+          .take(1)
+          .then((rows) => rows[0] ?? null)
+      : null;
     const [attackingThreads, defendingThreads, publishedArtifacts, finalArtifacts] =
       await Promise.all([
         ctx.db
@@ -442,20 +476,36 @@ export const loadReportContext = internalQuery({
           .withIndex("by_defender", (q) => q.eq("defenderParticipantId", participant._id))
           .order("desc")
           .take(30),
-        ctx.db
-          .query("synthesisArtifacts")
-          .withIndex("by_session_and_status", (q) =>
-            q.eq("sessionId", session._id).eq("status", "published"),
-          )
-          .order("desc")
-          .take(ARTIFACT_CONTEXT_LIMIT),
-        ctx.db
-          .query("synthesisArtifacts")
-          .withIndex("by_session_and_status", (q) =>
-            q.eq("sessionId", session._id).eq("status", "final"),
-          )
-          .order("desc")
-          .take(ARTIFACT_CONTEXT_LIMIT),
+        question
+          ? ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_questionId_and_status", (q) =>
+                q.eq("questionId", question._id).eq("status", "published"),
+              )
+              .order("desc")
+              .take(ARTIFACT_CONTEXT_LIMIT)
+          : ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_session_and_status", (q) =>
+                q.eq("sessionId", session._id).eq("status", "published"),
+              )
+              .order("desc")
+              .take(ARTIFACT_CONTEXT_LIMIT),
+        question
+          ? ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_questionId_and_status", (q) =>
+                q.eq("questionId", question._id).eq("status", "final"),
+              )
+              .order("desc")
+              .take(ARTIFACT_CONTEXT_LIMIT)
+          : ctx.db
+              .query("synthesisArtifacts")
+              .withIndex("by_session_and_status", (q) =>
+                q.eq("sessionId", session._id).eq("status", "final"),
+              )
+              .order("desc")
+              .take(ARTIFACT_CONTEXT_LIMIT),
       ]);
     const threadIds = new Set(
       [...attackingThreads, ...defendingThreads]
@@ -480,7 +530,9 @@ export const loadReportContext = internalQuery({
     return {
       report,
       session,
+      question,
       participant,
+      baseline,
       submissions,
       feedback,
       assignments,
@@ -568,17 +620,48 @@ export const generateReport = internalAction({
     await ctx.runMutation(internal.personalReports.markReportProcessing, args);
 
     try {
-      const { session, participant, submissions, feedback, assignments, fightDebriefs, artifacts } =
-        await ctx.runQuery(internal.personalReports.loadReportContext, {
-          reportId: args.reportId,
-        });
+      const {
+        session,
+        question,
+        participant,
+        baseline,
+        submissions,
+        feedback,
+        assignments,
+        fightDebriefs,
+        artifacts,
+      } = await ctx.runQuery(internal.personalReports.loadReportContext, {
+        reportId: args.reportId,
+      });
       const result = await ctx.runAction(internal.llm.runJson, {
         sessionId: session._id,
+        questionId: question?._id,
         feature: "personal_report",
         promptKey: "report.personal.v1",
         variables: {
           sessionTitle: session.title,
-          openingPrompt: session.openingPrompt,
+          openingPrompt: question?.prompt ?? session.openingPrompt,
+          questionJson: JSON.stringify(
+            question
+              ? {
+                  id: question._id,
+                  title: question.title,
+                  prompt: question.prompt,
+                  status: question.status,
+                  isCurrent: question.isCurrent,
+                }
+              : null,
+          ),
+          baselineJson: JSON.stringify(
+            baseline
+              ? {
+                  id: baseline._id,
+                  baselineText: baseline.baselineText,
+                  summary: baseline.summary,
+                  generatedAt: baseline.generatedAt,
+                }
+              : null,
+          ),
           participantJson: JSON.stringify({
             id: participant._id,
             nickname: participant.nickname,

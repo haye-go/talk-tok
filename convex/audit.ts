@@ -26,6 +26,7 @@ function toPublicAuditEvent(event: Doc<"auditEvents">) {
   return {
     id: event._id,
     sessionId: event.sessionId,
+    questionId: event.questionId,
     actorType: event.actorType,
     actorParticipantId: event.actorParticipantId,
     action: event.action,
@@ -39,6 +40,7 @@ function toPublicAuditEvent(event: Doc<"auditEvents">) {
 export const record = internalMutation({
   args: {
     sessionId: v.optional(v.id("sessions")),
+    questionId: v.optional(v.id("sessionQuestions")),
     actorType: v.union(v.literal("system"), v.literal("participant"), v.literal("instructor")),
     actorParticipantId: v.optional(v.id("participants")),
     action: v.string(),
@@ -57,6 +59,7 @@ export const record = internalMutation({
 export const listForSession = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -67,12 +70,18 @@ export const listForSession = query({
     }
 
     const limit = Math.min(MAX_AUDIT_LIMIT, Math.max(1, args.limit ?? DEFAULT_AUDIT_LIMIT));
-    const events = await ctx.db
-      .query("auditEvents")
-      .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-      .order("desc")
-      .take(limit);
+    const events = args.questionId
+      ? await ctx.db
+          .query("auditEvents")
+          .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
+          .order("desc")
+          .take(limit)
+      : await ctx.db
+          .query("auditEvents")
+          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+          .order("desc")
+          .take(limit);
 
-    return events.map(toPublicAuditEvent);
+    return events.filter((event) => event.sessionId === session._id).map(toPublicAuditEvent);
   },
 });
