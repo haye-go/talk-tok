@@ -6,6 +6,7 @@ import { createDefaultQuestionForSession } from "./sessionQuestions";
 const FOOD_DEMO_SLUG = "best-food-for-a-hackathon-live";
 const RESET_CONFIRMATION = "RESET FOOD HACKATHON SESSION";
 const MAX_RESET_BATCH = 500;
+const MAX_RESET_PASSES = 20;
 const SESSION_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 type SessionScopedTable =
@@ -201,6 +202,92 @@ async function deleteBatchBySession(
   return rows.length;
 }
 
+async function deleteBatchQuestionBaselinesBySession(ctx: MutationCtx, sessionId: Id<"sessions">) {
+  const rows = await ctx.db
+    .query("questionBaselines")
+    .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+    .take(MAX_RESET_BATCH);
+
+  for (const row of rows) {
+    await ctx.db.delete(row._id);
+  }
+
+  return rows.length;
+}
+
+async function countBySession(
+  ctx: QueryCtx | MutationCtx,
+  table: SessionScopedTable,
+  sessionId: Id<"sessions">,
+) {
+  return (
+    await ctx.db
+      .query(table)
+      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
+      .take(MAX_RESET_BATCH)
+  ).length;
+}
+
+async function countQuestionBaselinesBySession(
+  ctx: QueryCtx | MutationCtx,
+  sessionId: Id<"sessions">,
+) {
+  return (
+    await ctx.db
+      .query("questionBaselines")
+      .withIndex("by_sessionId", (q) => q.eq("sessionId", sessionId))
+      .take(MAX_RESET_BATCH)
+  ).length;
+}
+
+async function deleteAllBySession(
+  ctx: MutationCtx,
+  table: SessionScopedTable,
+  sessionId: Id<"sessions">,
+) {
+  let deleted = 0;
+  let capped = false;
+
+  for (let pass = 0; pass < MAX_RESET_PASSES; pass += 1) {
+    const count = await deleteBatchBySession(ctx, table, sessionId);
+    deleted += count;
+
+    if (count < MAX_RESET_BATCH) {
+      return { deleted, capped, leftover: 0 };
+    }
+  }
+
+  capped = true;
+
+  return {
+    deleted,
+    capped,
+    leftover: await countBySession(ctx, table, sessionId),
+  };
+}
+
+async function deleteAllQuestionBaselinesBySession(ctx: MutationCtx, sessionId: Id<"sessions">) {
+  let deleted = 0;
+  let capped = false;
+
+  for (let pass = 0; pass < MAX_RESET_PASSES; pass += 1) {
+    const count = await deleteBatchQuestionBaselinesBySession(ctx, sessionId);
+    deleted += count;
+
+    if (count < MAX_RESET_BATCH) {
+      return { deleted, capped, leftover: 0 };
+    }
+  }
+
+  capped = true;
+
+  return {
+    deleted,
+    capped,
+    leftover: await countQuestionBaselinesBySession(ctx, sessionId),
+  };
+}
+
 async function resetFoodSessionData(ctx: MutationCtx, sessionId: Id<"sessions">) {
   const tables: SessionScopedTable[] = [
     "argumentLinks",
@@ -230,30 +317,52 @@ async function resetFoodSessionData(ctx: MutationCtx, sessionId: Id<"sessions">)
   ];
   let deleted = 0;
   const perTable: Record<string, number> = {};
+  const leftovers: Record<string, number> = {};
+  let capped = false;
 
   for (const table of tables) {
-    const count = await deleteBatchBySession(ctx, table, sessionId);
-    perTable[table] = count;
-    deleted += count;
+    const result = await deleteAllBySession(ctx, table, sessionId);
+    perTable[table] = result.deleted;
+    deleted += result.deleted;
+
+    if (result.capped) {
+      capped = true;
+    }
+
+    if (result.leftover > 0) {
+      leftovers[table] = result.leftover;
+    }
   }
-  const questionCount = await deleteSessionQuestionsBySession(ctx, sessionId);
-  perTable.sessionQuestions = questionCount;
-  deleted += questionCount;
+  const baselineResult = await deleteAllQuestionBaselinesBySession(ctx, sessionId);
+  perTable.questionBaselines = baselineResult.deleted;
+  deleted += baselineResult.deleted;
+
+  if (baselineResult.capped) {
+    capped = true;
+  }
+
+  if (baselineResult.leftover > 0) {
+    leftovers.questionBaselines = baselineResult.leftover;
+  }
+
+  const questionResult = await deleteAllSessionQuestionsBySession(ctx, sessionId);
+  perTable.sessionQuestions = questionResult.deleted;
+  deleted += questionResult.deleted;
+
+  if (questionResult.capped) {
+    capped = true;
+  }
+
+  if (questionResult.leftover > 0) {
+    leftovers.sessionQuestions = questionResult.leftover;
+  }
 
   return {
     deleted,
     perTable,
-    capped: Object.values(perTable).some((count) => count === MAX_RESET_BATCH),
+    leftovers,
+    capped,
   };
-}
-
-async function countBySession(ctx: QueryCtx, table: SessionScopedTable, sessionId: Id<"sessions">) {
-  return (
-    await ctx.db
-      .query(table)
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .take(MAX_RESET_BATCH)
-  ).length;
 }
 
 async function deleteSessionQuestionsBySession(ctx: MutationCtx, sessionId: Id<"sessions">) {
@@ -269,7 +378,32 @@ async function deleteSessionQuestionsBySession(ctx: MutationCtx, sessionId: Id<"
   return rows.length;
 }
 
-async function countSessionQuestionsBySession(ctx: QueryCtx, sessionId: Id<"sessions">) {
+async function deleteAllSessionQuestionsBySession(ctx: MutationCtx, sessionId: Id<"sessions">) {
+  let deleted = 0;
+  let capped = false;
+
+  for (let pass = 0; pass < MAX_RESET_PASSES; pass += 1) {
+    const count = await deleteSessionQuestionsBySession(ctx, sessionId);
+    deleted += count;
+
+    if (count < MAX_RESET_BATCH) {
+      return { deleted, capped, leftover: 0 };
+    }
+  }
+
+  capped = true;
+
+  return {
+    deleted,
+    capped,
+    leftover: await countSessionQuestionsBySession(ctx, sessionId),
+  };
+}
+
+async function countSessionQuestionsBySession(
+  ctx: QueryCtx | MutationCtx,
+  sessionId: Id<"sessions">,
+) {
   return (
     await ctx.db
       .query("sessionQuestions")
