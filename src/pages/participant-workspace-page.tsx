@@ -31,6 +31,7 @@ import {
   setDemoClientKey,
   storeParticipant,
 } from "@/lib/client-identity";
+import { categoryColorToTone } from "@/lib/category-colors";
 import { DEMO_SESSION_SLUG, TABS, type TabId } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 
@@ -144,6 +145,7 @@ export function ParticipantWorkspacePage({
   const [feedbackQueueWarning, setFeedbackQueueWarning] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
   const [showAdditionalComposer, setShowAdditionalComposer] = useState(false);
+  const [showEarlierPoints, setShowEarlierPoints] = useState(false);
   const [expandedContributionId, setExpandedContributionId] = useState<Id<"submissions"> | null>(
     null,
   );
@@ -534,29 +536,40 @@ export function ParticipantWorkspacePage({
             />
           ) : (
             <>
-              <Card
-                title="Your contributions"
-                description="Posting stays open-ended. Add another point, reflect on the feedback, or move into the room from here."
-                footer={
-                  <>
-                    {contributionsOpen ? (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setShowAdditionalComposer((value) => !value)}
-                      >
-                        {showAdditionalComposer ? "Cancel another point" : "Add another point"}
-                      </Button>
-                    ) : (
-                      <Badge tone="neutral">New top-level posts are paused</Badge>
-                    )}
-                    <Button type="button" variant="ghost" size="sm" onClick={() => handleTabChange("explore")}>
-                      Go to Explore
+              <Card>
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <Badge tone="success">Submitted</Badge>
+                  <span className="text-[var(--c-muted)]">
+                    {new Date(primaryContribution!.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  {assignmentBySubmissionId.get(primaryContribution!.id)?.categoryName ? (
+                    <Badge tone={categoryColorToTone(undefined, 0)}>
+                      {assignmentBySubmissionId.get(primaryContribution!.id)!.categoryName}
+                    </Badge>
+                  ) : null}
+                  {(() => {
+                    const fb = feedbackBySubmissionId.get(primaryContribution!.id);
+                    if (fb?.status === "success") return <Badge tone="sky">Feedback ready</Badge>;
+                    if (fb?.status === "queued" || fb?.status === "processing") return <Badge tone="neutral">Feedback pending</Badge>;
+                    if (fb?.status === "error") return <Badge tone="coral">Feedback error</Badge>;
+                    return null;
+                  })()}
+                </div>
+                {contributionsOpen ? (
+                  <div className="mt-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowAdditionalComposer((value) => !value)}
+                    >
+                      {showAdditionalComposer ? "Cancel" : "Add another point"}
                     </Button>
-                  </>
-                }
-              />
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-[var(--c-muted)]">New contributions are paused.</p>
+                )}
+              </Card>
 
               {showAdditionalComposer ? (
                 <ResponseComposer
@@ -567,35 +580,71 @@ export function ParticipantWorkspacePage({
                 />
               ) : null}
 
-              {topLevelContributions.map((submission, index) => (
-                <ContributionThreadCard
-                  key={submission.id}
-                  submission={submission}
-                  feedback={feedbackBySubmissionId.get(submission.id) ?? null}
-                  assignment={assignmentBySubmissionId.get(submission.id) ?? null}
-                  categories={ws?.categorySummary}
-                  followUps={followUpsByParentId.get(submission.id) ?? []}
-                  recategorisationRequest={requestBySubmissionId.get(submission.id) ?? null}
-                  expanded={activeExpandedContributionId === submission.id}
-                  isLatest={index === 0}
-                  canStartFight={canUseFight}
-                  onToggleExpanded={() =>
-                    setExpandedContributionId((current) =>
-                      current === submission.id ? null : submission.id,
-                    )
-                  }
-                  onRequestRecategorisation={(request) =>
-                    handleRequestRecategorisation(submission.id, request)
-                  }
-                  onAddFollowUp={() => setFollowUpParentId(submission.id)}
-                  onViewExplore={() => handleTabChange("explore")}
-                  onStartFight={canUseFight ? () => handleTabChange("fight") : undefined}
-                  onRetryFeedback={() => handleRetryFeedback(submission.id)}
-                  feedbackRetrying={retryingFeedbackSubmissionId === submission.id}
-                >
-                  {followUpParentId === submission.id ? followUpComposer : null}
-                </ContributionThreadCard>
-              ))}
+              <ContributionThreadCard
+                submission={topLevelContributions[0]}
+                feedback={feedbackBySubmissionId.get(topLevelContributions[0].id) ?? null}
+                assignment={assignmentBySubmissionId.get(topLevelContributions[0].id) ?? null}
+                categories={ws?.categorySummary}
+                followUps={followUpsByParentId.get(topLevelContributions[0].id) ?? []}
+                recategorisationRequest={requestBySubmissionId.get(topLevelContributions[0].id) ?? null}
+                expanded={activeExpandedContributionId === topLevelContributions[0].id}
+                isLatest
+                onToggleExpanded={() =>
+                  setExpandedContributionId((current) =>
+                    current === topLevelContributions[0].id ? null : topLevelContributions[0].id,
+                  )
+                }
+                onRequestRecategorisation={(request) =>
+                  handleRequestRecategorisation(topLevelContributions[0].id, request)
+                }
+                onAddFollowUp={() => setFollowUpParentId(topLevelContributions[0].id)}
+                onRetryFeedback={() => handleRetryFeedback(topLevelContributions[0].id)}
+                feedbackRetrying={retryingFeedbackSubmissionId === topLevelContributions[0].id}
+              >
+                {followUpParentId === topLevelContributions[0].id ? followUpComposer : null}
+              </ContributionThreadCard>
+
+              {topLevelContributions.length > 1 ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowEarlierPoints((v) => !v)}
+                  >
+                    {showEarlierPoints
+                      ? "Hide earlier points"
+                      : `Earlier points (${topLevelContributions.length - 1})`}
+                  </Button>
+                  {showEarlierPoints
+                    ? topLevelContributions.slice(1).map((submission) => (
+                        <ContributionThreadCard
+                          key={submission.id}
+                          submission={submission}
+                          feedback={feedbackBySubmissionId.get(submission.id) ?? null}
+                          assignment={assignmentBySubmissionId.get(submission.id) ?? null}
+                          categories={ws?.categorySummary}
+                          followUps={followUpsByParentId.get(submission.id) ?? []}
+                          recategorisationRequest={requestBySubmissionId.get(submission.id) ?? null}
+                          expanded={activeExpandedContributionId === submission.id}
+                          onToggleExpanded={() =>
+                            setExpandedContributionId((current) =>
+                              current === submission.id ? null : submission.id,
+                            )
+                          }
+                          onRequestRecategorisation={(request) =>
+                            handleRequestRecategorisation(submission.id, request)
+                          }
+                          onAddFollowUp={() => setFollowUpParentId(submission.id)}
+                          onRetryFeedback={() => handleRetryFeedback(submission.id)}
+                          feedbackRetrying={retryingFeedbackSubmissionId === submission.id}
+                        >
+                          {followUpParentId === submission.id ? followUpComposer : null}
+                        </ContributionThreadCard>
+                      ))
+                    : null}
+                </>
+              ) : null}
             </>
           )}
         </div>

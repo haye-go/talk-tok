@@ -67,12 +67,9 @@ export interface ContributionThreadCardProps {
   recategorisationRequest?: RecategorisationRequestData | null;
   expanded?: boolean;
   isLatest?: boolean;
-  canStartFight?: boolean;
   onToggleExpanded?: () => void;
   onRequestRecategorisation?: (request: RecategorisationRequestInput) => Promise<void> | void;
   onAddFollowUp?: () => void;
-  onViewExplore?: () => void;
-  onStartFight?: () => void;
   onRetryFeedback?: () => Promise<void> | void;
   feedbackRetrying?: boolean;
   children?: ReactNode;
@@ -98,12 +95,9 @@ export function ContributionThreadCard({
   recategorisationRequest,
   expanded = false,
   isLatest = false,
-  canStartFight = false,
   onToggleExpanded,
   onRequestRecategorisation,
   onAddFollowUp,
-  onViewExplore,
-  onStartFight,
   onRetryFeedback,
   feedbackRetrying = false,
   children,
@@ -171,19 +165,11 @@ export function ContributionThreadCard({
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="secondary" onClick={onToggleExpanded}>
-          {expanded ? "Hide analysis" : "View analysis"}
+          {expanded ? "Hide analysis" : "Open analysis"}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={onAddFollowUp}>
           Add follow-up
         </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onViewExplore}>
-          View in Explore
-        </Button>
-        {canStartFight ? (
-          <Button type="button" size="sm" variant="ghost" onClick={onStartFight}>
-            Go to Fight
-          </Button>
-        ) : null}
       </div>
 
       {children}

@@ -105,9 +105,6 @@ export function ResponseComposer({
         </span>
         <ToneSelector value={tone} onChange={setTone} />
       </div>
-      <p className="mt-2 text-[10px] text-[var(--c-muted)]">
-        Typing telemetry is stored locally and sent only on submit.
-      </p>
       <Button
         className="mt-2 w-full"
         type="submit"
