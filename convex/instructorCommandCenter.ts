@@ -13,6 +13,8 @@ const CATEGORY_LIMIT = 100;
 const JOB_LIMIT = 80;
 const AUDIT_LIMIT = 50;
 const RECENT_SUBMISSION_LIMIT = 30;
+const ROOM_SUBMISSION_LIMIT = 200;
+const ROOM_REACTION_LIMIT = 800;
 const FOLLOW_UP_LIMIT = 30;
 const FIGHT_THREAD_LIMIT = 60;
 const SYNTHESIS_ARTIFACT_LIMIT = 80;
@@ -147,6 +149,16 @@ function emptyArtifactStatusCounts(): Record<ArtifactStatus, number> {
   };
 }
 
+function emptyReactionCounts() {
+  return {
+    agree: 0,
+    sharp: 0,
+    question: 0,
+    spark: 0,
+    changed_mind: 0,
+  };
+}
+
 function toSubmission(
   submission: Doc<"submissions">,
   participant: Doc<"participants"> | null,
@@ -181,6 +193,237 @@ function toSubmission(
     createdAt: submission.createdAt,
   };
 }
+
+function isTopLevelMessage(submission: Doc<"submissions">) {
+  return (
+    !submission.parentSubmissionId &&
+    !submission.followUpPromptId &&
+    (submission.kind === "initial" || submission.kind === "additional_point")
+  );
+}
+
+export const room = query({
+  args: {
+    sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      return null;
+    }
+
+    const [questions, currentQuestion] = await Promise.all([
+      listQuestionsForSession(ctx, session._id),
+      getCurrentQuestionForSession(ctx, session),
+    ]);
+    const selectedQuestion =
+      args.questionId && questions.some((question) => question._id === args.questionId)
+        ? (questions.find((question) => question._id === args.questionId) ?? null)
+        : currentQuestion;
+    const selectedQuestionId = selectedQuestion?._id;
+
+    const [
+      participants,
+      submissions,
+      categories,
+      assignments,
+      reactions,
+      pendingRequests,
+    ] = await Promise.all([
+      ctx.db
+        .query("participants")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(PARTICIPANT_LIMIT),
+      selectedQuestionId
+        ? ctx.db
+            .query("submissions")
+            .withIndex("by_questionId_and_createdAt", (q) =>
+              q.eq("questionId", selectedQuestionId),
+            )
+            .order("desc")
+            .take(ROOM_SUBMISSION_LIMIT)
+        : ctx.db
+            .query("submissions")
+            .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(ROOM_SUBMISSION_LIMIT),
+      ctx.db
+        .query("categories")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(CATEGORY_LIMIT),
+      selectedQuestionId
+        ? ctx.db
+            .query("submissionCategories")
+            .withIndex("by_questionId", (q) => q.eq("questionId", selectedQuestionId))
+            .take(ROOM_SUBMISSION_LIMIT)
+        : ctx.db
+            .query("submissionCategories")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(ROOM_SUBMISSION_LIMIT),
+      ctx.db
+        .query("reactions")
+        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(ROOM_REACTION_LIMIT),
+      selectedQuestionId
+        ? ctx.db
+            .query("recategorizationRequests")
+            .withIndex("by_questionId_and_status", (q) =>
+              q.eq("questionId", selectedQuestionId).eq("status", "pending"),
+            )
+            .take(50)
+        : ctx.db
+            .query("recategorizationRequests")
+            .withIndex("by_session_and_status", (q) =>
+              q.eq("sessionId", session._id).eq("status", "pending"),
+            )
+            .take(50),
+    ]);
+
+    const activeCategories = categories.filter(
+      (category) =>
+        category.status === "active" &&
+        (!selectedQuestionId ||
+          !category.questionId ||
+          category.questionId === selectedQuestionId),
+    );
+    const categoriesById = new Map(categories.map((category) => [category._id, category]));
+    const participantsById = new Map(
+      participants.map((participant) => [participant._id, participant]),
+    );
+    const selectedSubmissionIds = new Set(submissions.map((submission) => submission._id));
+    const assignmentBySubmission = new Map<
+      Id<"submissions">,
+      {
+        questionId?: Id<"sessionQuestions">;
+        categoryId: Id<"categories">;
+        categoryName?: string;
+        categorySlug?: string;
+        categoryStatus?: "active" | "archived";
+      }
+    >();
+
+    for (const assignment of assignments) {
+      if (!selectedSubmissionIds.has(assignment.submissionId)) {
+        continue;
+      }
+
+      const category = categoriesById.get(assignment.categoryId);
+      assignmentBySubmission.set(assignment.submissionId, {
+        questionId: assignment.questionId,
+        categoryId: assignment.categoryId,
+        categoryName: category?.name,
+        categorySlug: category?.slug,
+        categoryStatus: category?.status,
+      });
+    }
+
+    const reactionsBySubmission = new Map<
+      Id<"submissions">,
+      { counts: ReturnType<typeof emptyReactionCounts> }
+    >();
+
+    for (const reaction of reactions) {
+      if (!selectedSubmissionIds.has(reaction.submissionId)) {
+        continue;
+      }
+
+      const state = reactionsBySubmission.get(reaction.submissionId) ?? {
+        counts: emptyReactionCounts(),
+      };
+      state.counts[reaction.kind] += 1;
+      reactionsBySubmission.set(reaction.submissionId, state);
+    }
+
+    const repliesByParentId = new Map<Id<"submissions">, Doc<"submissions">[]>();
+
+    for (const submission of submissions) {
+      if (!submission.parentSubmissionId) {
+        continue;
+      }
+
+      const existing = repliesByParentId.get(submission.parentSubmissionId) ?? [];
+      existing.push(submission);
+      repliesByParentId.set(submission.parentSubmissionId, existing);
+    }
+
+    const toThreadMessage = (submission: Doc<"submissions">) => {
+      const reactionState = reactionsBySubmission.get(submission._id);
+
+      return {
+        submission: toSubmission(
+          submission,
+          participantsById.get(submission.participantId) ?? null,
+          assignmentBySubmission.get(submission._id) ?? null,
+        ),
+        stats: {
+          replyCount: repliesByParentId.get(submission._id)?.length ?? 0,
+          upvoteCount: reactionState?.counts.agree ?? 0,
+          reactionCounts: reactionState?.counts ?? emptyReactionCounts(),
+        },
+      };
+    };
+
+    const toThread = (root: Doc<"submissions">) => {
+      const assignment = assignmentBySubmission.get(root._id);
+
+      return {
+        root: toThreadMessage(root),
+        replies: (repliesByParentId.get(root._id) ?? [])
+          .sort((left, right) => left.createdAt - right.createdAt)
+          .map(toThreadMessage),
+        assignment: assignment
+          ? {
+              categoryId: assignment.categoryId,
+              categorySlug: assignment.categorySlug,
+              categoryName: assignment.categoryName,
+              status: assignment.categoryStatus,
+            }
+          : null,
+      };
+    };
+
+    const latestThreads = submissions
+      .filter(isTopLevelMessage)
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .map(toThread);
+    const threadsByCategory = activeCategories.map((category) => ({
+      category: {
+        id: category._id,
+        questionId: category.questionId,
+        slug: category.slug,
+        name: category.name,
+        description: category.description,
+        color: category.color,
+        source: category.source,
+        status: category.status,
+        createdAt: category.createdAt,
+        updatedAt: category.updatedAt,
+      },
+      threads: latestThreads.filter((thread) => thread.assignment?.categoryId === category._id),
+    }));
+    const uncategorizedThreads = latestThreads.filter((thread) => !thread.assignment);
+
+    return {
+      session: toSessionSnapshot(session, participants.length),
+      selectedQuestion: selectedQuestion ? toPublicQuestion(selectedQuestion) : null,
+      latestThreads,
+      threadsByCategory,
+      uncategorizedThreads,
+      needsAttention: {
+        uncategorizedCount: uncategorizedThreads.length,
+        pendingRecategorisationCount: pendingRequests.length,
+        failedLiveJobCount: 0,
+      },
+      caps: {
+        submissions: submissions.length === ROOM_SUBMISSION_LIMIT,
+        reactions: reactions.length === ROOM_REACTION_LIMIT,
+      },
+    };
+  },
+});
 
 export const overview = query({
   args: {

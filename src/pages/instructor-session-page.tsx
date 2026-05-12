@@ -1728,8 +1728,6 @@ export function InstructorSessionPage() {
 
           <PresenceBar
             typing={presence.typing}
-            submitted={presence.submitted}
-            idle={presence.idle}
           />
 
           {/* Consensus pulse placeholder */}
