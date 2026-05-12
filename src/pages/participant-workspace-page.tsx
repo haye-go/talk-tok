@@ -141,9 +141,15 @@ export function ParticipantWorkspacePage({
   );
   const [retryingFeedbackSubmissionId, setRetryingFeedbackSubmissionId] =
     useState<Id<"submissions"> | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  const routeDrivenTab: TabId | null = fightSlug ? "fight" : null;
+  const [activeTab, setActiveTab] = useState<TabId>(routeDrivenTab ?? initialTab);
   const [generatingReport, setGeneratingReport] = useState(false);
   const touchedPresenceKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!routeDrivenTab) return;
+    setActiveTab(routeDrivenTab);
+  }, [routeDrivenTab]);
 
   useEffect(() => {
     if (!participant || !clientKey) return;
@@ -616,39 +622,22 @@ export function ParticipantWorkspacePage({
         </div>
       }
       fight={
-        fightSlug ? (
-          <FightThread
-            sessionSlug={sessionSlug}
-            fightSlug={fightSlug}
-            clientKey={clientKey}
-            myParticipantId={participant.id}
-          />
-        ) : canUseFightMe ? (
-          <FightHome
-            myFights={ws?.fightMe.mine ?? []}
-            pendingIncoming={ws?.fightMe.pendingIncoming ?? []}
-            currentFight={ws?.fightMe.current ?? null}
-            fightMeEnabled={ws?.session.fightMeEnabled ?? session.fightMeEnabled}
-            sessionSlug={sessionSlug}
-            clientKey={clientKey}
-            mySubmissionId={primaryContribution?.id}
-            onNavigateToThread={(nextFightSlug) =>
-              void navigate({ to: routes.sessionFight(sessionSlug, nextFightSlug) })
-            }
-          />
-        ) : canUseFight ? (
-          <Card title="Fight needs a contribution first">
-            <p className="text-sm text-[var(--c-muted)]">
-              Submit a response to this question before you open a Fight thread.
-            </p>
-          </Card>
-        ) : (
-          <Card title="Fight is unavailable">
-            <p className="text-sm text-[var(--c-muted)]">
-              The instructor has not enabled Fight for this question yet.
-            </p>
-          </Card>
-        )
+        <FightTabContent
+          sessionSlug={sessionSlug}
+          clientKey={clientKey}
+          myParticipantId={participant.id}
+          myFights={ws?.fightMe.mine ?? []}
+          pendingIncoming={ws?.fightMe.pendingIncoming ?? []}
+          currentFight={ws?.fightMe.current ?? null}
+          fightMeEnabled={ws?.session.fightMeEnabled ?? session.fightMeEnabled}
+          mySubmissionId={primaryContribution?.id}
+          canUseFight={canUseFight}
+          canUseFightMe={canUseFightMe}
+          fightSlug={fightSlug}
+          onNavigateToThread={(nextFightSlug) =>
+            void navigate({ to: routes.sessionFight(sessionSlug, nextFightSlug) })
+          }
+        />
       }
       me={
         showReviewDetail ? (
@@ -692,6 +681,80 @@ export function ParticipantWorkspacePage({
         )
       }
     />
+  );
+}
+
+interface FightTabContentProps {
+  sessionSlug: string;
+  clientKey: string;
+  myParticipantId: string;
+  myFights: NonNullable<ReturnType<typeof useParticipantWorkspace>>["fightMe"]["mine"];
+  pendingIncoming: NonNullable<ReturnType<typeof useParticipantWorkspace>>["fightMe"]["pendingIncoming"];
+  currentFight: NonNullable<ReturnType<typeof useParticipantWorkspace>>["fightMe"]["current"];
+  fightMeEnabled: boolean;
+  mySubmissionId?: Id<"submissions">;
+  canUseFight: boolean;
+  canUseFightMe: boolean;
+  fightSlug?: string;
+  onNavigateToThread: (fightSlug: string) => void;
+}
+
+function FightTabContent({
+  sessionSlug,
+  clientKey,
+  myParticipantId,
+  myFights,
+  pendingIncoming,
+  currentFight,
+  fightMeEnabled,
+  mySubmissionId,
+  canUseFight,
+  canUseFightMe,
+  fightSlug,
+  onNavigateToThread,
+}: FightTabContentProps) {
+  if (fightSlug) {
+    return (
+      <FightThread
+        sessionSlug={sessionSlug}
+        fightSlug={fightSlug}
+        clientKey={clientKey}
+        myParticipantId={myParticipantId}
+      />
+    );
+  }
+
+  if (canUseFightMe) {
+    return (
+      <FightHome
+        myFights={myFights}
+        pendingIncoming={pendingIncoming}
+        currentFight={currentFight}
+        fightMeEnabled={fightMeEnabled}
+        sessionSlug={sessionSlug}
+        clientKey={clientKey}
+        mySubmissionId={mySubmissionId}
+        onNavigateToThread={onNavigateToThread}
+      />
+    );
+  }
+
+  if (canUseFight) {
+    return (
+      <Card title="Fight needs a contribution first">
+        <p className="text-sm text-[var(--c-muted)]">
+          Submit a response to this question before you open a Fight thread.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="Fight is unavailable">
+      <p className="text-sm text-[var(--c-muted)]">
+        The instructor has not enabled Fight for this question yet.
+      </p>
+    </Card>
   );
 }
 
