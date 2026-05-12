@@ -8,6 +8,7 @@ import { ContributionThreadCard } from "@/components/contribute/contribution-thr
 import { FightHome } from "@/components/fight/fight-home";
 import { FightThread } from "@/components/fight/fight-thread";
 import { ParticipantShell } from "@/components/layout/participant-shell";
+import { ParticipantStateSection } from "@/components/layout/participant-state-section";
 import { MyZoneTab } from "@/components/myzone/my-zone-tab";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
@@ -543,11 +544,8 @@ export function ParticipantWorkspacePage({
       onActiveTabChange={handleTabChange}
       contribute={
         <div className="grid gap-4">
-          <Card tone="cream">
-            <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--c-on-sig-light-body)]">
-              {promptLabel}
-            </p>
-            <p className="mt-1 text-sm font-medium leading-relaxed text-[var(--c-on-sig-light)]">
+          <Card tone="cream" eyebrow={promptLabel}>
+            <p className="text-sm font-medium leading-relaxed text-[var(--c-ink)]">
               &ldquo;{selectedPrompt}&rdquo;
             </p>
           </Card>
@@ -560,12 +558,10 @@ export function ParticipantWorkspacePage({
           ) : null}
 
           {!contributionsOpen && topLevelContributions.length === 0 ? (
-            <Card>
-              <p className="text-sm text-[var(--c-muted)]">
-                This question is browseable, but new contributions are closed until the instructor
-                reopens it.
-              </p>
-            </Card>
+            <ParticipantStateSection kind="locked" title="Contributions paused">
+              This question is browseable, but new contributions are closed until the instructor
+              reopens it.
+            </ParticipantStateSection>
           ) : null}
 
           {topLevelContributions.length === 0 ? (
@@ -576,28 +572,29 @@ export function ParticipantWorkspacePage({
             />
           ) : (
             <>
-              <Card title="Your contributions">
-                <p className="text-sm text-[var(--c-muted)]">
-                  Posting stays open-ended. Add another point, reflect on the feedback, or move
-                  into the room from here.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {contributionsOpen ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => setShowAdditionalComposer((value) => !value)}
-                    >
-                      {showAdditionalComposer ? "Cancel another point" : "Add another point"}
+              <Card
+                title="Your contributions"
+                description="Posting stays open-ended. Add another point, reflect on the feedback, or move into the room from here."
+                footer={
+                  <>
+                    {contributionsOpen ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setShowAdditionalComposer((value) => !value)}
+                      >
+                        {showAdditionalComposer ? "Cancel another point" : "Add another point"}
+                      </Button>
+                    ) : (
+                      <Badge tone="neutral">New top-level posts are paused</Badge>
+                    )}
+                    <Button type="button" variant="ghost" size="sm" onClick={() => handleTabChange("explore")}>
+                      Go to Explore
                     </Button>
-                  ) : (
-                    <Badge tone="neutral">New top-level posts are paused</Badge>
-                  )}
-                  <Button type="button" variant="ghost" onClick={() => handleTabChange("explore")}>
-                    Go to Explore
-                  </Button>
-                </div>
-              </Card>
+                  </>
+                }
+              />
 
               {showAdditionalComposer ? (
                 <ResponseComposer

@@ -206,26 +206,20 @@ export function ContributionThreadCard({
               retrying={feedbackRetrying}
             />
           ) : (
-            <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
-              <p className="font-display text-sm font-medium text-[var(--c-ink)]">AI feedback</p>
-              <p className="mt-1 text-xs text-[var(--c-muted)]">
-                Feedback will appear here after you submit this contribution.
-              </p>
-            </div>
+            <Card title="AI feedback" description="Feedback will appear here after you submit this contribution." />
           )}
 
           {assignment ? (
-            <div
-              className="rounded-md bg-[var(--c-surface-soft)] p-3"
-              style={{ border: "1px solid var(--c-sig-sky)" }}
-            >
+            <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
               <p className="text-xs text-[var(--c-muted)]">Placed in</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <Badge tone={categoryColorToTone(undefined, 0)}>
                   {assignment.categoryName ?? "Categorized"}
                 </Badge>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowRecatForm((value) => !value)}
                   disabled={
                     !onRequestRecategorisation ||
@@ -233,10 +227,9 @@ export function ContributionThreadCard({
                     Boolean(recategorisationRequest) ||
                     recatSubmitted
                   }
-                  className="text-xs text-[var(--c-link)] underline"
                 >
                   Request re-categorization
-                </button>
+                </Button>
               </div>
               {(recategorisationRequest || recatSubmitted) && (
                 <InlineAlert tone="success" className="mt-3 text-xs">
