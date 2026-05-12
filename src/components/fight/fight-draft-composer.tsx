@@ -52,8 +52,7 @@ export function FightDraftComposer({
 
   return (
     <div
-      className="rounded-md border bg-[var(--c-surface-soft)] p-3"
-      style={{ borderColor: "var(--c-sig-coral)" }}
+      className="rounded-md border border-[var(--c-tab-fight)] bg-[var(--c-surface-soft)] p-3"
     >
       {turnDeadlineAt && (
         <div className="mb-2">

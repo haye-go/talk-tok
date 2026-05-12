@@ -36,8 +36,7 @@ export function FightDebrief({
   if (status === "error") {
     return (
       <div
-        className="rounded-md bg-[var(--c-surface-soft)] p-4"
-        style={{ borderLeft: "3px solid var(--c-error)" }}
+        className="rounded-md border-l-[3px] border-l-[var(--c-error)] bg-[var(--c-surface-soft)] p-4"
       >
         <p className="font-display text-xs font-medium text-[var(--c-ink)]">Debrief failed</p>
         <p className="text-[10px] text-[var(--c-muted)]">{error ?? "An error occurred."}</p>

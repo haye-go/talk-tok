@@ -32,7 +32,7 @@ export function FightThread({
   if (!sessionSlug || !fightSlug) {
     return (
       <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-4 text-center">
-        <Sword size={24} className="mx-auto text-[var(--c-sig-coral)]" />
+        <Sword size={24} className="mx-auto text-[var(--c-tab-fight)]" />
         <p className="mt-2 font-display text-sm font-medium text-[var(--c-ink)]">
           Select or start a Fight Me thread
         </p>
