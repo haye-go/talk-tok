@@ -15,6 +15,8 @@ const PEER_RESPONSE_LIMIT = 30;
 const JOB_LIMIT = 40;
 const FIGHT_THREAD_LIMIT = 40;
 const SYNTHESIS_ARTIFACT_LIMIT = 40;
+const PARTICIPANT_PRESENCE_LIMIT = 500;
+const OFFLINE_AFTER_MS = 45_000;
 
 const toneValidator = v.union(
   v.literal("gentle"),
@@ -136,6 +138,40 @@ function toParticipant(participant: Doc<"participants">) {
     lastSeenAt: participant.lastSeenAt,
     presenceState: participant.presenceState,
   };
+}
+
+function orderReleasedQuestions(
+  questions: Doc<"sessionQuestions">[],
+  currentQuestionId?: Id<"sessionQuestions">,
+) {
+  return questions
+    .filter((question) => question.status === "released")
+    .sort((left, right) => {
+      if (left._id === currentQuestionId) return -1;
+      if (right._id === currentQuestionId) return 1;
+
+      const leftReleasedAt = left.releasedAt ?? left.createdAt;
+      const rightReleasedAt = right.releasedAt ?? right.createdAt;
+
+      return rightReleasedAt - leftReleasedAt;
+    });
+}
+
+function presenceAggregateFor(participants: Doc<"participants">[], now: number) {
+  const aggregate = {
+    total: participants.length,
+    typing: 0,
+    submitted: 0,
+    idle: 0,
+    offline: 0,
+  };
+
+  for (const row of participants) {
+    const derivedState = now - row.lastSeenAt > OFFLINE_AFTER_MS ? "offline" : row.presenceState;
+    aggregate[derivedState] += 1;
+  }
+
+  return aggregate;
 }
 
 function nicknameForPeer(session: Doc<"sessions">, participant: Doc<"participants"> | null) {
@@ -279,6 +315,7 @@ export const overview = query({
       publishedArtifacts,
       finalArtifacts,
       personalReports,
+      presenceParticipants,
     ] = await Promise.all([
       listQuestionsForSession(ctx, session._id),
       getCurrentQuestionForSession(ctx, session),
@@ -347,14 +384,24 @@ export const overview = query({
         )
         .order("desc")
         .take(1),
+      ctx.db
+        .query("participants")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(PARTICIPANT_PRESENCE_LIMIT),
     ]);
     const requestedQuestion = args.questionId ? await ctx.db.get(args.questionId) : null;
+    const releasedQuestionsOrdered = orderReleasedQuestions(questions, currentQuestion?._id);
     const selectedQuestion =
-      requestedQuestion && requestedQuestion.sessionId === session._id
+      requestedQuestion &&
+      requestedQuestion.sessionId === session._id &&
+      requestedQuestion.status === "released"
         ? requestedQuestion
-        : currentQuestion;
+        : currentQuestion?.status === "released"
+          ? currentQuestion
+          : (releasedQuestionsOrdered[0] ?? null);
 
     const selectedQuestionId = selectedQuestion?._id;
+    const presenceAggregate = presenceAggregateFor(presenceParticipants, Date.now());
     const synthesisVisible =
       Boolean(selectedQuestion?.synthesisVisible) &&
       session.visibilityMode !== "private_until_released";
@@ -546,10 +593,12 @@ export const overview = query({
 
     return {
       session: toSessionSnapshot(session),
-      questions: questions.map(toPublicQuestion),
+      questions: releasedQuestionsOrdered.map(toPublicQuestion),
+      releasedQuestionsOrdered: releasedQuestionsOrdered.map(toPublicQuestion),
       currentQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
       selectedQuestion: selectedQuestion ? toPublicQuestion(selectedQuestion) : null,
       participant: toParticipant(participant),
+      presenceAggregate,
       visibility: {
         mode: session.visibilityMode,
         canSeeCategorySummary:
