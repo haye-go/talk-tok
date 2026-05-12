@@ -1289,8 +1289,20 @@ export function InstructorSessionPage() {
       onPreviousAct={retreatPhase}
       onNextAct={advancePhase}
       left={
-        <div className="grid gap-4 p-4">
-          <nav className="grid gap-1">
+        <div className="flex min-h-full flex-col gap-6 bg-gradient-to-b from-[#18324c] to-[#12263a] p-5 text-[#d9e7f3]">
+          <section className="border-b border-white/10 pb-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b8cadb]">
+              Session
+            </p>
+            <h2 className="mt-2 font-display text-base font-semibold text-white">
+              {session.title}
+            </h2>
+            <p className="mt-2 text-xs leading-5 text-[#8ea4bb]">
+              Entry links stay intentional: Open Room for live use, Open Setup for preparation.
+            </p>
+          </section>
+
+          <nav className="grid gap-2">
             {INSTRUCTOR_WORKSPACE_TABS.map((tab) => {
               const Icon = tab.icon;
 
@@ -1299,20 +1311,66 @@ export function InstructorSessionPage() {
                   key={tab.id}
                   href={workspaceHref(tab.id)}
                   className={cn(
-                    "inline-flex min-h-10 items-center gap-2 rounded-sm px-3 text-sm font-medium transition",
+                    "inline-flex min-h-11 items-center justify-between gap-3 rounded-xl px-3 text-sm font-semibold transition",
                     workspaceTab === tab.id
-                      ? "bg-[color-mix(in_oklch,var(--c-canvas),transparent_88%)] text-[var(--c-canvas)]"
-                      : "text-[color-mix(in_oklch,var(--c-canvas),transparent_35%)] hover:bg-[color-mix(in_oklch,var(--c-canvas),transparent_94%)] hover:text-[var(--c-canvas)]",
+                      ? "bg-white/12 text-white"
+                      : "text-[#b8cadb] hover:bg-white/8 hover:text-white",
                   )}
                 >
-                  <Icon size={16} />
-                  {tab.label}
+                  <span className="inline-flex items-center gap-2">
+                    <Icon size={16} />
+                    {tab.label}
+                  </span>
+                  <span className="text-[11px] font-semibold text-[#8ea4bb]">
+                    {tab.id === "room" ? "Live" : tab.id === "setup" ? "Prepare" : "Review"}
+                  </span>
                 </a>
               );
             })}
           </nav>
 
-          <div className="border-t border-[color-mix(in_oklch,var(--c-canvas),transparent_88%)] pt-4">
+          {workspaceTab === "room" ? (
+            <section className="grid gap-2 border-t border-white/10 pt-5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b8cadb]">
+                Room Modes
+              </p>
+              {ROOM_MODES.map((mode) => {
+                const Icon = mode.icon;
+
+                return (
+                  <a
+                    key={mode.id}
+                    href={roomModeHref(mode.id)}
+                    className={cn(
+                      "inline-flex min-h-10 items-center justify-between gap-3 rounded-xl px-3 text-sm font-semibold transition",
+                      roomMode === mode.id
+                        ? "bg-white/12 text-white"
+                        : "text-[#b8cadb] hover:bg-white/8 hover:text-white",
+                    )}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Icon size={15} />
+                      {mode.label}
+                    </span>
+                    <span className="text-[11px] font-semibold text-[#8ea4bb]">
+                      {mode.id === "latest"
+                        ? "Default"
+                        : mode.id === "categories"
+                          ? "Board"
+                          : "Phase 17"}
+                    </span>
+                  </a>
+                );
+              })}
+            </section>
+          ) : null}
+
+          <p className="mt-auto border-t border-white/10 pt-5 text-xs leading-5 text-[#8ea4bb]">
+            Room is for live reading and intervention. Setup holds drafting and configuration.
+            Reports holds synthesis, argument map, personal reports, and AI review surfaces.
+          </p>
+
+          <div className="hidden">
           {/* Category board */}
           <div className="flex items-center justify-between">
             <span className="text-xs text-[var(--c-muted)]">

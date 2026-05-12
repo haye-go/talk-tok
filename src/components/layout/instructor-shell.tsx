@@ -37,7 +37,7 @@ export function InstructorShell({
   const resolvedRail = rail ?? right;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--c-canvas)]">
+    <div className="flex min-h-dvh flex-col bg-[#eef3f8]">
       <InstructorTopBar
         sessionTitle={sessionTitle}
         sessionCode={sessionCode}
@@ -46,12 +46,14 @@ export function InstructorShell({
         onPreviousAct={onPreviousAct ?? fallbackAct.goBackAct}
         onNextAct={onNextAct ?? fallbackAct.advanceAct}
       />
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[220px_minmax(0,1fr)_320px] xl:grid-cols-[240px_minmax(0,1fr)_340px]">
-        <aside className="min-h-0 overflow-y-auto border-b border-[var(--c-hairline)] bg-[var(--c-ink)] text-[var(--c-canvas)] lg:border-b-0 lg:border-r lg:border-[color-mix(in_oklch,var(--c-canvas),transparent_88%)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[226px_minmax(0,1fr)_314px]">
+        <aside className="min-h-0 overflow-y-auto border-b border-[#223a54] bg-[#12263a] text-[#d9e7f3] lg:border-b-0 lg:border-r">
           {resolvedSidebar}
         </aside>
-        <main className="min-h-0 overflow-y-auto bg-[var(--c-canvas)]">{resolvedMain}</main>
-        <aside className="min-h-0 overflow-y-auto border-t border-[var(--c-hairline)] bg-[var(--c-surface-soft)] lg:border-l lg:border-t-0 lg:border-[var(--c-hairline)]">
+        <main className="min-h-0 overflow-y-auto bg-gradient-to-b from-[#f7fafc] to-[#f2f6fa]">
+          {resolvedMain}
+        </main>
+        <aside className="min-h-0 overflow-y-auto border-t border-[#d7e0ea] bg-[#f3f7fb] lg:border-l lg:border-t-0">
           {resolvedRail}
         </aside>
       </div>
