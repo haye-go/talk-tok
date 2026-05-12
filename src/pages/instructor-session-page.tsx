@@ -2713,40 +2713,46 @@ export function InstructorSessionPage() {
         )
       }
       right={
-        <div className="grid gap-4 p-4">
-          <section className="grid gap-2 border-b border-[var(--c-hairline)] pb-4">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--c-muted)]">
-              Live controls
+        <div className="flex min-h-full flex-col gap-5 p-5 text-[var(--c-body)]">
+          <section className="border-b border-[#d7e0ea] pb-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
+              Persistent Live Rail
             </p>
-            <div>
-              <p className="font-display text-sm font-medium text-[var(--c-ink)]">
-                {selectedQuestion?.title ?? "No question selected"}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-[var(--c-muted)]">
-                {selectedQuestionSummary?.counts.submissions ?? 0} submissions /{" "}
-                {selectedQuestionSummary?.counts.uncategorized ?? responses.uncategorized}{" "}
-                uncategorized
-              </p>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <MetricTile label="Typing" value={String(presence.typing)} />
-              <MetricTile label="Submitted" value={String(presence.submitted)} />
-              <MetricTile label="Idle" value={String(presence.idle)} />
-            </div>
+            <h2 className="mt-2 font-display text-base font-semibold text-[var(--c-ink)]">
+              Quick actions from any tab
+            </h2>
+            <p className="mt-2 text-xs leading-5 text-[var(--c-muted)]">
+              Live controls stay reachable without forcing a workspace switch. Deep setup and
+              review surfaces live in the center tabs.
+            </p>
           </section>
 
-          <section className="grid gap-2 border-b border-[var(--c-hairline)] pb-4">
-            <p className="text-xs font-medium text-[var(--c-ink)]">Question switcher</p>
-            <div className="grid gap-1.5">
+          <section className="rounded-2xl border border-[#dbe5ef] bg-white/75 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">
+              Selected Question
+            </p>
+            <p className="mt-2 font-display text-sm font-semibold leading-5 text-[var(--c-ink)]">
+              {selectedQuestion?.title ?? "No question selected"}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-[var(--c-muted)]">
+              {selectedQuestionSummary?.counts.submissions ?? 0} submissions /{" "}
+              {selectedQuestionSummary?.counts.uncategorized ?? responses.uncategorized}{" "}
+              uncategorized
+            </p>
+          </section>
+
+          <section className="border-b border-[#d7e0ea] pb-5">
+            <p className="mb-2 text-xs font-semibold text-[var(--c-ink)]">Question switcher</p>
+            <div className="grid gap-2">
               {questions.map((question) => (
                 <a
                   key={question.id}
                   href={questionHref(question.id)}
                   className={cn(
-                    "rounded-sm border px-2.5 py-2 text-xs transition",
+                    "rounded-xl border px-3 py-2 text-xs transition",
                     selectedQuestion?.id === question.id
-                      ? "border-[var(--c-primary)] bg-[var(--c-surface-strong)] text-[var(--c-ink)]"
-                      : "border-[var(--c-hairline)] text-[var(--c-muted)] hover:bg-[var(--c-surface-strong)] hover:text-[var(--c-ink)]",
+                      ? "border-[#17212b] bg-white text-[var(--c-ink)]"
+                      : "border-[#d7e0ea] text-[var(--c-muted)] hover:bg-white hover:text-[var(--c-ink)]",
                   )}
                 >
                   <span className="block truncate font-medium">{question.title}</span>
@@ -2756,8 +2762,72 @@ export function InstructorSessionPage() {
             </div>
           </section>
 
-          <section className="grid gap-2 border-b border-[var(--c-hairline)] pb-4">
-            <p className="text-xs font-medium text-[var(--c-ink)]">Release state</p>
+          <section className="rounded-2xl border border-[#dbe5ef] bg-white/75 p-4">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">
+              Release + Interaction
+            </p>
+            <div className="grid gap-2.5">
+              {[
+                ["Contributions", session.phase === "submit" ? "Open" : "Not submit"],
+                [
+                  "Peer responses",
+                  session.visibilityMode === "raw_responses_visible" ? "Visible" : "Hidden",
+                ],
+                [
+                  "Category board",
+                  session.visibilityMode === "private_until_released" ? "Hidden" : "Visible",
+                ],
+                ["Synthesis", synthesisReleasedForQuestion ? "Visible" : "Hidden"],
+                ["Reports", reportsReleasedForQuestion ? "Visible" : "Hidden"],
+                ["Replies", "On"],
+                ["Upvotes", "On"],
+                ["Fight", session.fightMeEnabled ? "On" : "Off"],
+                ["Reports gate", session.summaryGateEnabled ? "On" : "Off"],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex items-center justify-between gap-3 border-b border-[#e5edf4] pb-2 last:border-b-0 last:pb-0"
+                >
+                  <span className="text-sm text-[var(--c-ink)]">{label}</span>
+                  <span
+                    className={cn(
+                      "rounded-full px-2.5 py-1 text-[10px] font-bold",
+                      ["Open", "Visible", "On"].includes(value)
+                        ? "bg-[#dff6f0] text-[#0f766e]"
+                        : "bg-[#edf2f7] text-[var(--c-muted)]",
+                    )}
+                  >
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[#dbe5ef] bg-white/75 p-4">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">
+              Live Counters
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ["Typing now", presence.typing],
+                ["Submitted", presence.submitted],
+                ["Idle", presence.idle],
+                ["Uncategorized", selectedQuestionSummary?.counts.uncategorized ?? responses.uncategorized],
+                ["Pending recat", recategorisation.pendingCount],
+              ].map(([label, value]) => (
+                <div key={label} className="border-t border-[#d7e0ea] py-2">
+                  <strong className="block font-display text-xl text-[var(--c-ink)]">{value}</strong>
+                  <span className="text-[10px] text-[var(--c-muted)]">{label}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[#eadfcb] bg-[#fffaf2]/75 p-4">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">
+              Quick Live Actions
+            </p>
             <div className="grid gap-2">
               <Button
                 type="button"
@@ -2786,92 +2856,51 @@ export function InstructorSessionPage() {
               >
                 Hide room
               </Button>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <Badge
-                tone={session.visibilityMode === "private_until_released" ? "warning" : "success"}
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => void handleTriggerCategorisation()}
+                disabled={categorisationBusy}
               >
-                {session.visibilityMode.replace(/_/g, " ")}
-              </Badge>
-              <Badge tone={session.fightMeEnabled ? "success" : "neutral"}>Fight</Badge>
-              <Badge tone={session.summaryGateEnabled ? "success" : "neutral"}>Reports gate</Badge>
+                {categorisationBusy ? "Categorising..." : "Run categorisation"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => handleGenerateClassSynthesis()}
+                disabled={generatingClass}
+              >
+                {generatingClass ? "Generating..." : "Generate synthesis"}
+              </Button>
             </div>
           </section>
 
-          <section className="grid gap-2 border-b border-[var(--c-hairline)] pb-4">
-            <p className="text-xs font-medium text-[var(--c-ink)]">Live actions</p>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => void handleTriggerCategorisation()}
-              disabled={categorisationBusy}
-            >
-              {categorisationBusy ? "Categorising..." : "Run categorisation"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => handleGenerateClassSynthesis()}
-              disabled={generatingClass}
-            >
-              {generatingClass ? "Generating..." : "Generate synthesis"}
-            </Button>
+          <section className="grid gap-2">
+            <p className="text-xs font-semibold text-[var(--c-muted)]">Live Activity</p>
+            {studentActivity.length === 0 ? (
+              <p className="text-sm text-[var(--c-muted)]">No student activity yet.</p>
+            ) : (
+              studentActivity.slice(0, 8).map((event) => (
+                <div
+                  key={event.id}
+                  className="border-b border-[#d7e0ea] pb-2 text-xs text-[var(--c-body)]"
+                >
+                  <strong>{event.actorType}</strong> {event.action.replace(/_/g, " ")}
+                  {event.targetType ? (
+                    <span className="text-[var(--c-muted)]"> on {event.targetType}</span>
+                  ) : null}
+                  <span className="ml-1.5 text-[10px] text-[var(--c-muted)]">
+                    {new Date(event.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              ))
+            )}
           </section>
-
-          <p className="text-xs text-[var(--c-muted)]">Live Activity</p>
-          {studentActivity.length === 0 && (
-            <p className="text-sm text-[var(--c-muted)]">No student activity yet.</p>
-          )}
-          {studentActivity.map((event) => (
-            <div
-              key={event.id}
-              className="border-b border-[var(--c-hairline)] pb-2 text-xs text-[var(--c-body)]"
-            >
-              <span
-                className="mr-1.5 inline-block h-2 w-2 rounded-full"
-                style={{
-                  background: event.action.includes("synthesis")
-                    ? "var(--c-sig-peach)"
-                    : event.action.includes("report")
-                      ? "var(--c-success)"
-                      : event.action.includes("fight")
-                        ? "var(--c-sig-coral)"
-                        : event.action.includes("recat")
-                          ? "var(--c-sig-yellow)"
-                          : event.action.includes("follow")
-                            ? "var(--c-sig-peach)"
-                            : "var(--c-sig-sky)",
-                }}
-              />
-              <strong>{event.actorType}</strong> {event.action.replace(/_/g, " ")}
-              {event.targetType && (
-                <span className="text-[var(--c-muted)]"> on {event.targetType}</span>
-              )}
-              <span className="ml-1.5 text-[10px] text-[var(--c-muted)]">
-                {new Date(event.createdAt).toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-            </div>
-          ))}
-
-          {/* Synthesis Artifacts */}
-          {recentArtifacts.length > 0 && (
-            <>
-              <p className="mt-3 text-xs text-[var(--c-muted)]">Synthesis Artifacts</p>
-              {recentArtifacts.map((artifact) => (
-                <SynthesisArtifactCard
-                  key={artifact.id}
-                  artifact={artifact}
-                  sessionSlug={sessionSlug}
-                  isInstructor
-                />
-              ))}
-            </>
-          )}
         </div>
       }
     />
