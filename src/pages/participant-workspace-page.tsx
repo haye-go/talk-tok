@@ -12,12 +12,12 @@ import { ParticipantStateSection } from "@/components/layout/participant-state-s
 import { MyZoneTab } from "@/components/myzone/my-zone-tab";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
+import { PresenceBar } from "@/components/stream/presence-bar";
 import { StreamTab } from "@/components/stream/stream-tab";
 import {
   ResponseComposer,
   type ResponseComposerSubmit,
 } from "@/components/submission/response-composer";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
@@ -31,7 +31,6 @@ import {
   setDemoClientKey,
   storeParticipant,
 } from "@/lib/client-identity";
-import { categoryColorToTone } from "@/lib/category-colors";
 import { DEMO_SESSION_SLUG, TABS, type TabId } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 
@@ -145,26 +144,16 @@ export function ParticipantWorkspacePage({
   const [feedbackQueueWarning, setFeedbackQueueWarning] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
   const [showAdditionalComposer, setShowAdditionalComposer] = useState(false);
-  const [showEarlierPoints, setShowEarlierPoints] = useState(false);
   const [expandedContributionId, setExpandedContributionId] = useState<Id<"submissions"> | null>(
     null,
   );
   const [retryingFeedbackSubmissionId, setRetryingFeedbackSubmissionId] =
     useState<Id<"submissions"> | null>(null);
   const routeDrivenTab: TabId | null = fightSlug ? "fight" : showReviewDetail ? "me" : null;
-  const [activeTab, setActiveTab] = useState<TabId>(routeDrivenTab ?? requestedTab ?? initialTab);
+  const [localActiveTab, setLocalActiveTab] = useState<TabId>(requestedTab ?? initialTab);
+  const activeTab = routeDrivenTab ?? localActiveTab;
   const [generatingReport, setGeneratingReport] = useState(false);
   const touchedPresenceKey = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!routeDrivenTab) return;
-    setActiveTab(routeDrivenTab);
-  }, [routeDrivenTab]);
-
-  useEffect(() => {
-    if (routeDrivenTab) return;
-    setActiveTab(requestedTab ?? initialTab);
-  }, [initialTab, requestedTab, routeDrivenTab]);
 
   useEffect(() => {
     if (!participant || !clientKey) return;
@@ -326,7 +315,7 @@ export function ParticipantWorkspacePage({
   }
 
   function handleTabChange(nextTab: TabId) {
-    setActiveTab(nextTab);
+    setLocalActiveTab(nextTab);
     void navigate({
       to: routes.sessionTab(sessionSlug, nextTab),
     });
@@ -381,24 +370,12 @@ export function ParticipantWorkspacePage({
   const matchesSelectedQuestion = (questionId?: Id<"sessionQuestions"> | null) =>
     !selectedQuestion?.id || questionId === selectedQuestion.id;
 
-  const initialResponses =
-    ws?.myZoneHistory.initialResponses.filter((submission) =>
-      matchesSelectedQuestion(submission.questionId),
-    ) ?? [];
+  const myThreads = ws?.myThreads ?? [];
   const nonInitialResponses =
     ws?.myZoneHistory.followUpResponses.filter((submission) =>
       matchesSelectedQuestion(submission.questionId),
     ) ?? [];
-
-  const topLevelAdditionalResponses = nonInitialResponses.filter(
-    (submission) =>
-      submission.kind === "additional_point" &&
-      !submission.parentSubmissionId &&
-      !submission.followUpPromptId,
-  );
-  const topLevelContributions = [...initialResponses, ...topLevelAdditionalResponses].sort(
-    (left, right) => right.createdAt - left.createdAt,
-  );
+  const topLevelContributions = myThreads.map((thread) => thread.root.submission);
   const followUpResponses = nonInitialResponses.filter(
     (submission) => Boolean(submission.parentSubmissionId) || Boolean(submission.followUpPromptId),
   );
@@ -417,32 +394,12 @@ export function ParticipantWorkspacePage({
     ws?.recategorisationRequests.filter((request) => matchesSelectedQuestion(request.questionId)) ??
     [];
 
-  const feedbackBySubmissionId = new Map(
-    scopedFeedback.map((feedback) => [feedback.submissionId, feedback] as const),
-  );
-  const assignmentBySubmissionId = new Map(
-    scopedAssignments.map((assignment) => [assignment.submissionId, assignment] as const),
-  );
-  const requestBySubmissionId = new Map(
-    scopedRecategorisationRequests.map((request) => [request.submissionId, request] as const),
-  );
-  const followUpsByParentId = new Map<Id<"submissions">, typeof followUpResponses>();
-
-  for (const submission of followUpResponses) {
-    if (!submission.parentSubmissionId) {
-      continue;
-    }
-    const existing = followUpsByParentId.get(submission.parentSubmissionId) ?? [];
-    existing.push(submission);
-    followUpsByParentId.set(submission.parentSubmissionId, existing);
-  }
-
   const primaryContribution = topLevelContributions[0] ?? null;
   const activeExpandedContributionId = topLevelContributions.some(
     (submission) => submission.id === expandedContributionId,
   )
     ? expandedContributionId
-    : (topLevelContributions[0]?.id ?? null);
+    : null;
 
   const canSeeCategorySummary =
     selectedQuestion?.categoryBoardVisible ??
@@ -530,125 +487,83 @@ export function ParticipantWorkspacePage({
             </ParticipantStateSection>
           ) : null}
 
+          <div className="flex flex-col gap-2 rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3 sm:flex-row sm:items-center sm:justify-between">
+            <PresenceBar
+              typing={ws?.presenceAggregate.typing ?? 0}
+              submitted={ws?.presenceAggregate.submitted ?? 0}
+              idle={ws?.presenceAggregate.idle ?? 0}
+              className="border-none bg-transparent p-0"
+            />
+            {contributionsOpen && topLevelContributions.length > 0 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowAdditionalComposer((value) => !value)}
+              >
+                {showAdditionalComposer ? "Cancel" : "Add another point"}
+              </Button>
+            ) : !contributionsOpen ? (
+              <p className="text-xs text-[var(--c-muted)]">New contributions are paused.</p>
+            ) : (
+              <p className="text-xs text-[var(--c-muted)]">Add your first response below.</p>
+            )}
+          </div>
+
           {topLevelContributions.length === 0 ? (
             <ResponseComposer
               softWordLimit={session.responseSoftLimitWords}
               submitLabel="Submit response"
               onSubmit={(_text, _tone, submission) => handleSubmit(submission)}
             />
-          ) : (
-            <>
-              <Card>
-                <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                  <Badge tone="success">Submitted</Badge>
-                  <span className="text-[var(--c-muted)]">
-                    {new Date(primaryContribution!.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                  {assignmentBySubmissionId.get(primaryContribution!.id)?.categoryName ? (
-                    <Badge tone={categoryColorToTone(undefined, 0)}>
-                      {assignmentBySubmissionId.get(primaryContribution!.id)!.categoryName}
-                    </Badge>
-                  ) : null}
-                  {(() => {
-                    const fb = feedbackBySubmissionId.get(primaryContribution!.id);
-                    if (fb?.status === "success") return <Badge tone="sky">Feedback ready</Badge>;
-                    if (fb?.status === "queued" || fb?.status === "processing") return <Badge tone="neutral">Feedback pending</Badge>;
-                    if (fb?.status === "error") return <Badge tone="coral">Feedback error</Badge>;
-                    return null;
-                  })()}
-                </div>
-                {contributionsOpen ? (
-                  <div className="mt-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setShowAdditionalComposer((value) => !value)}
-                    >
-                      {showAdditionalComposer ? "Cancel" : "Add another point"}
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-xs text-[var(--c-muted)]">New contributions are paused.</p>
-                )}
-              </Card>
+          ) : showAdditionalComposer ? (
+            <ResponseComposer
+              softWordLimit={session.responseSoftLimitWords}
+              submitLabel="Add another point"
+              placeholder="Add another angle, example, or challenge..."
+              onSubmit={(_text, _tone, submission) => handleAddAnotherPoint(submission)}
+            />
+          ) : null}
 
-              {showAdditionalComposer ? (
-                <ResponseComposer
-                  softWordLimit={session.responseSoftLimitWords}
-                  submitLabel="Add another point"
-                  placeholder="Add another angle, example, or challenge..."
-                  onSubmit={(_text, _tone, submission) => handleAddAnotherPoint(submission)}
-                />
-              ) : null}
+          {myThreads.length > 0 ? (
+            <div className="grid gap-3">
+              {myThreads.map((thread, index) => {
+                const submission = thread.root.submission;
 
-              <ContributionThreadCard
-                submission={topLevelContributions[0]}
-                feedback={feedbackBySubmissionId.get(topLevelContributions[0].id) ?? null}
-                assignment={assignmentBySubmissionId.get(topLevelContributions[0].id) ?? null}
-                categories={ws?.categorySummary}
-                followUps={followUpsByParentId.get(topLevelContributions[0].id) ?? []}
-                recategorisationRequest={requestBySubmissionId.get(topLevelContributions[0].id) ?? null}
-                expanded={activeExpandedContributionId === topLevelContributions[0].id}
-                isLatest
-                onToggleExpanded={() =>
-                  setExpandedContributionId((current) =>
-                    current === topLevelContributions[0].id ? null : topLevelContributions[0].id,
-                  )
-                }
-                onRequestRecategorisation={(request) =>
-                  handleRequestRecategorisation(topLevelContributions[0].id, request)
-                }
-                onAddFollowUp={() => setFollowUpParentId(topLevelContributions[0].id)}
-                onRetryFeedback={() => handleRetryFeedback(topLevelContributions[0].id)}
-                feedbackRetrying={retryingFeedbackSubmissionId === topLevelContributions[0].id}
-              >
-                {followUpParentId === topLevelContributions[0].id ? followUpComposer : null}
-              </ContributionThreadCard>
-
-              {topLevelContributions.length > 1 ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowEarlierPoints((v) => !v)}
+                return (
+                  <ContributionThreadCard
+                    key={submission.id}
+                    submission={submission}
+                    feedback={thread.feedbackSummary}
+                    assignment={thread.assignment}
+                    categories={ws?.categorySummary}
+                    followUps={thread.replies.map((reply) => ({
+                      id: reply.submission.id,
+                      body: reply.submission.body,
+                      createdAt: reply.submission.createdAt,
+                      followUpTitle: reply.submission.kind === "reply" ? "Reply" : "Follow-up",
+                    }))}
+                    recategorisationRequest={thread.recategorisationRequest}
+                    expanded={activeExpandedContributionId === submission.id}
+                    isLatest={index === 0}
+                    onToggleExpanded={() =>
+                      setExpandedContributionId((current) =>
+                        current === submission.id ? null : submission.id,
+                      )
+                    }
+                    onRequestRecategorisation={(request) =>
+                      handleRequestRecategorisation(submission.id, request)
+                    }
+                    onAddFollowUp={() => setFollowUpParentId(submission.id)}
+                    onRetryFeedback={() => handleRetryFeedback(submission.id)}
+                    feedbackRetrying={retryingFeedbackSubmissionId === submission.id}
                   >
-                    {showEarlierPoints
-                      ? "Hide earlier points"
-                      : `Earlier points (${topLevelContributions.length - 1})`}
-                  </Button>
-                  {showEarlierPoints
-                    ? topLevelContributions.slice(1).map((submission) => (
-                        <ContributionThreadCard
-                          key={submission.id}
-                          submission={submission}
-                          feedback={feedbackBySubmissionId.get(submission.id) ?? null}
-                          assignment={assignmentBySubmissionId.get(submission.id) ?? null}
-                          categories={ws?.categorySummary}
-                          followUps={followUpsByParentId.get(submission.id) ?? []}
-                          recategorisationRequest={requestBySubmissionId.get(submission.id) ?? null}
-                          expanded={activeExpandedContributionId === submission.id}
-                          onToggleExpanded={() =>
-                            setExpandedContributionId((current) =>
-                              current === submission.id ? null : submission.id,
-                            )
-                          }
-                          onRequestRecategorisation={(request) =>
-                            handleRequestRecategorisation(submission.id, request)
-                          }
-                          onAddFollowUp={() => setFollowUpParentId(submission.id)}
-                          onRetryFeedback={() => handleRetryFeedback(submission.id)}
-                          feedbackRetrying={retryingFeedbackSubmissionId === submission.id}
-                        >
-                          {followUpParentId === submission.id ? followUpComposer : null}
-                        </ContributionThreadCard>
-                      ))
-                    : null}
-                </>
-              ) : null}
-            </>
-          )}
+                    {followUpParentId === submission.id ? followUpComposer : null}
+                  </ContributionThreadCard>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       }
       explore={
