@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface ReleasedQuestion {
   id: string;
@@ -28,14 +28,14 @@ export function ParticipantContextRail({
 
   return (
     <aside className="hidden w-[300px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-4 lg:flex">
-      <Card tone="cream">
-        <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--c-on-sig-light-body)]">
+      <section className="rounded-lg border border-[var(--c-question-surface-strong)]/35 bg-[var(--c-question-surface)] p-4 shadow-[0_12px_32px_color-mix(in_oklch,var(--c-question-surface-strong),transparent_88%)]">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--c-muted)]">
           {promptLabel}
         </p>
-        <p className="mt-1 text-sm font-medium leading-relaxed text-[var(--c-on-sig-light)]">
+        <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--c-question-ink)]">
           &ldquo;{prompt}&rdquo;
         </p>
-      </Card>
+      </section>
 
       {questions.length > 1 && onSelectQuestion ? (
         <div>
@@ -52,11 +52,12 @@ export function ParticipantContextRail({
                   onClick={() =>
                     onSelectQuestion(question.isCurrent ? null : question.id)
                   }
-                  className={`rounded-pill border px-2.5 py-1 text-[11px] transition ${
+                  className={cn(
+                    "rounded-pill border px-2.5 py-1 text-[11px] transition",
                     active
                       ? "border-[var(--c-primary)] bg-[var(--c-primary)] text-[var(--c-on-primary)]"
-                      : "border-[var(--c-hairline)] bg-[var(--c-canvas)] text-[var(--c-ink)] hover:bg-[var(--c-surface-strong)]"
-                  }`}
+                      : "border-[var(--c-hairline)] bg-[var(--c-canvas)] text-[var(--c-ink)] hover:bg-[var(--c-surface-strong)]",
+                  )}
                 >
                   {question.title}
                   {question.isCurrent ? " (current)" : ""}

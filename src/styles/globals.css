@@ -63,6 +63,9 @@
   --c-hairline: oklch(0.8975 0 0);
   --c-border-strong: oklch(0.6752 0.014 82.2);
   --c-topbar: oklch(0.938 0.031 81.75);
+  --c-question-surface: oklch(0.985 0.022 230);
+  --c-question-surface-strong: oklch(0.92 0.055 230);
+  --c-question-ink: oklch(0.26 0.055 252);
 
   --c-sig-coral: oklch(0.4894 0.168 36.02);
   --c-sig-slate: oklch(0.3 0.065 260);
@@ -110,6 +113,9 @@ html.dark {
   --c-hairline: oklch(0.25 0.006 82.2);
   --c-border-strong: oklch(0.4 0.008 82.2);
   --c-topbar: oklch(0.2 0.012 82.2);
+  --c-question-surface: oklch(0.18 0.025 252);
+  --c-question-surface-strong: oklch(0.32 0.055 252);
+  --c-question-ink: oklch(0.9 0.035 230);
 
   --c-tab-contribute: oklch(0.75 0.06 230);
   --c-tab-explore: oklch(0.78 0.10 52);

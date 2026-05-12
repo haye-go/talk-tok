@@ -375,7 +375,9 @@ export function ParticipantWorkspacePage({
 
   const ws = workspace;
   const selectedQuestion = ws?.selectedQuestion ?? ws?.currentQuestion ?? null;
-  const releasedQuestions = (ws?.questions ?? []).filter((question) => question.status === "released");
+  const releasedQuestions =
+    ws?.releasedQuestionsOrdered ??
+    (ws?.questions ?? []).filter((question) => question.status === "released");
   const matchesSelectedQuestion = (questionId?: Id<"sessionQuestions"> | null) =>
     !selectedQuestion?.id || questionId === selectedQuestion.id;
 

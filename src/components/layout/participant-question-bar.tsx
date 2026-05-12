@@ -29,19 +29,19 @@ export function ParticipantQuestionBar({
   const Caret = expanded ? CaretUp : CaretDown;
 
   return (
-    <div className="border-b border-[var(--c-sig-mustard)]/30 bg-[var(--c-sig-cream)] px-4 py-2">
+    <div className="border-b border-[var(--c-question-surface-strong)]/35 bg-[var(--c-question-surface)] px-4 py-2 shadow-[0_8px_22px_color-mix(in_oklch,var(--c-question-surface-strong),transparent_86%)]">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-start justify-between gap-2 text-left"
+        className="flex w-full items-start justify-between gap-2 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-info-border)]"
       >
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--c-on-sig-light-body)]">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--c-muted)]">
             {promptLabel}
           </p>
           <p
             className={cn(
-              "mt-0.5 text-xs font-medium leading-snug text-[var(--c-on-sig-light)]",
+              "mt-0.5 text-xs font-semibold leading-snug text-[var(--c-question-ink)]",
               !expanded && "line-clamp-1",
             )}
           >
@@ -50,7 +50,7 @@ export function ParticipantQuestionBar({
         </div>
         <Caret
           size={14}
-          className="mt-1 shrink-0 text-[var(--c-on-sig-light-body)]"
+          className="mt-1 shrink-0 text-[var(--c-question-ink)]"
         />
       </button>
 
