@@ -8,6 +8,7 @@ import {
   type ResponseComposerSubmit,
 } from "@/components/submission/response-composer";
 import { SynthesisArtifactCard } from "@/components/synthesis/synthesis-artifact-card";
+import { ParticipantStateSection } from "@/components/layout/participant-state-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -204,50 +205,50 @@ export function StreamTab({
         </div>
       ) : null}
 
-      {canSeeRawPeerResponses ? (
-        <div className="grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3 text-xs text-[var(--c-muted)]">
-          {!repliesEnabled ? <p>Replies are paused for this question.</p> : null}
-          {!upvotesEnabled ? <p>Upvotes are paused for this question.</p> : null}
-          {fightEnabled && !mySubmissionId ? (
-            <p>Submit your own contribution before you challenge a response.</p>
-          ) : null}
-        </div>
+      {canSeeRawPeerResponses && (!repliesEnabled || !upvotesEnabled || (fightEnabled && !mySubmissionId)) ? (
+        <Card>
+          <div className="grid gap-1 text-xs text-[var(--c-muted)]">
+            {!repliesEnabled ? <p>Replies are paused for this question.</p> : null}
+            {!upvotesEnabled ? <p>Upvotes are paused for this question.</p> : null}
+            {fightEnabled && !mySubmissionId ? (
+              <p>Submit your own contribution before you challenge a response.</p>
+            ) : null}
+          </div>
+        </Card>
       ) : null}
 
-      <Card title="Class synthesis">
-        {!synthesisVisible ? (
-          <p className="text-sm text-[var(--c-muted)]">
-            The instructor has not released synthesis for this question yet.
-          </p>
-        ) : synthesisBlockedBySession ? (
-          <p className="text-sm text-[var(--c-muted)]">
-            Synthesis is released for this question, but the session is still in private visibility.
-          </p>
-        ) : artifacts.length === 0 ? (
-          <p className="text-sm text-[var(--c-muted)]">
-            No synthesis has been generated for this question yet.
-          </p>
-        ) : (
+      {!synthesisVisible ? (
+        <ParticipantStateSection kind="waiting" title="Class synthesis">
+          The instructor has not released synthesis for this question yet.
+        </ParticipantStateSection>
+      ) : synthesisBlockedBySession ? (
+        <ParticipantStateSection kind="locked" title="Class synthesis">
+          Synthesis is released for this question, but the session is still in private visibility.
+        </ParticipantStateSection>
+      ) : artifacts.length === 0 ? (
+        <ParticipantStateSection kind="empty" title="Class synthesis">
+          No synthesis has been generated for this question yet.
+        </ParticipantStateSection>
+      ) : (
+        <Card title="Class synthesis">
           <div className="space-y-2">
             {artifacts.map((artifact) => (
               <SynthesisArtifactCard key={artifact.id} artifact={artifact} sessionSlug={sessionSlug ?? ""} />
             ))}
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {!canSeeRawPeerResponses ? (
-        <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-4 text-center">
-          <p className="text-sm text-[var(--c-muted)]">
-            Peer responses remain private until the instructor releases them.
-          </p>
-        </div>
+        <ParticipantStateSection kind="hidden" title="Peer responses">
+          Peer responses remain private until the instructor releases them.
+        </ParticipantStateSection>
       ) : (
         <div className="space-y-2">
           {filtered.length === 0 ? (
-            <p className="py-4 text-center text-sm text-[var(--c-muted)]">
+            <ParticipantStateSection kind="empty" title="Peer responses">
               No peer responses visible yet.
-            </p>
+            </ParticipantStateSection>
           ) : null}
 
           {filtered.map((response) => {
