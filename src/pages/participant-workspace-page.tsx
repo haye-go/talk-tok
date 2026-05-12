@@ -770,28 +770,29 @@ function FightTabContent({
 
   if (canUseFight) {
     return (
-      <Card>
-        <p className="text-sm text-[var(--c-muted)]">
-          Submit a response before you can open a Fight thread.
-        </p>
-        <Button
-          type="button"
-          variant="secondary"
-          className="mt-3"
-          onClick={() => onNavigateToTab?.("contribute")}
-        >
-          Go to Contribute
-        </Button>
-      </Card>
+      <ParticipantStateSection
+        kind="empty"
+        title="Ready to fight"
+        action={
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => onNavigateToTab?.("contribute")}
+          >
+            Go to Contribute
+          </Button>
+        }
+      >
+        Submit a response before you can open a Fight thread.
+      </ParticipantStateSection>
     );
   }
 
   return (
-    <Card>
-      <p className="text-sm text-[var(--c-muted)]">
-        The instructor has not enabled Fight for this question yet.
-      </p>
-    </Card>
+    <ParticipantStateSection kind="locked" title="Fight">
+      The instructor has not enabled Fight for this question yet.
+    </ParticipantStateSection>
   );
 }
 

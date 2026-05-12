@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { FightCountdown } from "@/components/fight/fight-countdown";
 import { FightTargetPicker } from "@/components/fight/fight-target-picker";
+import { ParticipantStateSection } from "@/components/layout/participant-state-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -73,11 +74,9 @@ export function FightHome({
 
   if (!fightMeEnabled) {
     return (
-      <Card>
-        <p className="text-sm text-[var(--c-muted)]">
-          Fight Me mode is not enabled for this session.
-        </p>
-      </Card>
+      <ParticipantStateSection kind="locked" title="Fight Me">
+        Fight Me mode is not enabled for this session.
+      </ParticipantStateSection>
     );
   }
 
@@ -100,7 +99,7 @@ export function FightHome({
       <div className="space-y-3">
         <Card>
           <div className="text-center">
-            <Sword size={24} className="mx-auto mb-2 text-[var(--c-sig-coral)]" />
+            <Sword size={24} className="mx-auto mb-2 text-[var(--c-tab-fight)]" />
             <p className="font-display text-sm font-medium text-[var(--c-ink)]">
               You have an active fight!
             </p>
@@ -124,11 +123,10 @@ export function FightHome({
       {pendingIncoming.map((challenge) => (
         <div
           key={challenge.id}
-          className="rounded-md border bg-[var(--c-surface-soft)] p-4"
-          style={{ borderColor: "var(--c-sig-coral)" }}
+          className="rounded-md border border-[var(--c-tab-fight)] bg-[var(--c-surface-soft)] p-4"
         >
           <div className="flex items-center justify-between">
-            <p className="font-display text-sm font-medium text-[var(--c-sig-coral)]">
+            <p className="font-display text-sm font-medium text-[var(--c-tab-fight)]">
               <Sword size={14} className="mr-1 inline" />
               Incoming Challenge!
             </p>
@@ -162,12 +160,9 @@ export function FightHome({
       ))}
 
       {/* Start new fight CTAs */}
-      <div
-        className="rounded-md bg-[var(--c-surface-soft)] p-4 text-center"
-        style={{ border: "1px solid var(--c-sig-coral)" }}
-      >
-        <Lightning size={28} weight="fill" className="mx-auto mb-1 text-[var(--c-sig-coral)]" />
-        <p className="font-display text-base font-medium text-[var(--c-sig-coral)]">
+      <div className="rounded-md border border-[var(--c-tab-fight)] bg-[var(--c-surface-soft)] p-4 text-center">
+        <Lightning size={28} weight="fill" className="mx-auto mb-1 text-[var(--c-tab-fight)]" />
+        <p className="font-display text-base font-medium text-[var(--c-tab-fight)]">
           Fight Me Mode
         </p>
         <p className="mt-1 text-xs text-[var(--c-muted)]">
@@ -217,13 +212,14 @@ function PastFights({
                 {fight.status.replace(/_/g, " ")}
               </Badge>
             </div>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => onNavigate(fight.slug)}
-              className="text-[10px] text-[var(--c-link)] underline"
             >
               View
-            </button>
+            </Button>
           </div>
         ))}
       </div>
