@@ -16,6 +16,7 @@ const JOB_LIMIT = 40;
 const FIGHT_THREAD_LIMIT = 40;
 const SYNTHESIS_ARTIFACT_LIMIT = 40;
 const PARTICIPANT_PRESENCE_LIMIT = 500;
+const THREAD_REACTION_LIMIT = 1_000;
 const OFFLINE_AFTER_MS = 45_000;
 
 const toneValidator = v.union(
@@ -279,6 +280,31 @@ function toFightThread(thread: Doc<"fightThreads">) {
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
   };
+}
+
+function emptyReactionCounts() {
+  return {
+    agree: 0,
+    sharp: 0,
+    question: 0,
+    spark: 0,
+    changed_mind: 0,
+  };
+}
+
+function matchesSelectedQuestion(
+  submission: Doc<"submissions">,
+  selectedQuestionId?: Id<"sessionQuestions">,
+) {
+  return !selectedQuestionId || !submission.questionId || submission.questionId === selectedQuestionId;
+}
+
+function isTopLevelMessage(submission: Doc<"submissions">) {
+  return (
+    !submission.parentSubmissionId &&
+    !submission.followUpPromptId &&
+    (submission.kind === "initial" || submission.kind === "additional_point")
+  );
 }
 
 export const overview = query({
@@ -558,9 +584,145 @@ export const overview = query({
     const feedbackBySubmission = feedback
       .filter((row) => mySubmissionIds.has(row.submissionId))
       .map(toFeedback);
+    const feedbackMap = new Map(feedbackBySubmission.map((row) => [row.submissionId, row]));
     const recategorisationRequests = requests
       .filter((row) => mySubmissionIds.has(row.submissionId))
       .map(toRecategorisationRequest);
+    const recategorisationMap = new Map(
+      recategorisationRequests.map((row) => [row.submissionId, row]),
+    );
+    const selectedQuestionSubmissions = sessionSubmissions.filter((submission) =>
+      matchesSelectedQuestion(submission, selectedQuestionId),
+    );
+    const selectedQuestionSubmissionIds = new Set(
+      selectedQuestionSubmissions.map((submission) => submission._id),
+    );
+    const reactions =
+      selectedQuestionSubmissionIds.size > 0
+        ? await ctx.db
+            .query("reactions")
+            .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(THREAD_REACTION_LIMIT)
+        : [];
+    const reactionsBySubmission = new Map<
+      Id<"submissions">,
+      {
+        counts: ReturnType<typeof emptyReactionCounts>;
+        myReactions: Doc<"reactions">["kind"][];
+      }
+    >();
+
+    for (const reaction of reactions) {
+      if (!selectedQuestionSubmissionIds.has(reaction.submissionId)) {
+        continue;
+      }
+
+      const state = reactionsBySubmission.get(reaction.submissionId) ?? {
+        counts: emptyReactionCounts(),
+        myReactions: [],
+      };
+      state.counts[reaction.kind] += 1;
+
+      if (reaction.participantId === participant._id) {
+        state.myReactions.push(reaction.kind);
+      }
+
+      reactionsBySubmission.set(reaction.submissionId, state);
+    }
+
+    const repliesByParentId = new Map<Id<"submissions">, Doc<"submissions">[]>();
+
+    for (const submission of selectedQuestionSubmissions) {
+      if (!submission.parentSubmissionId) {
+        continue;
+      }
+
+      const existing = repliesByParentId.get(submission.parentSubmissionId) ?? [];
+      existing.push(submission);
+      repliesByParentId.set(submission.parentSubmissionId, existing);
+    }
+
+    const toThreadMessage = (submission: Doc<"submissions">) => {
+      const reactionState = reactionsBySubmission.get(submission._id);
+
+      return {
+        submission: toSubmission(
+          submission,
+          participantsById.get(submission.participantId) ?? null,
+          session,
+        ),
+        stats: {
+          replyCount: repliesByParentId.get(submission._id)?.length ?? 0,
+          upvoteCount: reactionState?.counts.agree ?? 0,
+          reactionCounts: reactionState?.counts ?? emptyReactionCounts(),
+        },
+        viewerState: {
+          isOwn: submission.participantId === participant._id,
+          hasUpvoted: reactionState?.myReactions.includes("agree") ?? false,
+          myReactions: reactionState?.myReactions ?? [],
+        },
+      };
+    };
+
+    const toThread = (root: Doc<"submissions">) => {
+      const assignment = assignmentBySubmission.get(root._id);
+      const rootFeedback = feedbackMap.get(root._id);
+      const recategorisationRequest = recategorisationMap.get(root._id);
+
+      return {
+        root: toThreadMessage(root),
+        replies: (repliesByParentId.get(root._id) ?? [])
+          .sort((left, right) => left.createdAt - right.createdAt)
+          .map(toThreadMessage),
+        assignment: assignment
+          ? {
+              categoryId: assignment.categoryId,
+              categorySlug: assignment.categorySlug,
+              categoryName: assignment.categoryName,
+              categoryColor: assignment.categoryColor,
+              status: assignment.status,
+            }
+          : null,
+        feedbackSummary: rootFeedback
+          ? {
+              status: rootFeedback.status,
+              tone: rootFeedback.tone,
+              reasoningBand: rootFeedback.reasoningBand,
+              originalityBand: rootFeedback.originalityBand,
+              specificityBand: rootFeedback.specificityBand,
+              summary: rootFeedback.summary,
+              error: rootFeedback.error,
+            }
+          : null,
+        recategorisationRequest: recategorisationRequest
+          ? {
+              status: recategorisationRequest.status,
+              requestedCategoryId: recategorisationRequest.requestedCategoryId,
+              suggestedCategoryName: recategorisationRequest.suggestedCategoryName,
+            }
+          : null,
+      };
+    };
+
+    const myThreads = selectedQuestionSubmissions
+      .filter(
+        (submission) => submission.participantId === participant._id && isTopLevelMessage(submission),
+      )
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .map(toThread);
+    const canSeeSelectedPeerThreads =
+      selectedQuestion?.peerResponsesVisible ?? session.visibilityMode === "raw_responses_visible";
+    const peerThreads = canSeeSelectedPeerThreads
+      ? selectedQuestionSubmissions
+          .filter(
+            (submission) =>
+              submission.participantId !== participant._id && isTopLevelMessage(submission),
+          )
+          .sort((left, right) => right.createdAt - left.createdAt)
+          .slice(0, PEER_RESPONSE_LIMIT)
+          .map(toThread)
+      : [];
     const peerResponses =
       session.visibilityMode === "raw_responses_visible"
         ? sessionSubmissions
@@ -609,6 +771,8 @@ export const overview = query({
       mySubmissions: mySubmissions.map((submission) =>
         toSubmission(submission, participant, session),
       ),
+      myThreads,
+      peerThreads,
       activeFollowUps,
       feedbackBySubmission,
       assignmentsBySubmission: mySubmissions
