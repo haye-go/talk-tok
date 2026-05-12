@@ -925,6 +925,73 @@ export function InstructorSessionPage() {
         </div>
       </details>
 
+      {pendingRecatRequests && pendingRecatRequests.length > 0 ? (
+        <Card title="Recategorisation Requests">
+          <div className="grid gap-2">
+            {pendingRecatRequests.slice(0, 6).map((request) => {
+              const requestedCategory = request.requestedCategoryId
+                ? categoryById.get(request.requestedCategoryId)
+                : null;
+              const canApprove = Boolean(request.requestedCategoryId);
+              const busy = decidingRecatId === request.id;
+
+              return (
+                <div
+                  key={request.id}
+                  className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-surface-strong)] p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-[var(--c-ink)]">
+                        {requestedCategory
+                          ? `Move to ${requestedCategory.name}`
+                          : `Suggested: ${request.suggestedCategoryName ?? "New category"}`}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--c-body)]">
+                        {request.reason}
+                      </p>
+                    </div>
+                    <Badge tone="warning">{request.status}</Badge>
+                  </div>
+                  <div className="mt-3 flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        void handleRecategorisationDecision({
+                          requestId: request.id,
+                          decision: "rejected",
+                        })
+                      }
+                    >
+                      Reject
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busy || !canApprove}
+                      onClick={() =>
+                        void handleRecategorisationDecision({
+                          requestId: request.id,
+                          decision: "approved",
+                          categoryId: request.requestedCategoryId ?? undefined,
+                        })
+                      }
+                    >
+                      {busy ? "Saving..." : "Approve"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
+
+      <PresenceBar typing={presence.typing} />
+
       {roomMode === "latest" ? (
         <section className="grid gap-3">
           <div className="flex items-center justify-between gap-3">
@@ -1291,6 +1358,36 @@ export function InstructorSessionPage() {
         items={aiJobStatusItems}
         contextLabel={overview.currentQuestion?.title ?? "the current question"}
       />
+
+      <section className="grid gap-5 lg:grid-cols-2">
+        <Card>
+          <p className="mb-1.5 text-[10px] uppercase tracking-[0.14em] text-[var(--c-muted)]">
+            Consensus Pulse
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-[var(--c-sig-coral)]">Against</span>
+            <div className="flex h-2.5 flex-1 overflow-hidden rounded-pill bg-[var(--c-hairline)]">
+              <div className="bg-[var(--c-sig-coral)]" style={{ width: "30%" }} />
+              <div className="bg-[var(--c-sig-mustard)]" style={{ width: "25%" }} />
+              <div className="bg-[var(--c-sig-sky)]" style={{ width: "45%" }} />
+            </div>
+            <span className="text-[10px] text-[var(--c-sig-sky)]">For</span>
+          </div>
+        </Card>
+
+        <Card title="Input Patterns">
+          <div className="grid gap-1.5 text-sm">
+            {(Object.keys(patternCounts) as InputPattern[]).map((pattern) => (
+              <div key={pattern} className="flex items-center justify-between gap-3">
+                <span className="text-xs text-[var(--c-body)]">{inputPatternLabel(pattern)}</span>
+                <span className="font-mono text-xs text-[var(--c-ink)]">
+                  {patternCounts[pattern]}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
         <Card title="Synthesis">
