@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
-import { ChatCircleText, Sword } from "@phosphor-icons/react";
-import { useMutation, useQuery } from "convex/react";
+import { useState } from "react";
+import { ChatCircleText, SquaresFour, Sword, TextAlignLeft } from "@phosphor-icons/react";
+import { useMutation } from "convex/react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { api } from "../../../convex/_generated/api";
-import { ParticipantThreadAction } from "@/components/messages/participant-thread-card";
+import {
+  ParticipantThreadAction,
+  ParticipantThreadCard,
+} from "@/components/messages/participant-thread-card";
 import { ReactionBar } from "@/components/reactions/reaction-bar";
 import {
   ResponseComposer,
@@ -12,11 +15,8 @@ import {
 import { SynthesisArtifactCard } from "@/components/synthesis/synthesis-artifact-card";
 import { ParticipantStateSection } from "@/components/layout/participant-state-section";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { PresenceBar } from "@/components/stream/presence-bar";
-import { ResponseStreamItem } from "@/components/stream/response-stream-item";
 import { categoryColorToTone } from "@/lib/category-colors";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +39,44 @@ interface CategorySummary {
   assignmentCount: number;
 }
 
+interface ThreadSubmission {
+  id: Id<"submissions">;
+  nickname: string;
+  body: string;
+  kind: "initial" | "additional_point" | "reply" | "fight_me_turn";
+  createdAt: number;
+}
+
+interface ThreadMessage {
+  submission: ThreadSubmission;
+  stats: {
+    replyCount: number;
+    upvoteCount: number;
+    reactionCounts: Record<string, number>;
+  };
+  viewerState: {
+    isOwn: boolean;
+    hasUpvoted: boolean;
+    myReactions: string[];
+  };
+}
+
+interface PeerThread {
+  root: ThreadMessage;
+  replies: ThreadMessage[];
+  assignment: {
+    categoryId: Id<"categories">;
+    categoryName?: string | null;
+    categoryColor?: string | null;
+  } | null;
+}
+
+interface PeerThreadCategorySection {
+  category: CategorySummary | null;
+  threadCount: number;
+  threads: PeerThread[];
+}
+
 interface SynthesisArtifact {
   id: Id<"synthesisArtifacts">;
   categoryId?: Id<"categories"> | null;
@@ -53,10 +91,24 @@ interface SynthesisArtifact {
   publishedAt?: number | null;
 }
 
+interface SynthesisView {
+  visible: boolean;
+  artifacts: SynthesisArtifact[];
+  classArtifacts: SynthesisArtifact[];
+  categorySections: Array<{
+    category: CategorySummary;
+    artifactCount: number;
+    artifacts: SynthesisArtifact[];
+  }>;
+}
+
 interface StreamTabProps {
   peerResponses?: PeerResponse[];
+  peerThreads?: PeerThread[];
+  peerThreadsByCategory?: PeerThreadCategorySection[];
   categories?: CategorySummary[];
   synthesisArtifacts?: SynthesisArtifact[];
+  synthesisView?: SynthesisView;
   synthesisVisible?: boolean;
   synthesisBlockedBySession?: boolean;
   canSeeRawPeerResponses?: boolean;
@@ -75,10 +127,47 @@ interface StreamTabProps {
   onFightCreated?: (fightSlug: string) => void;
 }
 
+type RoomMode = "latest" | "category" | "synthesis";
+
+function threadFromPeerResponse(response: PeerResponse): PeerThread {
+  return {
+    root: {
+      submission: {
+        id: response.id,
+        nickname: response.nickname,
+        body: response.body,
+        kind: "initial",
+        createdAt: response.createdAt,
+      },
+      stats: {
+        replyCount: 0,
+        upvoteCount: 0,
+        reactionCounts: {},
+      },
+      viewerState: {
+        isOwn: false,
+        hasUpvoted: false,
+        myReactions: [],
+      },
+    },
+    replies: [],
+    assignment: response.categoryId
+      ? {
+          categoryId: response.categoryId,
+          categoryName: response.categoryName,
+          categoryColor: response.categoryColor,
+        }
+      : null,
+  };
+}
+
 export function StreamTab({
   peerResponses,
+  peerThreads,
+  peerThreadsByCategory,
   categories,
   synthesisArtifacts,
+  synthesisView,
   synthesisVisible = false,
   synthesisBlockedBySession = false,
   canSeeRawPeerResponses = true,
@@ -88,43 +177,30 @@ export function StreamTab({
   fightEnabled = false,
   selectedQuestionId,
   softWordLimit,
-  presenceTyping = 0,
-  presenceSubmitted = 0,
-  presenceIdle = 0,
   sessionSlug,
   clientKey,
   mySubmissionId,
   onFightCreated,
 }: StreamTabProps) {
-  const [filter, setFilter] = useState<Id<"categories"> | null>(null);
+  const [roomMode, setRoomMode] = useState<RoomMode>("latest");
   const [replyParentId, setReplyParentId] = useState<Id<"submissions"> | null>(null);
   const [replyError, setReplyError] = useState<string | null>(null);
   const [creatingFightFor, setCreatingFightFor] = useState<Id<"submissions"> | null>(null);
-  const [showSynthesis, setShowSynthesis] = useState(false);
 
   const createReply = useMutation(api.submissions.create);
   const createChallenge = useMutation(api.fightMe.createChallenge);
 
   const cats = categories ?? [];
-  const responses: PeerResponse[] = peerResponses ?? [];
-  const artifacts = synthesisArtifacts ?? [];
-  const submissionIds = responses.map((response) => response.id);
-  const reactionState = useQuery(
-    api.reactions.listForSubmissions,
-    sessionSlug && submissionIds.length > 0
-      ? { sessionSlug, submissionIds, clientKey: clientKey ?? undefined }
-      : "skip",
-  );
+  const latestThreads = peerThreads ?? (peerResponses ?? []).map(threadFromPeerResponse);
+  const categorySections = peerThreadsByCategory ?? [];
+  const synthesisArtifactsForView =
+    synthesisView?.artifacts ?? synthesisArtifacts ?? [];
+  const synthesisAvailable =
+    (synthesisView?.visible ?? synthesisVisible) &&
+    !synthesisBlockedBySession &&
+    synthesisArtifactsForView.length > 0;
 
-  const reactionsBySubmissionId = useMemo(
-    () => new Map((reactionState ?? []).map((row) => [row.submissionId, row] as const)),
-    [reactionState],
-  );
-  const filtered = filter
-    ? responses.filter((response) => response.categoryId === filter)
-    : responses;
-
-  async function handleReply(response: PeerResponse, submission: ResponseComposerSubmit) {
+  async function handleReply(thread: PeerThread, submission: ResponseComposerSubmit) {
     if (!sessionSlug || !clientKey) {
       return;
     }
@@ -137,7 +213,7 @@ export function StreamTab({
         body: submission.body,
         questionId: selectedQuestionId,
         kind: "reply",
-        parentSubmissionId: response.id,
+        parentSubmissionId: thread.root.submission.id,
         telemetry: submission.telemetry,
       });
       setReplyParentId(null);
@@ -147,17 +223,19 @@ export function StreamTab({
     }
   }
 
-  async function handleFight(response: PeerResponse) {
+  async function handleFight(thread: PeerThread) {
+    const submissionId = thread.root.submission.id;
+
     if (!sessionSlug || !clientKey || !fightEnabled || !mySubmissionId || creatingFightFor) {
       return;
     }
 
-    setCreatingFightFor(response.id);
+    setCreatingFightFor(submissionId);
     try {
       const result = await createChallenge({
         sessionSlug,
         clientKey,
-        defenderSubmissionId: response.id,
+        defenderSubmissionId: submissionId,
         attackerSubmissionId: mySubmissionId,
       });
       onFightCreated?.(result.slug);
@@ -166,54 +244,184 @@ export function StreamTab({
     }
   }
 
-  const synthesisAvailable = synthesisVisible && !synthesisBlockedBySession && artifacts.length > 0;
+  function renderThread(thread: PeerThread) {
+    const submission = thread.root.submission;
+    const replyOpen = replyParentId === submission.id;
+    const creatingFight = creatingFightFor === submission.id;
+
+    return (
+      <div key={submission.id} className="flex flex-col gap-2">
+        <ParticipantThreadCard
+          authorLabel={submission.nickname}
+          body={submission.body}
+          createdAt={submission.createdAt}
+          categoryName={thread.assignment?.categoryName ?? undefined}
+          categoryTone={categoryColorToTone(thread.assignment?.categoryColor)}
+          stats={thread.root.stats}
+          replies={thread.replies.map((reply) => ({
+            id: reply.submission.id,
+            authorLabel: reply.submission.nickname,
+            body: reply.submission.body,
+            createdAt: reply.submission.createdAt,
+            isOwn: reply.viewerState.isOwn,
+          }))}
+          actions={
+            sessionSlug && clientKey ? (
+              <>
+                <ParticipantThreadAction
+                  disabled={!repliesEnabled}
+                  onClick={() => setReplyParentId(replyOpen ? null : submission.id)}
+                >
+                  <ChatCircleText size={12} />
+                  {replyOpen ? "Cancel reply" : "Reply"}
+                </ParticipantThreadAction>
+                <ParticipantThreadAction
+                  disabled={!fightEnabled || !mySubmissionId || creatingFight}
+                  onClick={() => void handleFight(thread)}
+                >
+                  <Sword size={12} />
+                  {creatingFight ? "Starting..." : "Fight"}
+                </ParticipantThreadAction>
+                <ReactionBar
+                  submissionId={submission.id}
+                  sessionSlug={sessionSlug}
+                  clientKey={clientKey}
+                  counts={thread.root.stats.reactionCounts}
+                  myReactions={thread.root.viewerState.myReactions}
+                  mode="upvote"
+                  variant="compact"
+                  disabled={!upvotesEnabled}
+                />
+              </>
+            ) : null
+          }
+        />
+
+        {replyOpen ? (
+          <Card title={`Reply to ${submission.nickname}`}>
+            {replyError ? <InlineAlert tone="error">{replyError}</InlineAlert> : null}
+            <ResponseComposer
+              softWordLimit={softWordLimit}
+              submitLabel="Send reply"
+              placeholder="Respond directly to this point..."
+              onSubmit={(_text, _tone, replySubmission) =>
+                handleReply(thread, replySubmission)
+              }
+            />
+          </Card>
+        ) : null}
+      </div>
+    );
+  }
+
+  function renderLatest() {
+    if (latestThreads.length === 0) {
+      return (
+        <ParticipantStateSection kind="empty" title="Peer responses">
+          No peer responses visible yet.
+        </ParticipantStateSection>
+      );
+    }
+
+    return <div className="flex flex-col gap-3">{latestThreads.map(renderThread)}</div>;
+  }
+
+  function renderByCategory() {
+    const visibleSections = categorySections.filter((section) => section.threads.length > 0);
+
+    if (!canSeeCategorySummary || visibleSections.length === 0) {
+      return (
+        <ParticipantStateSection kind="empty" title="Categories">
+          No category groups are ready yet.
+        </ParticipantStateSection>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-4">
+        {visibleSections.map((section, index) => (
+          <section
+            key={section.category?.id ?? "uncategorized"}
+            className="rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
+          >
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              {section.category ? (
+                <Badge tone={categoryColorToTone(section.category.color, index)}>
+                  {section.category.name}
+                </Badge>
+              ) : (
+                <Badge tone="neutral">Uncategorized</Badge>
+              )}
+              <span className="text-[11px] text-[var(--c-muted)]">
+                {section.threadCount} {section.threadCount === 1 ? "message" : "messages"}
+              </span>
+            </div>
+            <div className="flex flex-col gap-3">{section.threads.map(renderThread)}</div>
+          </section>
+        ))}
+      </div>
+    );
+  }
+
+  function renderSynthesis() {
+    if (!synthesisAvailable) {
+      return (
+        <ParticipantStateSection kind="empty" title="Synthesis">
+          Class synthesis is not available for this question yet.
+        </ParticipantStateSection>
+      );
+    }
+
+    return (
+      <Card title="Class synthesis">
+        <div className="flex flex-col gap-2">
+          {synthesisArtifactsForView.map((artifact) => (
+            <SynthesisArtifactCard
+              key={artifact.id}
+              artifact={artifact}
+              sessionSlug={sessionSlug ?? ""}
+            />
+          ))}
+        </div>
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3 text-xs text-[var(--c-muted)]">
-        <span>{responses.length} {responses.length === 1 ? "response" : "responses"}</span>
-        {cats.length > 0 ? <span>{cats.length} {cats.length === 1 ? "category" : "categories"}</span> : null}
-        {synthesisAvailable ? <Badge tone="sky">Synthesis available</Badge> : null}
-      </div>
-
-      <PresenceBar typing={presenceTyping} submitted={presenceSubmitted} idle={presenceIdle} />
-
-      {canSeeCategorySummary && cats.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => setFilter(null)}
-            className={cn(
-              "cursor-pointer rounded-pill px-2.5 py-1 text-[10px] font-medium transition-colors",
-              !filter
-                ? "bg-[var(--c-primary)] text-[var(--c-on-primary)]"
-                : "bg-[var(--c-surface-strong)] text-[var(--c-muted)]",
-            )}
-          >
-            All
-          </button>
-          {cats.map((category, index) => (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--c-muted)]">
+        <div className="flex flex-wrap items-center gap-3">
+          <span>{latestThreads.length} {latestThreads.length === 1 ? "message" : "messages"}</span>
+          {cats.length > 0 ? <span>{cats.length} {cats.length === 1 ? "category" : "categories"}</span> : null}
+          {synthesisAvailable ? <Badge tone="sky">Synthesis ready</Badge> : null}
+        </div>
+        <div className="flex rounded-pill border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-0.5">
+          {([
+            ["latest", TextAlignLeft, "Latest"],
+            ["category", SquaresFour, "By category"],
+            ["synthesis", TextAlignLeft, "Synthesis"],
+          ] as const).map(([mode, Icon, label]) => (
             <button
-              key={category.id}
+              key={mode}
               type="button"
-              onClick={() => setFilter(filter === category.id ? null : category.id)}
-              className="cursor-pointer"
+              disabled={mode === "synthesis" && !synthesisAvailable}
+              onClick={() => setRoomMode(mode)}
+              className={cn(
+                "inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-pill px-2 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+                roomMode === mode
+                  ? "bg-[var(--c-primary)] text-[var(--c-on-primary)]"
+                  : "text-[var(--c-muted)] hover:bg-[var(--c-surface-strong)] hover:text-[var(--c-ink)]",
+              )}
             >
-              <Badge
-                tone={categoryColorToTone(category.color, index)}
-                className={cn(
-                  "cursor-pointer transition-opacity",
-                  filter && filter !== category.id && "opacity-40",
-                )}
-              >
-                {category.name}
-              </Badge>
+              <Icon size={12} />
+              {label}
             </button>
           ))}
         </div>
-      ) : null}
+      </div>
 
-      {canSeeRawPeerResponses && (!repliesEnabled || !upvotesEnabled || (fightEnabled && !mySubmissionId)) ? (
+      {canSeeRawPeerResponses &&
+      (!repliesEnabled || !upvotesEnabled || (fightEnabled && !mySubmissionId)) ? (
         <Card>
           <div className="grid gap-1 text-xs text-[var(--c-muted)]">
             {!repliesEnabled ? <p>Replies are paused for this question.</p> : null}
@@ -229,97 +437,13 @@ export function StreamTab({
         <ParticipantStateSection kind="hidden" title="Peer responses">
           Peer responses remain private until the instructor releases them.
         </ParticipantStateSection>
+      ) : roomMode === "category" ? (
+        renderByCategory()
+      ) : roomMode === "synthesis" ? (
+        renderSynthesis()
       ) : (
-        <div className="space-y-2">
-          {filtered.length === 0 ? (
-            <ParticipantStateSection kind="empty" title="Peer responses">
-              No peer responses visible yet.
-            </ParticipantStateSection>
-          ) : null}
-
-          {filtered.map((response) => {
-            const reaction = reactionsBySubmissionId.get(response.id);
-            const replyOpen = replyParentId === response.id;
-            const creatingFight = creatingFightFor === response.id;
-
-            return (
-              <div key={response.id} className="space-y-2">
-                <ResponseStreamItem
-                  nickname={response.nickname}
-                  text={response.body}
-                  categoryColor={categoryColorToTone(response.categoryColor)}
-                  categoryName={response.categoryName ?? undefined}
-                />
-
-                {sessionSlug && clientKey ? (
-                  <div className="flex flex-wrap items-center gap-2 pl-1">
-                    <ParticipantThreadAction
-                      type="button"
-                      disabled={!repliesEnabled}
-                      onClick={() => setReplyParentId(replyOpen ? null : response.id)}
-                    >
-                      <ChatCircleText size={12} />
-                      {replyOpen ? "Cancel reply" : "Reply"}
-                    </ParticipantThreadAction>
-                    <ParticipantThreadAction
-                      type="button"
-                      disabled={!fightEnabled || !mySubmissionId || creatingFight}
-                      onClick={() => void handleFight(response)}
-                    >
-                      <Sword size={12} />
-                      {creatingFight ? "Starting..." : "Fight"}
-                    </ParticipantThreadAction>
-                    <ReactionBar
-                      submissionId={response.id}
-                      sessionSlug={sessionSlug}
-                      clientKey={clientKey}
-                      counts={reaction?.counts}
-                      myReactions={reaction?.myReactions}
-                      mode="upvote"
-                      variant="compact"
-                      disabled={!upvotesEnabled}
-                    />
-                  </div>
-                ) : null}
-
-                {replyOpen ? (
-                  <Card title={`Reply to ${response.nickname}`}>
-                    {replyError ? <InlineAlert tone="error">{replyError}</InlineAlert> : null}
-                    <ResponseComposer
-                      softWordLimit={softWordLimit}
-                      submitLabel="Send reply"
-                      placeholder="Respond directly to this point..."
-                      onSubmit={(_text, _tone, submission) => handleReply(response, submission)}
-                    />
-                  </Card>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+        renderLatest()
       )}
-
-      {synthesisAvailable ? (
-        <>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowSynthesis((v) => !v)}
-          >
-            {showSynthesis ? "Hide class synthesis" : "View class synthesis"}
-          </Button>
-          {showSynthesis ? (
-            <Card title="Class synthesis">
-              <div className="space-y-2">
-                {artifacts.map((artifact) => (
-                  <SynthesisArtifactCard key={artifact.id} artifact={artifact} sessionSlug={sessionSlug ?? ""} />
-                ))}
-              </div>
-            </Card>
-          ) : null}
-        </>
-      ) : null}
     </div>
   );
 }

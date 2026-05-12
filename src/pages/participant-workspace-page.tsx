@@ -570,8 +570,11 @@ export function ParticipantWorkspacePage({
         <div className="grid gap-4">
           <StreamTab
             peerResponses={ws?.recentPeerResponses}
+            peerThreads={ws?.peerThreads}
+            peerThreadsByCategory={ws?.peerThreadsByCategory}
             categories={ws?.categorySummary}
             synthesisArtifacts={synthesisArtifacts}
+            synthesisView={ws?.synthesisView}
             synthesisVisible={selectedQuestion?.synthesisVisible ?? false}
             synthesisBlockedBySession={session.visibilityMode === "private_until_released"}
             canSeeRawPeerResponses={canSeeRawPeerResponses}
