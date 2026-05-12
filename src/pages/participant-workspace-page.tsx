@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type FormEvent } from "react";
 import { ChartBar, CircleNotch } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
@@ -141,7 +141,7 @@ export function ParticipantWorkspacePage({
   );
   const [retryingFeedbackSubmissionId, setRetryingFeedbackSubmissionId] =
     useState<Id<"submissions"> | null>(null);
-  const routeDrivenTab: TabId | null = fightSlug ? "fight" : null;
+  const routeDrivenTab: TabId | null = fightSlug ? "fight" : showReviewDetail ? "me" : null;
   const [activeTab, setActiveTab] = useState<TabId>(routeDrivenTab ?? initialTab);
   const [generatingReport, setGeneratingReport] = useState(false);
   const touchedPresenceKey = useRef<string | null>(null);
@@ -640,45 +640,30 @@ export function ParticipantWorkspacePage({
         />
       }
       me={
-        showReviewDetail ? (
-          <ReviewDetail
-            report={report ?? null}
-            generating={generatingReport}
-            onGenerate={handleGenerateReport}
-          />
-        ) : (
-          <div className="grid gap-4">
-            <MyZoneTab
-              initialResponses={topLevelContributions}
-              followUpResponses={followUpResponses}
-              feedbackBySubmission={scopedFeedback}
-              assignmentsBySubmission={scopedAssignments}
-              recategorisationRequests={scopedRecategorisationRequests}
-              fightThreads={ws?.fightMe.mine}
-              positionShifts={positionShifts ?? undefined}
-              personalReport={ws?.personalReport}
-              personalReportsVisible={selectedQuestion?.personalReportsVisible ?? false}
-              loading={ws === undefined}
-              onViewFight={(nextFightSlug) =>
-                void navigate({ to: routes.sessionFight(sessionSlug, nextFightSlug) })
-              }
-              onViewReport={() => void navigate({ to: routes.sessionReview(sessionSlug) })}
-            />
-            <Card title="Nickname">
-              <form className="grid gap-3" onSubmit={handleNicknameSubmit}>
-                <Input
-                  label="Visible nickname"
-                  value={nickname}
-                  onChange={(event) => setNicknameDraft(event.target.value)}
-                  error={nicknameError ?? undefined}
-                />
-                <Button type="submit" variant="secondary">
-                  Update nickname
-                </Button>
-              </form>
-            </Card>
-          </div>
-        )
+        <MeTabContent
+          showReviewDetail={showReviewDetail}
+          report={report ?? null}
+          generatingReport={generatingReport}
+          onGenerateReport={handleGenerateReport}
+          initialResponses={topLevelContributions}
+          followUpResponses={followUpResponses}
+          feedbackBySubmission={scopedFeedback}
+          assignmentsBySubmission={scopedAssignments}
+          recategorisationRequests={scopedRecategorisationRequests}
+          fightThreads={ws?.fightMe.mine}
+          positionShifts={positionShifts ?? undefined}
+          personalReport={ws?.personalReport}
+          personalReportsVisible={selectedQuestion?.personalReportsVisible ?? false}
+          loading={ws === undefined}
+          onViewFight={(nextFightSlug) =>
+            void navigate({ to: routes.sessionFight(sessionSlug, nextFightSlug) })
+          }
+          onViewReport={() => void navigate({ to: routes.sessionReview(sessionSlug) })}
+          nickname={nickname}
+          nicknameError={nicknameError ?? undefined}
+          onNicknameChange={(value) => setNicknameDraft(value)}
+          onNicknameSubmit={handleNicknameSubmit}
+        />
       }
     />
   );
@@ -755,6 +740,90 @@ function FightTabContent({
         The instructor has not enabled Fight for this question yet.
       </p>
     </Card>
+  );
+}
+
+interface MeTabContentProps {
+  showReviewDetail: boolean;
+  report: PersonalReportView | null;
+  generatingReport: boolean;
+  onGenerateReport: () => Promise<void>;
+  initialResponses: NonNullable<ReturnType<typeof useParticipantWorkspace>>["myZoneHistory"]["initialResponses"];
+  followUpResponses: NonNullable<ReturnType<typeof useParticipantWorkspace>>["myZoneHistory"]["followUpResponses"];
+  feedbackBySubmission: NonNullable<ReturnType<typeof useParticipantWorkspace>>["feedbackBySubmission"];
+  assignmentsBySubmission: NonNullable<ReturnType<typeof useParticipantWorkspace>>["assignmentsBySubmission"];
+  recategorisationRequests: NonNullable<ReturnType<typeof useParticipantWorkspace>>["recategorisationRequests"];
+  fightThreads?: ComponentProps<typeof MyZoneTab>["fightThreads"];
+  positionShifts?: ComponentProps<typeof MyZoneTab>["positionShifts"];
+  personalReport?: ComponentProps<typeof MyZoneTab>["personalReport"];
+  personalReportsVisible: boolean;
+  loading: boolean;
+  onViewFight: (fightSlug: string) => void;
+  onViewReport: () => void;
+  nickname: string;
+  nicknameError?: string;
+  onNicknameChange: (value: string) => void;
+  onNicknameSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+}
+
+function MeTabContent({
+  showReviewDetail,
+  report,
+  generatingReport,
+  onGenerateReport,
+  initialResponses,
+  followUpResponses,
+  feedbackBySubmission,
+  assignmentsBySubmission,
+  recategorisationRequests,
+  fightThreads,
+  positionShifts,
+  personalReport,
+  personalReportsVisible,
+  loading,
+  onViewFight,
+  onViewReport,
+  nickname,
+  nicknameError,
+  onNicknameChange,
+  onNicknameSubmit,
+}: MeTabContentProps) {
+  if (showReviewDetail) {
+    return (
+      <ReviewDetail report={report} generating={generatingReport} onGenerate={onGenerateReport} />
+    );
+  }
+
+  return (
+    <div className="grid gap-4">
+      <MyZoneTab
+        initialResponses={initialResponses}
+        followUpResponses={followUpResponses}
+        feedbackBySubmission={feedbackBySubmission}
+        assignmentsBySubmission={assignmentsBySubmission}
+        recategorisationRequests={recategorisationRequests}
+        fightThreads={fightThreads}
+        positionShifts={positionShifts}
+        personalReport={personalReport}
+        personalReportsVisible={personalReportsVisible}
+        loading={loading}
+        onViewFight={onViewFight}
+        onViewReport={onViewReport}
+      />
+      <Card title="Nickname">
+        <form className="grid gap-3" onSubmit={(event) => void onNicknameSubmit(event)}>
+          <Input
+            label="Visible nickname"
+            value={nickname}
+            onChange={(event) => onNicknameChange(event.target.value)}
+            error={nicknameError}
+          />
+          <Button type="submit" variant="secondary">
+            Update nickname
+          </Button>
+        </form>
+      </Card>
+    </div>
   );
 }
 
