@@ -1,8 +1,5 @@
 import type { ReactNode } from "react";
 import { InstructorTopBar } from "@/components/layout/instructor-top-bar";
-import { ThreePanelLayout } from "@/components/layout/three-panel-layout";
-import { Card } from "@/components/ui/card";
-import { MetricTile } from "@/components/ui/metric-tile";
 import { useAct } from "@/hooks/use-act";
 
 export interface InstructorShellProps {
@@ -15,6 +12,9 @@ export interface InstructorShellProps {
   left?: ReactNode;
   center?: ReactNode;
   right?: ReactNode;
+  sidebar?: ReactNode;
+  main?: ReactNode;
+  rail?: ReactNode;
 }
 
 export function InstructorShell({
@@ -27,8 +27,14 @@ export function InstructorShell({
   left,
   center,
   right,
+  sidebar,
+  main,
+  rail,
 }: InstructorShellProps) {
   const fallbackAct = useAct();
+  const resolvedSidebar = sidebar ?? left;
+  const resolvedMain = main ?? center;
+  const resolvedRail = rail ?? right;
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--c-canvas)]">
@@ -40,22 +46,15 @@ export function InstructorShell({
         onPreviousAct={onPreviousAct ?? fallbackAct.goBackAct}
         onNextAct={onNextAct ?? fallbackAct.advanceAct}
       />
-      <ThreePanelLayout
-        left={left ?? <Card title="Categories">Category board placeholder.</Card>}
-        center={
-          center ?? (
-            <div className="grid gap-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                <MetricTile label="Submitted" value="24/28" detail="Live placeholder" />
-                <MetricTile label="Originality" value="67%" detail="Aggregate placeholder" />
-                <MetricTile label="Recat Req" value="3" detail="Queue placeholder" />
-              </div>
-              <Card title="Consensus Pulse">CSS/card visualization placeholder for MVP.</Card>
-            </div>
-          )
-        }
-        right={right ?? <Card title="Activity Feed">Live event stream placeholder.</Card>}
-      />
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[220px_minmax(0,1fr)_320px] xl:grid-cols-[240px_minmax(0,1fr)_340px]">
+        <aside className="min-h-0 overflow-y-auto border-b border-[var(--c-hairline)] bg-[var(--c-ink)] text-[var(--c-canvas)] lg:border-b-0 lg:border-r lg:border-[color-mix(in_oklch,var(--c-canvas),transparent_88%)]">
+          {resolvedSidebar}
+        </aside>
+        <main className="min-h-0 overflow-y-auto bg-[var(--c-canvas)]">{resolvedMain}</main>
+        <aside className="min-h-0 overflow-y-auto border-t border-[var(--c-hairline)] bg-[var(--c-surface-soft)] lg:border-l lg:border-t-0 lg:border-[var(--c-hairline)]">
+          {resolvedRail}
+        </aside>
+      </div>
     </div>
   );
 }

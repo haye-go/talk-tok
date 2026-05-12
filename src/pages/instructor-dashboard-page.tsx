@@ -1,4 +1,4 @@
-import { Plus } from "@phosphor-icons/react";
+import { ArrowSquareOut, Plus, SlidersHorizontal } from "@phosphor-icons/react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { InstructorBrandBar } from "@/components/layout/instructor-brand-bar";
@@ -68,12 +68,27 @@ export function InstructorDashboardPage() {
                       {session.participantCount ?? 0} participants
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => (window.location.href = routes.instructorSession(session.slug))}
-                  >
-                    Open
-                  </Button>
+                  <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      icon={<SlidersHorizontal size={16} />}
+                      onClick={() =>
+                        (window.location.href = routes.instructorSessionSetup(session.slug))
+                      }
+                    >
+                      Open Setup
+                    </Button>
+                    <Button
+                      type="button"
+                      icon={<ArrowSquareOut size={16} />}
+                      onClick={() =>
+                        (window.location.href = routes.instructorSessionRoom(session.slug))
+                      }
+                    >
+                      Open Room
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

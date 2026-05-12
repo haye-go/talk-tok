@@ -1,6 +1,8 @@
 import { DEMO_SESSION_SLUG, type TabId } from "@/lib/constants";
 
 type ReadableSegment = string;
+export type InstructorWorkspaceTabId = "room" | "setup" | "reports";
+export type InstructorRoomModeId = "latest" | "categories" | "similarity";
 
 export function cleanRouteSegment(segment: ReadableSegment) {
   return segment.trim().replace(/^\/+|\/+$/g, "");
@@ -8,6 +10,19 @@ export function cleanRouteSegment(segment: ReadableSegment) {
 
 export function buildParticipantTabQuery(tab: TabId) {
   return tab === "contribute" ? "" : `?tab=${tab}`;
+}
+
+function buildSearchQuery(params: Record<string, string | undefined>) {
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value) {
+      search.set(key, value);
+    }
+  }
+
+  const query = search.toString();
+  return query ? `?${query}` : "";
 }
 
 export const routes = {
@@ -26,6 +41,44 @@ export const routes = {
   instructorSessionNew: () => "/instructor/session/new",
   instructorSession: (sessionSlug: ReadableSegment = DEMO_SESSION_SLUG) =>
     `/instructor/session/${cleanRouteSegment(sessionSlug)}`,
+  instructorSessionWorkspace: (
+    sessionSlug: ReadableSegment = DEMO_SESSION_SLUG,
+    options?: {
+      tab?: InstructorWorkspaceTabId;
+      mode?: InstructorRoomModeId;
+      questionId?: string;
+    },
+  ) =>
+    `${routes.instructorSession(sessionSlug)}${buildSearchQuery({
+      tab: options?.tab,
+      mode: options?.mode,
+      questionId: options?.questionId,
+    })}`,
+  instructorSessionRoom: (
+    sessionSlug: ReadableSegment = DEMO_SESSION_SLUG,
+    options?: { mode?: InstructorRoomModeId; questionId?: string },
+  ) =>
+    routes.instructorSessionWorkspace(sessionSlug, {
+      tab: "room",
+      mode: options?.mode,
+      questionId: options?.questionId,
+    }),
+  instructorSessionSetup: (
+    sessionSlug: ReadableSegment = DEMO_SESSION_SLUG,
+    options?: { questionId?: string },
+  ) =>
+    routes.instructorSessionWorkspace(sessionSlug, {
+      tab: "setup",
+      questionId: options?.questionId,
+    }),
+  instructorSessionReports: (
+    sessionSlug: ReadableSegment = DEMO_SESSION_SLUG,
+    options?: { questionId?: string },
+  ) =>
+    routes.instructorSessionWorkspace(sessionSlug, {
+      tab: "reports",
+      questionId: options?.questionId,
+    }),
   instructorProjector: (sessionSlug: ReadableSegment = DEMO_SESSION_SLUG) =>
     `/instructor/session/${cleanRouteSegment(sessionSlug)}/projector`,
   instructorTemplates: () => "/instructor/templates",

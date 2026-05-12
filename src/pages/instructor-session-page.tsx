@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { BookOpen, CircleNotch, FloppyDisk, Scales, Sparkle } from "@phosphor-icons/react";
-import { useParams } from "@tanstack/react-router";
+import { useLocation, useParams } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -168,8 +168,11 @@ interface CategoryDriftSlice {
 
 export function InstructorSessionPage() {
   const { sessionSlug } = useParams({ from: "/instructor/session/$sessionSlug" });
-  const overview = useInstructorOverview(sessionSlug);
-  const activeQuestionId = overview?.currentQuestion?.id;
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.searchStr);
+  const selectedQuestionId = (searchParams.get("questionId") as Id<"sessionQuestions"> | null) ?? undefined;
+  const overview = useInstructorOverview(sessionSlug, selectedQuestionId);
+  const activeQuestionId = overview?.selectedQuestion?.id ?? overview?.currentQuestion?.id;
   const questionScopedArgs = activeQuestionId ? { sessionSlug, questionId: activeQuestionId } : { sessionSlug };
   const triggerCategorisation = useMutation(api.categorisation.triggerForSession);
   const updatePhase = useMutation(api.instructorControls.updatePhase);
@@ -290,7 +293,7 @@ export function InstructorSessionPage() {
     followUps,
     synthesis,
     reports,
-    currentQuestion,
+    selectedQuestion,
   } = overview;
 
   const joinPath = routes.join(session.joinCode);
@@ -542,8 +545,8 @@ export function InstructorSessionPage() {
   const latestClassSynthesis = synthesis?.latestClassSynthesis;
   const reportsSummary = reports?.summary as PersonalReportsSummary | undefined;
   const recentReports = reports?.recent ?? [];
-  const synthesisReleasedForQuestion = currentQuestion?.synthesisVisible ?? false;
-  const reportsReleasedForQuestion = currentQuestion?.personalReportsVisible ?? false;
+  const synthesisReleasedForQuestion = selectedQuestion?.synthesisVisible ?? false;
+  const reportsReleasedForQuestion = selectedQuestion?.personalReportsVisible ?? false;
   const sessionPrivateVisibility = session.visibilityMode === "private_until_released";
   const jobRows = (aiJobs ?? overview.jobs.latest) as AiJobRecord[];
   const latestJobFor = (type: JobType) => jobRows.find((job) => job.type === type) ?? null;
@@ -563,7 +566,7 @@ export function InstructorSessionPage() {
     baselineGenerating ||
     isBusyStatus(latestBaselineJob?.status) ||
     isBusyStatus(questionBaseline?.status);
-  const baselineCanGenerate = currentQuestion?.status === "released";
+  const baselineCanGenerate = selectedQuestion?.status === "released";
   const embeddingBusy = embeddingQueued || isBusyStatus(latestEmbeddingJob?.status);
   const argMapBusy = argMapQueued || isBusyStatus(latestArgumentMapJob?.status);
   const embeddingCount = semanticStatus?.embeddingCount ?? 0;

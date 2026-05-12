@@ -185,6 +185,7 @@ function toSubmission(
 export const overview = query({
   args: {
     sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
     const session = await getSessionBySlug(ctx, args.sessionSlug);
@@ -280,11 +281,17 @@ export const overview = query({
     const participantsById = new Map(
       participants.map((participant) => [participant._id, participant]),
     );
-    const currentQuestionId = currentQuestion?._id;
+    const selectedQuestion =
+      args.questionId && questions.some((question) => question._id === args.questionId)
+        ? (questions.find((question) => question._id === args.questionId) ?? null)
+        : currentQuestion;
+    const selectedQuestionId = selectedQuestion?._id;
     const activeCategories = categories.filter(
       (category) =>
         category.status === "active" &&
-        (!currentQuestionId || !category.questionId || category.questionId === currentQuestionId),
+        (!selectedQuestionId ||
+          !category.questionId ||
+          category.questionId === selectedQuestionId),
     );
     const categoriesById = new Map(categories.map((category) => [category._id, category]));
     const assignmentBySubmission = new Map<
@@ -438,7 +445,7 @@ export const overview = query({
       session: toSessionSnapshot(session, participants.length),
       questions: questions.map(toPublicQuestion),
       currentQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
-      selectedQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
+      selectedQuestion: selectedQuestion ? toPublicQuestion(selectedQuestion) : null,
       questionSummaries,
       caps: {
         participantsCapped: participants.length === PARTICIPANT_LIMIT,
