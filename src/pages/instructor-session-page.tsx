@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { BookOpen, CircleNotch, FloppyDisk, Scales, Sparkle } from "@phosphor-icons/react";
+import {
+  BookOpen,
+  ChartBar,
+  CircleNotch,
+  FloppyDisk,
+  GearSix,
+  Graph,
+  ListBullets,
+  Scales,
+  Sparkle,
+  SquaresFour,
+  WarningCircle,
+} from "@phosphor-icons/react";
 import { useLocation, useParams } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -25,7 +37,12 @@ import { MetricTile } from "@/components/ui/metric-tile";
 import { useInstructorOverview } from "@/hooks/use-instructor-overview";
 import { categoryColorToTone } from "@/lib/category-colors";
 import { inputPatternLabel, type InputPattern } from "@/lib/submission-telemetry";
-import { routes } from "@/lib/routes";
+import {
+  routes,
+  type InstructorRoomModeId,
+  type InstructorWorkspaceTabId,
+} from "@/lib/routes";
+import { cn } from "@/lib/utils";
 
 const BAND_LABELS: Record<string, string> = {
   quiet: "Quiet",
@@ -53,6 +70,34 @@ const AI_READINESS_FEATURES = [
   { feature: "argument_map", label: "Argument map", promptKey: "argument_map.session.v1" },
   { feature: "embedding", label: "Embeddings", promptKey: null },
 ] as const;
+
+const INSTRUCTOR_WORKSPACE_TABS: Array<{
+  id: InstructorWorkspaceTabId;
+  label: string;
+  icon: typeof ListBullets;
+}> = [
+  { id: "room", label: "Room", icon: ListBullets },
+  { id: "setup", label: "Setup", icon: GearSix },
+  { id: "reports", label: "Reports", icon: ChartBar },
+];
+
+const ROOM_MODES: Array<{
+  id: InstructorRoomModeId;
+  label: string;
+  icon: typeof ListBullets;
+}> = [
+  { id: "latest", label: "Latest", icon: ListBullets },
+  { id: "categories", label: "Categories", icon: SquaresFour },
+  { id: "similarity", label: "Similarity", icon: Graph },
+];
+
+function isInstructorWorkspaceTab(value: string | null): value is InstructorWorkspaceTabId {
+  return value === "room" || value === "setup" || value === "reports";
+}
+
+function isInstructorRoomMode(value: string | null): value is InstructorRoomModeId {
+  return value === "latest" || value === "categories" || value === "similarity";
+}
 
 function previewText(value?: string | null, maxLength = 150) {
   const text = value?.trim();
@@ -170,6 +215,14 @@ export function InstructorSessionPage() {
   const { sessionSlug } = useParams({ from: "/instructor/session/$sessionSlug" });
   const location = useLocation();
   const searchParams = new URLSearchParams(location.searchStr);
+  const requestedWorkspaceTab = searchParams.get("tab");
+  const requestedRoomMode = searchParams.get("mode");
+  const workspaceTab: InstructorWorkspaceTabId = isInstructorWorkspaceTab(requestedWorkspaceTab)
+    ? requestedWorkspaceTab
+    : "room";
+  const roomMode: InstructorRoomModeId = isInstructorRoomMode(requestedRoomMode)
+    ? requestedRoomMode
+    : "latest";
   const selectedQuestionId = (searchParams.get("questionId") as Id<"sessionQuestions"> | null) ?? undefined;
   const overview = useInstructorOverview(sessionSlug, selectedQuestionId);
   const activeQuestionId = overview?.selectedQuestion?.id ?? overview?.currentQuestion?.id;
@@ -284,6 +337,8 @@ export function InstructorSessionPage() {
 
   const {
     session,
+    questions,
+    questionSummaries,
     presence,
     responses,
     categories,
@@ -303,6 +358,32 @@ export function InstructorSessionPage() {
   const patternCounts = responses.inputPatterns as Record<InputPattern, number>;
   const activeCategories = categories;
   const categoryById = new Map(activeCategories.map((category) => [category.id, category]));
+  const selectedQuestionSummary = questionSummaries.find(
+    (summary) => summary.question.id === selectedQuestion?.id,
+  );
+  const roomSubmissions = selectedQuestion?.id
+    ? recentSubmissions.filter((submission) => submission.questionId === selectedQuestion.id)
+    : recentSubmissions;
+  const repliesByParentId = new Map<Id<"submissions">, typeof recentSubmissions>();
+
+  for (const submission of roomSubmissions) {
+    if (!submission.parentSubmissionId) {
+      continue;
+    }
+
+    const existing = repliesByParentId.get(submission.parentSubmissionId) ?? [];
+    existing.push(submission);
+    repliesByParentId.set(submission.parentSubmissionId, existing);
+  }
+
+  const roomRootThreads = roomSubmissions.filter((submission) => !submission.parentSubmissionId);
+  const uncategorizedRoomThreads = roomRootThreads.filter((submission) => !submission.categoryId);
+  const roomThreadsByCategory = activeCategories
+    .map((category) => ({
+      category,
+      threads: roomRootThreads.filter((submission) => submission.categoryId === category.id),
+    }))
+    .filter((group) => group.threads.length > 0);
 
   const PHASE_ORDER = ["lobby", "submit", "discover", "challenge", "synthesize", "closed"] as const;
   type Phase = (typeof PHASE_ORDER)[number];
@@ -703,6 +784,407 @@ export function InstructorSessionPage() {
     },
   ];
 
+  const currentQuestionParam = selectedQuestion?.id;
+  const workspaceHref = (tab: InstructorWorkspaceTabId) =>
+    routes.instructorSessionWorkspace(session.slug, {
+      tab,
+      mode: tab === "room" ? roomMode : undefined,
+      questionId: currentQuestionParam,
+    });
+  const roomModeHref = (mode: InstructorRoomModeId) =>
+    routes.instructorSessionRoom(session.slug, {
+      mode,
+      questionId: currentQuestionParam,
+    });
+  const questionHref = (questionId: Id<"sessionQuestions">) =>
+    routes.instructorSessionWorkspace(session.slug, {
+      tab: workspaceTab,
+      mode: workspaceTab === "room" ? roomMode : undefined,
+      questionId,
+    });
+
+  function renderRoomThread(submission: (typeof recentSubmissions)[number]) {
+    const replies = repliesByParentId.get(submission.id) ?? [];
+
+    return (
+      <div
+        key={submission.id}
+        className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)]"
+      >
+        <SubmissionCard submission={submission} />
+        <div className="border-t border-[var(--c-hairline)] px-4 py-3 text-xs text-[var(--c-muted)]">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={submission.categoryId ? "neutral" : "warning"}>
+              {submission.categoryName ?? "Uncategorized"}
+            </Badge>
+            <span>{replies.length} replies</span>
+            <span>
+              {new Date(submission.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+          {replies.length > 0 ? (
+            <details className="mt-3">
+              <summary className="cursor-pointer font-medium text-[var(--c-ink)]">
+                Show replies
+              </summary>
+              <div className="mt-3 grid gap-2">
+                {replies.map((reply) => (
+                  <div
+                    key={reply.id}
+                    className="border-l-2 border-[var(--c-hairline)] pl-3"
+                  >
+                    <SubmissionCard submission={reply} />
+                  </div>
+                ))}
+              </div>
+            </details>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  const needsAttentionCount =
+    recategorisation.pendingCount +
+    responses.uncategorized +
+    (latestCategorisationJob?.status === "error" ? 1 : 0) +
+    (latestSynthesisJob?.status === "error" ? 1 : 0) +
+    (latestReportJob?.status === "error" ? 1 : 0);
+
+  const roomWorkspace = (
+    <div className="mx-auto grid w-full max-w-5xl gap-5 p-5 lg:p-7">
+      <header className="border-b border-[var(--c-hairline)] pb-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--c-muted)]">
+              Room
+            </p>
+            <h1 className="font-display text-2xl font-semibold text-[var(--c-ink)]">
+              {selectedQuestion?.title ?? "Live discussion"}
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--c-body)]">
+              {selectedQuestion?.prompt ?? session.openingPrompt}
+            </p>
+          </div>
+          <Badge tone={selectedQuestion?.isCurrent ? "success" : "neutral"}>
+            {selectedQuestion?.isCurrent
+              ? "Current question"
+              : (selectedQuestion?.status ?? session.phase)}
+          </Badge>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {ROOM_MODES.map((mode) => {
+            const Icon = mode.icon;
+
+            return (
+              <a
+                key={mode.id}
+                href={roomModeHref(mode.id)}
+                className={cn(
+                  "inline-flex min-h-9 items-center gap-2 rounded-sm border px-3 text-sm font-medium transition",
+                  roomMode === mode.id
+                    ? "border-[var(--c-primary)] bg-[var(--c-surface-strong)] text-[var(--c-ink)]"
+                    : "border-[var(--c-hairline)] text-[var(--c-muted)] hover:bg-[var(--c-surface-soft)] hover:text-[var(--c-ink)]",
+                )}
+              >
+                <Icon size={15} />
+                {mode.label}
+              </a>
+            );
+          })}
+        </div>
+      </header>
+
+      <details
+        open
+        className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)]"
+      >
+        <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3">
+          <span className="inline-flex items-center gap-2 font-display text-sm font-medium text-[var(--c-ink)]">
+            <WarningCircle size={16} />
+            Needs attention
+          </span>
+          <Badge tone={needsAttentionCount > 0 ? "warning" : "success"}>
+            {needsAttentionCount}
+          </Badge>
+        </summary>
+        <div className="grid gap-2 border-t border-[var(--c-hairline)] px-4 py-3 text-sm">
+          {recategorisation.pendingCount > 0 ? (
+            <p className="text-[var(--c-body)]">
+              {recategorisation.pendingCount} recategorisation request
+              {recategorisation.pendingCount === 1 ? "" : "s"} pending review.
+            </p>
+          ) : null}
+          {responses.uncategorized > 0 ? (
+            <p className="text-[var(--c-body)]">
+              {responses.uncategorized} response{responses.uncategorized === 1 ? "" : "s"} need
+              categorisation.
+            </p>
+          ) : null}
+          {latestCategorisationJob?.status === "error" ||
+          latestSynthesisJob?.status === "error" ||
+          latestReportJob?.status === "error" ? (
+            <p className="text-[var(--c-error)]">One or more live AI jobs need review.</p>
+          ) : null}
+          {needsAttentionCount === 0 ? (
+            <p className="text-[var(--c-muted)]">No live issues for the selected question.</p>
+          ) : null}
+        </div>
+      </details>
+
+      {roomMode === "latest" ? (
+        <section className="grid gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-medium text-[var(--c-ink)]">Latest threads</h2>
+            <Badge tone="neutral">{roomRootThreads.length}</Badge>
+          </div>
+          {roomRootThreads.length === 0 ? (
+            <Card>
+              <p className="text-sm text-[var(--c-muted)]">No submissions yet.</p>
+            </Card>
+          ) : (
+            roomRootThreads.map(renderRoomThread)
+          )}
+        </section>
+      ) : null}
+
+      {roomMode === "categories" ? (
+        <section className="grid gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-medium text-[var(--c-ink)]">By category</h2>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setCategoryError(null);
+                setShowAddCategory((value) => !value);
+              }}
+            >
+              + Add category
+            </Button>
+          </div>
+
+          {showAddCategory ? (
+            <form
+              className="grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleCreateCategory();
+              }}
+            >
+              <input
+                value={addCategoryName}
+                onChange={(event) => setAddCategoryName(event.target.value)}
+                placeholder="Category name"
+                className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+              />
+              <textarea
+                value={addCategoryDescription}
+                onChange={(event) => setAddCategoryDescription(event.target.value)}
+                placeholder="Short description"
+                rows={2}
+                className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+              />
+              {categoryError ? (
+                <p className="text-xs text-[var(--c-error)]">{categoryError}</p>
+              ) : null}
+              <div className="flex gap-2">
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={savingCategory || addCategoryName.trim().length < 2}
+                >
+                  {savingCategory ? "Saving..." : "Create"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowAddCategory(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : null}
+
+          {roomThreadsByCategory.map(({ category, threads }, index) => (
+            <section
+              key={category.id}
+              className="grid gap-3 border-l-4 pl-4"
+              style={{ borderColor: `var(--c-sig-${categoryColorToTone(category.color, index)})` }}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-display text-base font-medium text-[var(--c-ink)]">
+                    {category.name}
+                  </h3>
+                  {category.description ? (
+                    <p className="text-xs text-[var(--c-muted)]">{category.description}</p>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => startRenameCategory(category)}
+                  >
+                    Rename
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => startCategoryFollowUp(category)}
+                  >
+                    Follow-up
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handleGenerateCategorySummary(category.id)}
+                    disabled={generatingCategoryId === category.id}
+                  >
+                    {generatingCategoryId === category.id ? "Summarizing..." : "Summarize"}
+                  </Button>
+                </div>
+              </div>
+
+              {editingCategoryId === category.id ? (
+                <form
+                  className="grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleRenameCategory(category.id);
+                  }}
+                >
+                  <input
+                    value={editingCategoryName}
+                    onChange={(event) => setEditingCategoryName(event.target.value)}
+                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+                  />
+                  <textarea
+                    value={editingCategoryDescription}
+                    onChange={(event) => setEditingCategoryDescription(event.target.value)}
+                    rows={2}
+                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={savingCategory || editingCategoryName.trim().length < 2}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditingCategoryId(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
+
+              {followUpCategoryId === category.id ? (
+                <form
+                  className="grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleCreateCategoryFollowUp(category.id);
+                  }}
+                >
+                  <textarea
+                    value={followUpPrompt}
+                    onChange={(event) => setFollowUpPrompt(event.target.value)}
+                    rows={3}
+                    placeholder="Follow-up question for this category"
+                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+                  />
+                  {followUpError ? (
+                    <p className="text-xs text-[var(--c-error)]">{followUpError}</p>
+                  ) : null}
+                  <div className="flex gap-2">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={savingFollowUp || followUpPrompt.trim().length < 5}
+                    >
+                      {savingFollowUp ? "Sending..." : "Send"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setFollowUpCategoryId(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
+
+              {threads.map(renderRoomThread)}
+            </section>
+          ))}
+
+          {uncategorizedRoomThreads.length > 0 ? (
+            <section className="grid gap-3 border-l-4 border-[var(--c-muted)] pl-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="font-display text-base font-medium text-[var(--c-ink)]">
+                  Uncategorized
+                </h3>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void handleTriggerCategorisation()}
+                  disabled={categorisationBusy}
+                >
+                  {categorisationBusy ? "Categorising..." : "Run categorisation"}
+                </Button>
+              </div>
+              {uncategorizedRoomThreads.map(renderRoomThread)}
+            </section>
+          ) : null}
+        </section>
+      ) : null}
+
+      {roomMode === "similarity" ? (
+        <Card
+          title="Similarity map"
+          description="Phase 17 will provide semantic clusters here after the Room shell is stable."
+        >
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <MetricTile label="Embeddings" value={String(embeddingCount)} />
+            <MetricTile label="Signals" value={String(noveltyCount)} />
+            <MetricTile label="Threads" value={String(roomRootThreads.length)} />
+            <MetricTile label="Status" value={hasEmbeddings ? "ready" : "pending"} />
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-3"
+            onClick={handleQueueEmbeddings}
+            disabled={embeddingBusy}
+          >
+            {embeddingBusy ? "Queued" : "Generate embeddings"}
+          </Button>
+        </Card>
+      ) : null}
+    </div>
+  );
+
   return (
     <InstructorShell
       sessionTitle={session.title}
@@ -712,7 +1194,30 @@ export function InstructorSessionPage() {
       onPreviousAct={retreatPhase}
       onNextAct={advancePhase}
       left={
-        <div className="grid gap-3">
+        <div className="grid gap-4 p-4">
+          <nav className="grid gap-1">
+            {INSTRUCTOR_WORKSPACE_TABS.map((tab) => {
+              const Icon = tab.icon;
+
+              return (
+                <a
+                  key={tab.id}
+                  href={workspaceHref(tab.id)}
+                  className={cn(
+                    "inline-flex min-h-10 items-center gap-2 rounded-sm px-3 text-sm font-medium transition",
+                    workspaceTab === tab.id
+                      ? "bg-[color-mix(in_oklch,var(--c-canvas),transparent_88%)] text-[var(--c-canvas)]"
+                      : "text-[color-mix(in_oklch,var(--c-canvas),transparent_35%)] hover:bg-[color-mix(in_oklch,var(--c-canvas),transparent_94%)] hover:text-[var(--c-canvas)]",
+                  )}
+                >
+                  <Icon size={16} />
+                  {tab.label}
+                </a>
+              );
+            })}
+          </nav>
+
+          <div className="border-t border-[color-mix(in_oklch,var(--c-canvas),transparent_88%)] pt-4">
           {/* Category board */}
           <div className="flex items-center justify-between">
             <span className="text-xs text-[var(--c-muted)]">
@@ -974,10 +1479,14 @@ export function InstructorSessionPage() {
           >
             {templateSaved ? "Template saved!" : savingTemplate ? "Saving..." : "Save as Template"}
           </Button>
+          </div>
         </div>
       }
       center={
-        <div className="grid gap-3">
+        workspaceTab === "room" ? (
+          roomWorkspace
+        ) : (
+          <div className="grid gap-3 p-5 lg:p-7">
           <QuestionManagerPanel
             session={session}
             currentQuestion={overview.currentQuestion}
@@ -1704,10 +2213,117 @@ export function InstructorSessionPage() {
               />
             </Card>
           )}
-        </div>
+          </div>
+        )
       }
       right={
-        <div className="grid gap-3">
+        <div className="grid gap-4 p-4">
+          <section className="grid gap-2 border-b border-[var(--c-hairline)] pb-4">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--c-muted)]">
+              Live controls
+            </p>
+            <div>
+              <p className="font-display text-sm font-medium text-[var(--c-ink)]">
+                {selectedQuestion?.title ?? "No question selected"}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[var(--c-muted)]">
+                {selectedQuestionSummary?.counts.submissions ?? 0} submissions /{" "}
+                {selectedQuestionSummary?.counts.uncategorized ?? responses.uncategorized}{" "}
+                uncategorized
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <MetricTile label="Typing" value={String(presence.typing)} />
+              <MetricTile label="Submitted" value={String(presence.submitted)} />
+              <MetricTile label="Idle" value={String(presence.idle)} />
+            </div>
+          </section>
+
+          <section className="grid gap-2 border-b border-[var(--c-hairline)] pb-4">
+            <p className="text-xs font-medium text-[var(--c-ink)]">Question switcher</p>
+            <div className="grid gap-1.5">
+              {questions.map((question) => (
+                <a
+                  key={question.id}
+                  href={questionHref(question.id)}
+                  className={cn(
+                    "rounded-sm border px-2.5 py-2 text-xs transition",
+                    selectedQuestion?.id === question.id
+                      ? "border-[var(--c-primary)] bg-[var(--c-surface-strong)] text-[var(--c-ink)]"
+                      : "border-[var(--c-hairline)] text-[var(--c-muted)] hover:bg-[var(--c-surface-strong)] hover:text-[var(--c-ink)]",
+                  )}
+                >
+                  <span className="block truncate font-medium">{question.title}</span>
+                  <span className="mt-0.5 block text-[10px]">{question.status}</span>
+                </a>
+              ))}
+            </div>
+          </section>
+
+          <section className="grid gap-2 border-b border-[var(--c-hairline)] pb-4">
+            <p className="text-xs font-medium text-[var(--c-ink)]">Release state</p>
+            <div className="grid gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => void handleVisibilityChange("category_summary_only")}
+                disabled={session.visibilityMode === "category_summary_only"}
+              >
+                Release summaries
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => void handleVisibilityChange("raw_responses_visible")}
+                disabled={session.visibilityMode === "raw_responses_visible"}
+              >
+                Release responses
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => void handleVisibilityChange("private_until_released")}
+                disabled={session.visibilityMode === "private_until_released"}
+              >
+                Hide room
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge
+                tone={session.visibilityMode === "private_until_released" ? "warning" : "success"}
+              >
+                {session.visibilityMode.replace(/_/g, " ")}
+              </Badge>
+              <Badge tone={session.fightMeEnabled ? "success" : "neutral"}>Fight</Badge>
+              <Badge tone={session.summaryGateEnabled ? "success" : "neutral"}>Reports gate</Badge>
+            </div>
+          </section>
+
+          <section className="grid gap-2 border-b border-[var(--c-hairline)] pb-4">
+            <p className="text-xs font-medium text-[var(--c-ink)]">Live actions</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void handleTriggerCategorisation()}
+              disabled={categorisationBusy}
+            >
+              {categorisationBusy ? "Categorising..." : "Run categorisation"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => handleGenerateClassSynthesis()}
+              disabled={generatingClass}
+            >
+              {generatingClass ? "Generating..." : "Generate synthesis"}
+            </Button>
+          </section>
+
           <p className="text-xs text-[var(--c-muted)]">Live Activity</p>
           {studentActivity.length === 0 && (
             <p className="text-sm text-[var(--c-muted)]">No student activity yet.</p>
