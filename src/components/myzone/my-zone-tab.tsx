@@ -1,7 +1,9 @@
 import { ArrowsClockwise, CircleNotch, Sword, Timer } from "@phosphor-icons/react";
 import { FeedbackCard } from "@/components/feedback/feedback-card";
+import { ParticipantStateSection } from "@/components/layout/participant-state-section";
 import { LoadingState } from "@/components/state/loading-state";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { categoryColorToTone } from "@/lib/category-colors";
 
@@ -146,13 +148,9 @@ export function MyZoneTab({
           }
           action={
             onViewReport ? (
-              <button
-                type="button"
-                onClick={onViewReport}
-                className="text-[10px] text-[var(--c-link)] underline"
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={onViewReport}>
                 Open report page
-              </button>
+              </Button>
             ) : null
           }
         >
@@ -169,13 +167,9 @@ export function MyZoneTab({
           title="Private comparison notes"
           action={
             onViewReport ? (
-              <button
-                type="button"
-                onClick={onViewReport}
-                className="text-[10px] text-[var(--c-link)] underline"
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={onViewReport}>
                 View full report
-              </button>
+              </Button>
             ) : null
           }
         >
@@ -233,32 +227,23 @@ export function MyZoneTab({
           ) : null}
         </Card>
       ) : personalReport?.status === "queued" || personalReport?.status === "processing" ? (
-        <div className="flex items-center gap-2 rounded-md bg-[var(--c-surface-soft)] p-3">
-          <CircleNotch size={14} className="animate-spin text-[var(--c-success)]" />
-          <span className="text-xs text-[var(--c-muted)]">Generating personal report...</span>
-        </div>
+        <ParticipantStateSection kind="waiting" title="Personal report">
+          Generating your personal report...
+        </ParticipantStateSection>
       ) : personalReport?.status === "error" ? (
-        <Card title="Personal report failed">
-          <p className="text-sm text-[var(--c-muted)]">
-            {personalReport.error ?? "The personal report could not be generated yet."}
-          </p>
-        </Card>
+        <Card title="Personal report failed" description={personalReport.error ?? "The personal report could not be generated yet."} />
       ) : (
-        <Card title="Personal report pending">
-          <p className="text-sm text-[var(--c-muted)]">
-            Your report has not been generated for this question yet.
-          </p>
-        </Card>
+        <ParticipantStateSection kind="waiting" title="Personal report">
+          Your report has not been generated for this question yet.
+        </ParticipantStateSection>
       )}
 
       {loading ? <LoadingState label="Loading your responses..." /> : null}
 
       {!loading && initials.length === 0 ? (
-        <Card>
-          <p className="text-sm text-[var(--c-muted)]">
-            No contributions yet. Your submitted responses will appear here.
-          </p>
-        </Card>
+        <ParticipantStateSection kind="empty" title="Contributions">
+          No contributions yet. Your submitted responses will appear here.
+        </ParticipantStateSection>
       ) : null}
 
       {initials.map((submission) => {
@@ -319,10 +304,7 @@ export function MyZoneTab({
             ) : null}
 
             {recat ? (
-              <div
-                className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
-                style={{ borderLeft: "3px solid var(--c-sig-yellow)" }}
-              >
+              <div className="rounded-md border border-[var(--c-hairline)] border-l-[3px] border-l-[var(--c-sig-yellow)] bg-[var(--c-surface-soft)] p-3">
                 <p className="font-display text-xs font-medium text-[var(--c-sig-mustard)]">
                   Re-categorization request
                 </p>
@@ -362,8 +344,7 @@ export function MyZoneTab({
             {(positionShifts ?? []).map((shift) => (
               <div
                 key={shift.id}
-                className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
-                style={{ borderLeft: "3px solid var(--c-sig-mustard)" }}
+                className="rounded-md border border-[var(--c-hairline)] border-l-[3px] border-l-[var(--c-sig-mustard)] bg-[var(--c-surface-soft)] p-3"
               >
                 <p className="flex items-center gap-1 text-xs font-medium text-[var(--c-sig-mustard)]">
                   <ArrowsClockwise size={12} />
@@ -390,7 +371,7 @@ export function MyZoneTab({
                 className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-display text-xs font-semibold text-[var(--c-sig-coral)]">
+                  <span className="font-display text-xs font-semibold text-[var(--c-tab-fight)]">
                     <Sword size={12} className="mr-0.5 inline" />
                     {fight.mode === "vs_ai" ? "Fight vs AI" : "Fight 1v1"}
                   </span>
@@ -411,13 +392,14 @@ export function MyZoneTab({
                     {formatTime(fight.createdAt)}
                   </span>
                   {onViewFight ? (
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="sm"
                       onClick={() => onViewFight(fight.slug)}
-                      className="text-[10px] text-[var(--c-link)] underline"
                     >
                       View thread
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </div>
