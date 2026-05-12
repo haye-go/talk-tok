@@ -1280,6 +1280,333 @@ export function InstructorSessionPage() {
     </div>
   );
 
+  const reportsWorkspace = (
+    <div className="mx-auto grid w-full max-w-6xl gap-5 p-5 lg:p-7">
+      <header className="border-b border-[#d7e0ea] pb-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
+          Reports / Review
+        </p>
+        <h1 className="mt-2 font-display text-2xl font-semibold text-[var(--c-ink)]">
+          Review generated evidence and analysis
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--c-body)]">
+          Reports owns synthesis, personal reports, semantic review, novelty, category drift, and
+          the argument map. Live controls stay in the rail.
+        </p>
+      </header>
+
+      <AiJobStatusPanel
+        items={aiJobStatusItems}
+        contextLabel={overview.currentQuestion?.title ?? "the current question"}
+      />
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+        <Card title="Synthesis">
+          <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
+            Draft artifacts are instructor-only. Published and final artifacts are learner-facing
+            only when synthesis is released for the current question
+            {sessionPrivateVisibility ? " and session visibility is no longer private." : "."}
+          </p>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            <Badge tone={synthesisReleasedForQuestion ? "success" : "warning"}>
+              {synthesisReleasedForQuestion ? "Synthesis released" : "Synthesis hidden"}
+            </Badge>
+            {sessionPrivateVisibility ? <Badge tone="warning">Session visibility private</Badge> : null}
+          </div>
+          {artifactCounts ? (
+            <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+              <MetricTile label="Draft" value={String(artifactCounts.draft ?? 0)} />
+              <MetricTile label="Published" value={String(artifactCounts.published ?? 0)} />
+              <MetricTile label="Final" value={String(artifactCounts.final ?? 0)} />
+              <MetricTile label="Error" value={String(artifactCounts.error ?? 0)} />
+            </div>
+          ) : null}
+
+          {latestClassSynthesis ? (
+            <div className="mb-3 rounded-md bg-[var(--c-surface-strong)] p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-display text-sm font-semibold text-[var(--c-ink)]">
+                  <Sparkle size={13} className="mr-1 inline" />
+                  {latestClassSynthesis.title}
+                </span>
+                <Badge
+                  tone={
+                    latestClassSynthesis.status === "final"
+                      ? "success"
+                      : latestClassSynthesis.status === "published"
+                        ? "sky"
+                        : "neutral"
+                  }
+                >
+                  {latestClassSynthesis.status}
+                </Badge>
+              </div>
+              {latestClassSynthesis.summary ? (
+                <p className="mt-2 text-sm leading-6 text-[var(--c-body)]">
+                  {previewText(String(latestClassSynthesis.summary), 320)}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleGenerateClassSynthesis()}
+              disabled={generatingClass}
+            >
+              {generatingClass ? "Generating..." : "Class Synthesis"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleGenerateClassSynthesis("opposing_views")}
+              disabled={generatingOpposing}
+            >
+              {generatingOpposing ? "Generating..." : "Opposing Views"}
+            </Button>
+          </div>
+        </Card>
+
+        <Card title="Synthesis Artifacts">
+          <div className="grid gap-3">
+            {recentArtifacts.length === 0 ? (
+              <p className="text-sm text-[var(--c-muted)]">No synthesis artifacts yet.</p>
+            ) : (
+              recentArtifacts.map((artifact) => (
+                <SynthesisArtifactCard
+                  key={artifact.id}
+                  artifact={artifact}
+                  sessionSlug={sessionSlug}
+                  isInstructor
+                />
+              ))
+            )}
+          </div>
+        </Card>
+      </section>
+
+      <Card title="Personal Reports">
+        <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
+          Reports can be generated before they are released. Learners may use their private report
+          page, while this view shows generation and preview state for instructors.
+        </p>
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          <Badge tone={reportsReleasedForQuestion ? "success" : "warning"}>
+            {reportsReleasedForQuestion ? "Reports released" : "Reports hidden in Me"}
+          </Badge>
+        </div>
+        {reportsSummary ? (
+          <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+            <MetricTile label="Total" value={String(reportsSummary.total ?? 0)} />
+            <MetricTile label="Success" value={String(reportsSummary.success ?? 0)} />
+            <MetricTile
+              label="Processing"
+              value={String((reportsSummary.queued ?? 0) + (reportsSummary.processing ?? 0))}
+            />
+            <MetricTile label="Error" value={String(reportsSummary.error ?? 0)} />
+          </div>
+        ) : null}
+
+        <Button size="sm" variant="coral" onClick={handleGenerateReports} disabled={reportBusy}>
+          {reportBusy ? "Generating..." : "Generate All Reports"}
+        </Button>
+        {reportGenerationError ? (
+          <p className="mt-2 text-xs text-[var(--c-error)]">{reportGenerationError}</p>
+        ) : null}
+
+        <div className="mt-4 grid gap-2">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--c-muted)]">
+            Recent reports
+          </p>
+          {recentReports.length === 0 ? (
+            <p className="rounded-sm bg-[var(--c-surface-strong)] px-3 py-2 text-xs text-[var(--c-muted)]">
+              No personal reports generated yet.
+            </p>
+          ) : (
+            recentReports.slice(0, 6).map((report) => (
+              <div key={report.id} className="rounded-sm bg-[var(--c-surface-strong)] px-3 py-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-display text-sm font-medium text-[var(--c-ink)]">
+                      {report.nickname ?? "Unknown participant"}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-[var(--c-muted)]">
+                      {report.submissionCount ?? 0} responses · {report.followUpCount ?? 0}{" "}
+                      follow-ups · {report.fightCount ?? 0} fights ·{" "}
+                      {formatReportTime(report.generatedAt ?? report.updatedAt)}
+                    </p>
+                  </div>
+                  <Badge
+                    tone={
+                      report.status === "success"
+                        ? "success"
+                        : report.status === "error"
+                          ? "error"
+                          : "warning"
+                    }
+                  >
+                    {report.status}
+                  </Badge>
+                </div>
+                {previewText(report.summary) ? (
+                  <p className="mt-2 text-xs leading-relaxed text-[var(--c-body)]">
+                    {previewText(report.summary)}
+                  </p>
+                ) : null}
+                {report.status === "error" && report.error ? (
+                  <p className="mt-1 text-[10px] leading-relaxed text-[var(--c-error)]">
+                    Error: {report.error}
+                  </p>
+                ) : null}
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
+
+      <section className="grid gap-5 lg:grid-cols-2">
+        <Card title="Embeddings">
+          {semanticStatus ? (
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <MetricTile label="Stored" value={String(embeddingCount)} />
+              <MetricTile label="Submissions" value={String(semanticStatus.submissionCount)} />
+            </div>
+          ) : null}
+          <Button size="sm" variant="secondary" onClick={handleQueueEmbeddings} disabled={embeddingBusy}>
+            {embeddingBusy ? "Queued" : "Generate Embeddings"}
+          </Button>
+        </Card>
+
+        <Card title="Novelty Signals">
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <MetricTile label="Signals" value={String(noveltyCount)} />
+            <MetricTile label="Ready" value={hasNoveltySignals ? "Yes" : "No"} />
+          </div>
+          <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
+            Refresh recomputes novelty from existing embeddings. It does not create missing
+            embeddings.
+          </p>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void refreshSignals({ sessionSlug, questionId: activeQuestionId })}
+            disabled={!hasEmbeddings}
+          >
+            Refresh Signals
+          </Button>
+        </Card>
+
+        <Card title="Argument Map Readiness">
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <MetricTile label="Links" value={String(argumentLinkCount)} />
+            <MetricTile label="Ready" value={hasArgumentLinks ? "Yes" : "No"} />
+          </div>
+          <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
+            Argument links are generated from responses, categories, and synthesis artifacts for
+            the current question.
+          </p>
+          {latestArgumentMapJob?.error ? (
+            <p className="text-xs text-[var(--c-error)]">{latestArgumentMapJob.error}</p>
+          ) : null}
+          <Button size="sm" variant="secondary" onClick={handleGenerateArgMap} disabled={argMapBusy}>
+            {argMapBusy ? "Queued" : "Generate Argument Map"}
+          </Button>
+        </Card>
+
+        <Card title="Category Drift Readiness">
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <MetricTile label="Slices" value={String(categoryDrift?.slices.length ?? 0)} />
+            <MetricTile label="Transitions" value={String(categoryDrift?.transitions.length ?? 0)} />
+          </div>
+          <p className="text-xs leading-5 text-[var(--c-muted)]">
+            Drift is deterministic analysis over categorised initial and follow-up responses. It
+            becomes useful after categorisation and follow-up rounds exist.
+          </p>
+        </Card>
+      </section>
+
+      {semanticStatus?.readiness.canShowNoveltyRadar && noveltyRadar ? (
+        <Card title="Novelty Radar">
+          <div className="mb-3 grid grid-cols-3 gap-2">
+            <MetricTile label="Low" value={String(noveltyRadar.distribution.low)} />
+            <MetricTile label="Medium" value={String(noveltyRadar.distribution.medium)} />
+            <MetricTile label="High" value={String(noveltyRadar.distribution.high)} />
+          </div>
+          <div className="grid gap-2">
+            {noveltyRadar.topDistinctive.slice(0, 5).map((item: NoveltyRadarItem) => (
+              <div key={item.signalId} className="rounded-sm bg-[var(--c-surface-strong)] p-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-[var(--c-ink)]">{item.participantLabel}</span>
+                  <Badge tone="mustard">{item.band}</Badge>
+                </div>
+                {item.bodyPreview ? (
+                  <p className="mt-1 text-xs text-[var(--c-body)]">
+                    {previewText(item.bodyPreview, 140)}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
+      {categoryDrift && categoryDrift.slices.length > 0 ? (
+        <Card title="Category Drift">
+          <div className="overflow-x-auto">
+            <table className="w-full text-[10px]">
+              <thead>
+                <tr className="border-b border-[var(--c-hairline)] text-left text-[var(--c-muted)]">
+                  <th className="py-1 pr-2 font-medium">Slice</th>
+                  {categoryDrift.slices[0].categoryCounts.map((cell: CategoryCountCell) => (
+                    <th key={cell.categoryId} className="py-1 pr-2 font-medium">
+                      {cell.categoryName?.split(" ")[0]}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {categoryDrift.slices.map((slice: CategoryDriftSlice) => (
+                  <tr key={slice.key} className="border-b border-[var(--c-hairline)]">
+                    <td className="py-1 pr-2 text-[var(--c-ink)]">{slice.label}</td>
+                    {slice.categoryCounts.map((cell: CategoryCountCell) => (
+                      <td key={cell.categoryId} className="py-1 pr-2 font-mono text-[var(--c-body)]">
+                        {cell.count}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : null}
+
+      {semanticStatus?.readiness.canShowArgumentMap && argumentGraph ? (
+        <Card title="Argument Map">
+          <ArgumentMapGraph
+            nodes={argumentGraph.nodes}
+            edges={argumentGraph.edges}
+            rendererLabel={argumentGraph.layout?.suggestedRenderer}
+          />
+        </Card>
+      ) : null}
+
+      <Card title="Recent Submissions">
+        <div className="grid gap-3">
+          {recentSubmissions.length === 0 ? (
+            <p className="text-sm text-[var(--c-muted)]">No submissions yet.</p>
+          ) : (
+            recentSubmissions.slice(0, 8).map((submission) => (
+              <SubmissionCard key={submission.id} submission={submission} />
+            ))
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+
   return (
     <InstructorShell
       sessionTitle={session.title}
@@ -1638,6 +1965,8 @@ export function InstructorSessionPage() {
       center={
         workspaceTab === "room" ? (
           roomWorkspace
+        ) : workspaceTab === "reports" ? (
+          reportsWorkspace
         ) : (
           <div className="grid gap-3 p-5 lg:p-7">
           <QuestionManagerPanel
