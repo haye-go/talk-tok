@@ -2,12 +2,10 @@ import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ChartBar,
-  CircleNotch,
   FloppyDisk,
   GearSix,
   Graph,
   ListBullets,
-  Scales,
   Sparkle,
   SquaresFour,
   WarningCircle,
@@ -29,7 +27,7 @@ import { SubmissionCard } from "@/components/submission/submission-card";
 import { ErrorState } from "@/components/state/error-state";
 import { ArgumentMapGraph } from "@/components/instructor/argument-map-graph";
 import { LoadingState } from "@/components/state/loading-state";
-import { Badge, type BadgeProps } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
@@ -43,23 +41,6 @@ import {
   type InstructorWorkspaceTabId,
 } from "@/lib/routes";
 import { cn } from "@/lib/utils";
-
-const BAND_LABELS: Record<string, string> = {
-  quiet: "Quiet",
-  active: "Active",
-  highly_active: "Highly Active",
-  emerging: "Emerging",
-  solid: "Solid",
-  strong: "Strong",
-  exceptional: "Exceptional",
-  common: "Common",
-  above_average: "Above Avg",
-  distinctive: "Distinctive",
-  novel: "Novel",
-  limited: "Limited",
-  responsive: "Responsive",
-  highly_responsive: "Highly Responsive",
-};
 
 const AI_READINESS_FEATURES = [
   { feature: "feedback", label: "Feedback", promptKey: "feedback.private.v1" },
@@ -190,13 +171,6 @@ interface NoveltyRadarItem {
   categoryColor?: string;
   band: string;
   bodyPreview?: string;
-}
-
-interface NoveltyRadarCategoryAverage {
-  categoryId: string;
-  categoryName: string;
-  categoryColor?: string;
-  averageNoveltyScore: number;
 }
 
 interface CategoryCountCell {
@@ -2021,6 +1995,28 @@ export function InstructorSessionPage() {
                   : "No budget hard stop is currently blocking this session."}
               </p>
             </div>
+
+            <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-[var(--c-ink)]">Recent LLM failures</span>
+                <Badge tone={recentLlmFailures.length === 0 ? "success" : "error"}>
+                  {recentLlmFailures.length}
+                </Badge>
+              </div>
+              {recentLlmFailures.length === 0 ? (
+                <p className="mt-1 text-[11px] text-[var(--c-muted)]">
+                  No recent LLM errors found for this session.
+                </p>
+              ) : (
+                <div className="mt-1 grid gap-1">
+                  {recentLlmFailures.map((call) => (
+                    <p key={call.id} className="text-[11px] leading-4 text-[var(--c-error)]">
+                      {call.feature}: {call.error ?? "Unknown error"}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </Card>
       </section>
@@ -2281,6 +2277,12 @@ export function InstructorSessionPage() {
               >
                 {categorisationBusy ? "Categorising..." : "Run categorisation"}
               </Button>
+              {categorisationMessage ? (
+                <p className="text-xs text-[var(--c-success)]">{categorisationMessage}</p>
+              ) : null}
+              {categorisationError ? (
+                <p className="text-xs text-[var(--c-error)]">{categorisationError}</p>
+              ) : null}
               <Button
                 type="button"
                 size="sm"
