@@ -137,13 +137,6 @@ export function MyZoneTab({
 
   return (
     <div className="space-y-4">
-      <div className="-mx-4 -mt-4 bg-[var(--c-sig-peach)] px-4 py-4">
-        <h2 className="font-display text-lg font-medium text-[var(--c-on-sig-light)]">Me</h2>
-        <p className="text-xs text-[var(--c-on-sig-light-body)]" style={{ opacity: 0.7 }}>
-          Your private archive, feedback, and report
-        </p>
-      </div>
-
       {!personalReportsVisible ? (
         <Card
           title={
@@ -261,7 +254,11 @@ export function MyZoneTab({
       {loading ? <LoadingState label="Loading your responses..." /> : null}
 
       {!loading && initials.length === 0 ? (
-        <p className="text-sm text-[var(--c-muted)]">Your submitted responses appear here.</p>
+        <Card>
+          <p className="text-sm text-[var(--c-muted)]">
+            No contributions yet. Your submitted responses will appear here.
+          </p>
+        </Card>
       ) : null}
 
       {initials.map((submission) => {

@@ -31,9 +31,12 @@ export function BottomTabBar({
             data-active={active ? "true" : "false"}
             onClick={() => onTabChange(tab.id)}
             className={cn(
-              "flex min-h-14 cursor-pointer flex-col items-center justify-center gap-1 border-t-2 border-transparent px-1 text-xs text-[var(--c-muted)] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[var(--c-info-border)]",
-              active && "border-[var(--c-primary)] text-[var(--c-ink)]",
+              "flex min-h-14 cursor-pointer flex-col items-center justify-center gap-1 border-t-2 px-1 text-xs transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-[var(--c-info-border)]",
+              active
+                ? "font-medium"
+                : "border-transparent text-[var(--c-muted)]",
             )}
+            style={active ? { borderColor: tab.color, color: tab.color } : undefined}
           >
             <Icon size={20} weight={active ? "bold" : "regular"} />
             <span className="font-display">{tab.label}</span>

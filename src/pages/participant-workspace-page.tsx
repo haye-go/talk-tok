@@ -5,7 +5,6 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ContributionThreadCard } from "@/components/contribute/contribution-thread-card";
-import { DemoIdentityBar } from "@/components/demo/demo-identity-bar";
 import { FightHome } from "@/components/fight/fight-home";
 import { FightThread } from "@/components/fight/fight-thread";
 import { ParticipantShell } from "@/components/layout/participant-shell";
@@ -509,22 +508,49 @@ export function ParticipantWorkspacePage({
       </div>
     ) : null;
 
+  const promptLabel = selectedQuestion?.isCurrent ? "Current question" : "Released question";
+
   return (
     <ParticipantShell
-      topBar={<DemoIdentityBar sessionSlug={sessionSlug} />}
+      sessionTitle={session.title}
+      joinCode={session.joinCode}
+      nickname={participant.nickname}
+      sessionSlug={sessionSlug}
+      prompt={selectedPrompt}
+      promptLabel={promptLabel}
+      capabilities={{
+        contributionsOpen,
+        hasContributions: topLevelContributions.length > 0,
+        canSeeRawPeerResponses,
+        canSeeCategorySummary,
+        synthesisVisible: selectedQuestion?.synthesisVisible ?? false,
+        fightEnabled: canUseFight,
+        personalReportsVisible: selectedQuestion?.personalReportsVisible ?? false,
+      }}
+      releasedQuestions={releasedQuestions.map((q) => ({
+        id: q.id,
+        title: q.title,
+        isCurrent: q.isCurrent,
+      }))}
+      selectedQuestionId={selectedQuestion?.id ?? null}
+      onSelectQuestion={(questionId) =>
+        setSelectedQuestionOverrideId(
+          questionId as typeof selectedQuestionOverrideId,
+        )
+      }
       questionHeader={questionHeader}
       activeTab={activeTab}
       onActiveTabChange={handleTabChange}
       contribute={
         <div className="grid gap-4">
-          <div className="rounded-md bg-[var(--c-sig-cream)] p-3.5">
+          <Card tone="cream">
             <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--c-on-sig-light-body)]">
-              {selectedQuestion?.isCurrent ? "Current question" : "Released question"}
+              {promptLabel}
             </p>
             <p className="mt-1 text-sm font-medium leading-relaxed text-[var(--c-on-sig-light)]">
               &ldquo;{selectedPrompt}&rdquo;
             </p>
-          </div>
+          </Card>
 
           {submissionError ? <InlineAlert tone="error">{submissionError}</InlineAlert> : null}
           {feedbackQueueWarning ? (
@@ -534,7 +560,7 @@ export function ParticipantWorkspacePage({
           ) : null}
 
           {!contributionsOpen && topLevelContributions.length === 0 ? (
-            <Card title="Contributions are paused">
+            <Card>
               <p className="text-sm text-[var(--c-muted)]">
                 This question is browseable, but new contributions are closed until the instructor
                 reopens it.
@@ -613,8 +639,6 @@ export function ParticipantWorkspacePage({
               ))}
             </>
           )}
-
-          <p className="text-xs text-[var(--c-muted)]">Signed in as {participant.nickname}</p>
         </div>
       }
       explore={
@@ -657,6 +681,7 @@ export function ParticipantWorkspacePage({
           onNavigateToThread={(nextFightSlug) =>
             void navigate({ to: routes.sessionFight(sessionSlug, nextFightSlug) })
           }
+          onNavigateToTab={handleTabChange}
         />
       }
       me={
@@ -702,6 +727,7 @@ interface FightTabContentProps {
   canUseFightMe: boolean;
   fightSlug?: string;
   onNavigateToThread: (fightSlug: string) => void;
+  onNavigateToTab?: (tab: TabId) => void;
 }
 
 function FightTabContent({
@@ -717,6 +743,7 @@ function FightTabContent({
   canUseFightMe,
   fightSlug,
   onNavigateToThread,
+  onNavigateToTab,
 }: FightTabContentProps) {
   if (fightSlug) {
     return (
@@ -746,16 +773,24 @@ function FightTabContent({
 
   if (canUseFight) {
     return (
-      <Card title="Fight needs a contribution first">
+      <Card>
         <p className="text-sm text-[var(--c-muted)]">
-          Submit a response to this question before you open a Fight thread.
+          Submit a response before you can open a Fight thread.
         </p>
+        <Button
+          type="button"
+          variant="secondary"
+          className="mt-3"
+          onClick={() => onNavigateToTab?.("contribute")}
+        >
+          Go to Contribute
+        </Button>
       </Card>
     );
   }
 
   return (
-    <Card title="Fight is unavailable">
+    <Card>
       <p className="text-sm text-[var(--c-muted)]">
         The instructor has not enabled Fight for this question yet.
       </p>
@@ -830,7 +865,7 @@ function MeTabContent({
         onViewFight={onViewFight}
         onViewReport={onViewReport}
       />
-      <Card title="Nickname">
+      <Card eyebrow="Settings">
         <form className="grid gap-3" onSubmit={(event) => void onNicknameSubmit(event)}>
           <Input
             label="Visible nickname"
@@ -838,7 +873,7 @@ function MeTabContent({
             onChange={(event) => onNicknameChange(event.target.value)}
             error={nicknameError}
           />
-          <Button type="submit" variant="secondary">
+          <Button type="submit" variant="ghost" size="sm">
             Update nickname
           </Button>
         </form>
@@ -953,14 +988,14 @@ function ReviewDetail({ report, generating, onGenerate }: ReviewDetailProps) {
       ) : null}
 
       {report.growthOpportunity ? (
-        <div className="rounded-md bg-[var(--c-sig-cream)] p-3.5">
+        <Card tone="cream">
           <p className="font-display text-xs font-semibold text-[var(--c-sig-mustard)]">
             Growth Opportunity
           </p>
           <p className="mt-1 text-xs leading-relaxed text-[var(--c-on-sig-light-body)]">
             {report.growthOpportunity}
           </p>
-        </div>
+        </Card>
       ) : null}
 
       {report.generatedAt ? (

@@ -28,6 +28,7 @@ export interface TabDefinition {
   id: TabId;
   label: string;
   icon: Icon;
+  color: string;
 }
 
 export const DEMO_SESSION_CODE = "SPARK";
@@ -61,10 +62,10 @@ export const ACTS: ActDefinition[] = [
 ];
 
 export const TABS: TabDefinition[] = [
-  { id: "contribute", label: "Contribute", icon: Crosshair },
-  { id: "explore", label: "Explore", icon: ChatCircleText },
-  { id: "fight", label: "Fight", icon: Lightning },
-  { id: "me", label: "Me", icon: User },
+  { id: "contribute", label: "Contribute", icon: Crosshair, color: "var(--c-tab-contribute)" },
+  { id: "explore", label: "Explore", icon: ChatCircleText, color: "var(--c-tab-explore)" },
+  { id: "fight", label: "Fight", icon: Lightning, color: "var(--c-tab-fight)" },
+  { id: "me", label: "Me", icon: User, color: "var(--c-tab-me)" },
 ];
 
 export const INSTRUCTOR_NAV = [
