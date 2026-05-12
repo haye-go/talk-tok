@@ -1,4 +1,11 @@
-import { ArrowsClockwise, CircleNotch, Sword, Timer } from "@phosphor-icons/react";
+import { useState } from "react";
+import {
+  ArrowsClockwise,
+  ChatText,
+  ListBullets,
+  Sword,
+  Timer,
+} from "@phosphor-icons/react";
 import { FeedbackCard } from "@/components/feedback/feedback-card";
 import { ParticipantStateSection } from "@/components/layout/participant-state-section";
 import { LoadingState } from "@/components/state/loading-state";
@@ -88,12 +95,6 @@ interface MyZoneTabProps {
   onViewReport?: () => void;
 }
 
-function formatDuration(ms?: number) {
-  if (!ms) return null;
-  const sec = Math.round(ms / 1000);
-  return sec >= 60 ? `${Math.floor(sec / 60)}m ${sec % 60}s` : `${sec}s`;
-}
-
 function formatTime(timestamp: number) {
   return new Date(timestamp).toLocaleTimeString([], {
     hour: "2-digit",
@@ -136,109 +137,55 @@ export function MyZoneTab({
   const assignmentMap = new Map((assignmentsBySubmission ?? []).map((assignment) => [assignment.submissionId, assignment]));
   const recatMap = new Map((recategorisationRequests ?? []).map((request) => [request.submissionId, request]));
   const initials = initialResponses ?? [];
+  const followUps = followUpResponses ?? [];
+  const fights = fightThreads ?? [];
+  const shifts = positionShifts ?? [];
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const contributionCount = initials.length;
+  const followUpCount = followUps.length;
+  const fightCount = fights.length;
+  const shiftCount = shifts.length;
 
   return (
-    <div className="space-y-4">
-      {!personalReportsVisible ? (
-        <Card
-          title={
-            personalReport?.status === "success"
-              ? "Personal report generated, not released here"
-              : "Personal report not released"
-          }
-          action={
-            onViewReport ? (
-              <Button type="button" variant="ghost" size="sm" onClick={onViewReport}>
-                Open report page
-              </Button>
-            ) : null
-          }
-        >
-          <p className="text-sm text-[var(--c-muted)]">
-            {personalReport?.status === "success"
-              ? "Your private report exists. The instructor has not released report cards into this question view yet."
-              : personalReport?.status === "queued" || personalReport?.status === "processing"
-                ? "Your private report is generating. It will stay separate from this question view until the instructor releases reports."
-                : "The instructor has not released personal reports for this question yet. You can still use the private report page."}
-          </p>
-        </Card>
-      ) : personalReport?.status === "success" ? (
-        <Card
-          title="Private comparison notes"
-          action={
-            onViewReport ? (
-              <Button type="button" variant="ghost" size="sm" onClick={onViewReport}>
-                View full report
-              </Button>
-            ) : null
-          }
-        >
-          <div className="flex flex-wrap gap-1.5">
-            {personalReport.participationBand ? (
-              <Badge tone="sky">
-                {BAND_LABELS[personalReport.participationBand] ?? personalReport.participationBand}
-              </Badge>
-            ) : null}
-            {personalReport.reasoningBand ? (
-              <Badge tone="peach">
-                {BAND_LABELS[personalReport.reasoningBand] ?? personalReport.reasoningBand}
-              </Badge>
-            ) : null}
-            {personalReport.originalityBand ? (
-              <Badge tone="mustard">
-                {BAND_LABELS[personalReport.originalityBand] ?? personalReport.originalityBand}
-              </Badge>
-            ) : null}
-            {personalReport.responsivenessBand ? (
-              <Badge tone="cream">
-                {BAND_LABELS[personalReport.responsivenessBand] ??
-                  personalReport.responsivenessBand}
-              </Badge>
-            ) : null}
-          </div>
-          {personalReport.summary ? (
-            <p className="mt-3 text-sm leading-relaxed text-[var(--c-body)]">
-              {personalReport.summary}
-            </p>
-          ) : null}
-          {personalReport.argumentEvolution ? (
-            <div className="mt-3">
-              <p className="text-xs font-medium text-[var(--c-muted)]">Argument evolution</p>
-              <p className="mt-1 text-sm leading-relaxed text-[var(--c-body)]">
-                {personalReport.argumentEvolution}
-              </p>
-            </div>
-          ) : null}
-          {personalReport.growthOpportunity ? (
-            <div className="mt-3 rounded-md bg-[var(--c-sig-cream)] p-3">
-              <p className="text-xs font-medium text-[var(--c-sig-mustard)]">Growth opportunity</p>
-              <p className="mt-1 text-sm leading-relaxed text-[var(--c-on-sig-light-body)]">
-                {personalReport.growthOpportunity}
-              </p>
-            </div>
-          ) : null}
-          {personalReport.contributionTrace ? (
-            <div className="mt-3">
-              <p className="text-xs font-medium text-[var(--c-muted)]">Contribution trace</p>
-              <p className="mt-1 text-sm leading-relaxed text-[var(--c-body)]">
-                {personalReport.contributionTrace}
-              </p>
-            </div>
-          ) : null}
-        </Card>
-      ) : personalReport?.status === "queued" || personalReport?.status === "processing" ? (
-        <ParticipantStateSection kind="waiting" title="Personal report">
-          Generating your personal report...
-        </ParticipantStateSection>
-      ) : personalReport?.status === "error" ? (
-        <Card title="Personal report failed" description={personalReport.error ?? "The personal report could not be generated yet."} />
-      ) : (
-        <ParticipantStateSection kind="waiting" title="Personal report">
-          Your report has not been generated for this question yet.
-        </ParticipantStateSection>
-      )}
+    <div className="space-y-3">
+      <PersonalReportSection
+        personalReport={personalReport}
+        personalReportsVisible={personalReportsVisible}
+        onViewReport={onViewReport}
+      />
 
-      {loading ? <LoadingState label="Loading your responses..." /> : null}
+      {(contributionCount > 0 || followUpCount > 0 || fightCount > 0 || shiftCount > 0) ? (
+        <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--c-muted)]">
+          {contributionCount > 0 ? (
+            <span className="flex items-center gap-1">
+              <ListBullets size={12} />
+              {contributionCount} {contributionCount === 1 ? "contribution" : "contributions"}
+            </span>
+          ) : null}
+          {followUpCount > 0 ? (
+            <span className="flex items-center gap-1">
+              <ChatText size={12} />
+              {followUpCount} {followUpCount === 1 ? "follow-up" : "follow-ups"}
+            </span>
+          ) : null}
+          {fightCount > 0 ? (
+            <span className="flex items-center gap-1">
+              <Sword size={12} />
+              {fightCount} {fightCount === 1 ? "fight" : "fights"}
+            </span>
+          ) : null}
+          {shiftCount > 0 ? (
+            <span className="flex items-center gap-1">
+              <ArrowsClockwise size={12} />
+              {shiftCount} {shiftCount === 1 ? "shift" : "shifts"}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {loading ? <LoadingState label="Loading your activity..." /> : null}
 
       {!loading && initials.length === 0 ? (
         <ParticipantStateSection kind="empty" title="Contributions">
@@ -246,81 +193,33 @@ export function MyZoneTab({
         </ParticipantStateSection>
       ) : null}
 
-      {initials.map((submission) => {
-        const assignment = assignmentMap.get(submission.id);
-        const feedback = feedbackMap.get(submission.id);
-        const recat = recatMap.get(submission.id);
-        const duration = formatDuration(submission.compositionMs);
+      {initials.length > 0 ? (
+        <div className="space-y-1.5">
+          {initials.map((submission) => {
+            const assignment = assignmentMap.get(submission.id);
+            const feedback = feedbackMap.get(submission.id);
+            const recat = recatMap.get(submission.id);
+            const isExpanded = expandedId === submission.id;
 
-        return (
-          <Card
-            key={submission.id}
-            eyebrow={submission.kind === "initial" ? "Original post" : "Additional point"}
-            title="Your contribution"
-            action={
-              <span className="text-[10px] text-[var(--c-muted)]">
-                {formatTime(submission.createdAt)}
-              </span>
-            }
-            className="space-y-3"
-          >
-            <p className="text-sm leading-relaxed text-[var(--c-body)]">{submission.body}</p>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--c-muted)]">
-              {assignment?.categoryName ? (
-                <Badge tone={categoryColorToTone(undefined, 0)}>{assignment.categoryName}</Badge>
-              ) : (
-                <Badge tone="neutral">Uncategorized</Badge>
-              )}
-              <span>{submission.wordCount} words</span>
-              {duration ? (
-                <span>
-                  <Timer size={11} className="mr-0.5 inline" />
-                  {duration}
-                </span>
-              ) : null}
-            </div>
+            return (
+              <ContributionRow
+                key={submission.id}
+                submission={submission}
+                assignment={assignment}
+                feedback={feedback}
+                recat={recat}
+                expanded={isExpanded}
+                onToggle={() => setExpandedId(isExpanded ? null : submission.id)}
+              />
+            );
+          })}
+        </div>
+      ) : null}
 
-            {feedback ? (
-              <>
-                <FeedbackCard
-                  status={feedback.status}
-                  tone={feedback.tone}
-                  reasoningBand={feedback.reasoningBand}
-                  originalityBand={feedback.originalityBand}
-                  specificityBand={feedback.specificityBand}
-                  summary={feedback.summary}
-                  strengths={feedback.strengths}
-                  improvement={feedback.improvement}
-                  nextQuestion={feedback.nextQuestion}
-                  error={feedback.error}
-                />
-                {feedback.status === "success" ? (
-                  <p className="text-xs text-[var(--c-muted)]">
-                    This private feedback compares your contribution against a hidden instructor
-                    baseline and, when enough responses exist, the cohort context.
-                  </p>
-                ) : null}
-              </>
-            ) : null}
-
-            {recat ? (
-              <div className="rounded-md border border-[var(--c-hairline)] border-l-[3px] border-l-[var(--c-sig-yellow)] bg-[var(--c-surface-soft)] p-3">
-                <p className="font-display text-xs font-medium text-[var(--c-sig-mustard)]">
-                  Re-categorization request
-                </p>
-                <p className="mt-1 text-xs text-[var(--c-muted)]">
-                  {recat.suggestedCategoryName ?? "Different category"} - {recat.status}
-                </p>
-              </div>
-            ) : null}
-          </Card>
-        );
-      })}
-
-      {(followUpResponses ?? []).length > 0 ? (
+      {followUps.length > 0 ? (
         <Card title="Follow-ups">
           <div className="space-y-2">
-            {(followUpResponses ?? []).map((submission) => (
+            {followUps.map((submission) => (
               <div
                 key={submission.id}
                 className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
@@ -338,34 +237,10 @@ export function MyZoneTab({
         </Card>
       ) : null}
 
-      {(positionShifts ?? []).length > 0 ? (
-        <Card title="Position shifts">
-          <div className="space-y-2">
-            {(positionShifts ?? []).map((shift) => (
-              <div
-                key={shift.id}
-                className="rounded-md border border-[var(--c-hairline)] border-l-[3px] border-l-[var(--c-sig-mustard)] bg-[var(--c-surface-soft)] p-3"
-              >
-                <p className="flex items-center gap-1 text-xs font-medium text-[var(--c-sig-mustard)]">
-                  <ArrowsClockwise size={12} />
-                  Position shift
-                </p>
-                <p className="mt-1 text-sm leading-relaxed text-[var(--c-body)]">{shift.reason}</p>
-                {shift.influencedBy ? (
-                  <p className="mt-1 text-xs text-[var(--c-muted)]">
-                    Influenced by: {shift.influencedBy}
-                  </p>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : null}
-
-      {(fightThreads ?? []).length > 0 ? (
+      {fights.length > 0 ? (
         <Card title="Fight history">
           <div className="space-y-2">
-            {(fightThreads ?? []).map((fight) => (
+            {fights.map((fight) => (
               <div
                 key={fight.id}
                 className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
@@ -406,6 +281,232 @@ export function MyZoneTab({
             ))}
           </div>
         </Card>
+      ) : null}
+
+      {shifts.length > 0 ? (
+        <Card title="Position shifts">
+          <div className="space-y-2">
+            {shifts.map((shift) => (
+              <div
+                key={shift.id}
+                className="rounded-md border border-[var(--c-hairline)] border-l-[3px] border-l-[var(--c-sig-mustard)] bg-[var(--c-surface-soft)] p-3"
+              >
+                <p className="flex items-center gap-1 text-xs font-medium text-[var(--c-sig-mustard)]">
+                  <ArrowsClockwise size={12} />
+                  Position shift
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-[var(--c-body)]">{shift.reason}</p>
+                {shift.influencedBy ? (
+                  <p className="mt-1 text-xs text-[var(--c-muted)]">
+                    Influenced by: {shift.influencedBy}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
+
+function PersonalReportSection({
+  personalReport,
+  personalReportsVisible,
+  onViewReport,
+}: {
+  personalReport?: PersonalReportSummary | null;
+  personalReportsVisible: boolean;
+  onViewReport?: () => void;
+}) {
+  if (!personalReportsVisible) {
+    if (personalReport?.status === "queued" || personalReport?.status === "processing") {
+      return (
+        <ParticipantStateSection kind="waiting" title="Your report">
+          Your private report is generating.
+        </ParticipantStateSection>
+      );
+    }
+
+    return (
+      <ParticipantStateSection kind="hidden" title="Your report">
+        Reports are not available yet.
+        {onViewReport ? (
+          <Button type="button" variant="ghost" size="sm" onClick={onViewReport} className="mt-1">
+            Open report page
+          </Button>
+        ) : null}
+      </ParticipantStateSection>
+    );
+  }
+
+  if (personalReport?.status === "success") {
+    return (
+      <Card
+        title="Your private report"
+        action={
+          onViewReport ? (
+            <Button type="button" variant="ghost" size="sm" onClick={onViewReport}>
+              View full report
+            </Button>
+          ) : null
+        }
+      >
+        <div className="flex flex-wrap gap-1.5">
+          {personalReport.participationBand ? (
+            <Badge tone="sky">
+              {BAND_LABELS[personalReport.participationBand] ?? personalReport.participationBand}
+            </Badge>
+          ) : null}
+          {personalReport.reasoningBand ? (
+            <Badge tone="peach">
+              {BAND_LABELS[personalReport.reasoningBand] ?? personalReport.reasoningBand}
+            </Badge>
+          ) : null}
+          {personalReport.originalityBand ? (
+            <Badge tone="mustard">
+              {BAND_LABELS[personalReport.originalityBand] ?? personalReport.originalityBand}
+            </Badge>
+          ) : null}
+          {personalReport.responsivenessBand ? (
+            <Badge tone="cream">
+              {BAND_LABELS[personalReport.responsivenessBand] ??
+                personalReport.responsivenessBand}
+            </Badge>
+          ) : null}
+        </div>
+        {personalReport.summary ? (
+          <p className="mt-3 text-sm leading-relaxed text-[var(--c-body)]">
+            {personalReport.summary}
+          </p>
+        ) : null}
+        {personalReport.growthOpportunity ? (
+          <div className="mt-3 rounded-md bg-[var(--c-sig-cream)] p-3">
+            <p className="text-xs font-medium text-[var(--c-sig-mustard)]">Growth opportunity</p>
+            <p className="mt-1 text-sm leading-relaxed text-[var(--c-on-sig-light-body)]">
+              {personalReport.growthOpportunity}
+            </p>
+          </div>
+        ) : null}
+      </Card>
+    );
+  }
+
+  if (personalReport?.status === "queued" || personalReport?.status === "processing") {
+    return (
+      <ParticipantStateSection kind="waiting" title="Your report">
+        Your private report is generating.
+      </ParticipantStateSection>
+    );
+  }
+
+  if (personalReport?.status === "error") {
+    return (
+      <Card title="Report unavailable" description={personalReport.error ?? "Your report could not be generated. The instructor has been notified."} />
+    );
+  }
+
+  return (
+    <ParticipantStateSection kind="waiting" title="Your report">
+      Your report has not been generated yet.
+    </ParticipantStateSection>
+  );
+}
+
+function ContributionRow({
+  submission,
+  assignment,
+  feedback,
+  recat,
+  expanded,
+  onToggle,
+}: {
+  submission: Submission;
+  assignment?: Assignment;
+  feedback?: FeedbackSummary;
+  recat?: RecatRequest;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const snippet = submission.body.length > 120
+    ? submission.body.slice(0, 120) + "..."
+    : submission.body;
+
+  const feedbackBadge = feedback
+    ? feedback.status === "success"
+      ? "sky"
+      : feedback.status === "error"
+        ? "error"
+        : "neutral"
+    : null;
+
+  return (
+    <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)]">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full cursor-pointer items-start gap-2 p-3 text-left"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-sm leading-relaxed text-[var(--c-body)]">
+            {expanded ? submission.body : snippet}
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] text-[var(--c-muted)]">
+              <Timer size={10} className="mr-0.5 inline" />
+              {formatTime(submission.createdAt)}
+            </span>
+            {assignment?.categoryName ? (
+              <Badge tone={categoryColorToTone(undefined, 0)}>{assignment.categoryName}</Badge>
+            ) : null}
+            {feedbackBadge ? (
+              <Badge tone={feedbackBadge as "sky" | "error" | "neutral"}>
+                {feedback?.status === "success" ? "Feedback ready" : feedback?.status === "error" ? "Feedback failed" : "Pending"}
+              </Badge>
+            ) : null}
+            {recat ? (
+              <Badge tone="mustard">Recat {recat.status}</Badge>
+            ) : null}
+          </div>
+        </div>
+        <span className="shrink-0 text-[10px] text-[var(--c-muted)]">
+          {expanded ? "Collapse" : "Details"}
+        </span>
+      </button>
+
+      {expanded ? (
+        <div className="space-y-3 border-t border-[var(--c-hairline)] p-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--c-muted)]">
+            <span>{submission.wordCount} words</span>
+            <span>{submission.kind === "initial" ? "Original post" : "Additional point"}</span>
+          </div>
+
+          {feedback ? (
+            <FeedbackCard
+              status={feedback.status}
+              tone={feedback.tone}
+              reasoningBand={feedback.reasoningBand}
+              originalityBand={feedback.originalityBand}
+              specificityBand={feedback.specificityBand}
+              summary={feedback.summary}
+              strengths={feedback.strengths}
+              improvement={feedback.improvement}
+              nextQuestion={feedback.nextQuestion}
+              error={feedback.error}
+            />
+          ) : null}
+
+          {recat ? (
+            <div className="rounded-md border border-[var(--c-hairline)] border-l-[3px] border-l-[var(--c-sig-yellow)] bg-[var(--c-surface-soft)] p-3">
+              <p className="font-display text-xs font-medium text-[var(--c-sig-mustard)]">
+                Re-categorization request
+              </p>
+              <p className="mt-1 text-xs text-[var(--c-muted)]">
+                {recat.suggestedCategoryName ?? "Different category"} - {recat.status}
+              </p>
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
