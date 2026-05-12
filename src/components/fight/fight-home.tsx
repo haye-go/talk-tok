@@ -179,12 +179,28 @@ export function FightHome({
             {creatingAi ? "Starting..." : "vs AI"}
           </Button>
           <Button variant="secondary" className="flex-1" onClick={() => setShowPicker(true)}>
-            Challenge a Response
+            Challenge a peer
           </Button>
         </div>
       </div>
 
+      <FightRulesBlock />
+
       {myFights.length > 0 && <PastFights fights={myFights} onNavigate={onNavigateToThread} />}
+    </div>
+  );
+}
+
+function FightRulesBlock() {
+  return (
+    <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
+      <p className="font-display text-xs font-medium text-[var(--c-muted)]">How it works</p>
+      <ul className="mt-1.5 grid gap-1 text-xs text-[var(--c-muted)]">
+        <li>Submit a contribution first to unlock challenges</li>
+        <li>Each fight has a fixed number of turns for each side</li>
+        <li>1v1 challenges must be accepted within the deadline</li>
+        <li>Each turn has a time limit — don&apos;t let it expire</li>
+      </ul>
     </div>
   );
 }

@@ -151,6 +151,9 @@ export function FightThread({
 
       {isPending && clientKey && sessionSlug && fightSlug && (
         <div className="p-3">
+          <p className="mb-2 text-xs text-[var(--c-muted)]">
+            Your opponent hasn&apos;t accepted yet. You can draft your opening — it won&apos;t be sent until the fight starts.
+          </p>
           <FightDraftComposer
             sessionSlug={sessionSlug}
             fightSlug={fightSlug}

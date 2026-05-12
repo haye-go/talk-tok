@@ -43,7 +43,7 @@ export function FightTargetPicker({
       <div className="flex items-center justify-between">
         <h3 className="font-display text-sm font-medium text-[var(--c-ink)]">
           <Lightning size={14} className="mr-1 inline text-[var(--c-tab-fight)]" />
-          Pick a response to challenge
+          Pick a peer to challenge
         </h3>
         <Button variant="ghost" size="sm" onClick={onCancel}>
           Cancel
