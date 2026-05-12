@@ -17,6 +17,8 @@ const FIGHT_THREAD_LIMIT = 40;
 const SYNTHESIS_ARTIFACT_LIMIT = 40;
 const PARTICIPANT_PRESENCE_LIMIT = 500;
 const THREAD_REACTION_LIMIT = 1_000;
+const SYNTHESIS_QUOTE_LIMIT = 120;
+const SYNTHESIS_SUPPORTING_SNIPPET_LIMIT = 2;
 const OFFLINE_AFTER_MS = 45_000;
 
 const toneValidator = v.union(
@@ -458,6 +460,9 @@ export const overview = query({
         category.status === "active" &&
         (!selectedQuestionId || !category.questionId || category.questionId === selectedQuestionId),
     );
+    const activeCategoriesOrdered = [...activeCategories].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
     const categoriesById = new Map(categories.map((category) => [category._id, category]));
     const participantIds = new Set(
       sessionSubmissions.map((submission) => submission.participantId),
@@ -723,6 +728,143 @@ export const overview = query({
           .slice(0, PEER_RESPONSE_LIMIT)
           .map(toThread)
       : [];
+    const toCategorySummary = (category: Doc<"categories">) => ({
+      id: category._id,
+      questionId: category.questionId,
+      slug: category.slug,
+      name: category.name,
+      description: category.description,
+      color: category.color,
+      parentCategoryId: category.parentCategoryId,
+      assignmentCount: categoryCounts.get(category._id) ?? 0,
+    });
+    const categorizedPeerThreads = activeCategoriesOrdered.map((category) => {
+      const threads = peerThreads.filter(
+        (thread) => thread.assignment?.categoryId === category._id,
+      );
+
+      return {
+        category: toCategorySummary(category),
+        threadCount: threads.length,
+        threads,
+      };
+    });
+    const uncategorizedPeerThreads = peerThreads.filter((thread) => !thread.assignment);
+    const peerThreadsByCategory =
+      session.visibilityMode === "category_summary_only" ||
+      session.visibilityMode === "raw_responses_visible"
+        ? [
+            ...categorizedPeerThreads,
+            ...(uncategorizedPeerThreads.length > 0
+              ? [
+                  {
+                    category: null,
+                    threadCount: uncategorizedPeerThreads.length,
+                    threads: uncategorizedPeerThreads,
+                  },
+                ]
+              : []),
+          ]
+        : [];
+    const synthesisArtifactsById = new Map(
+      [...synthesisPublishedArtifacts, ...synthesisFinalArtifacts].map((artifact) => [
+        artifact._id,
+        artifact,
+      ]),
+    );
+    const synthesisArtifactsForView = [...synthesisArtifactsById.values()]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, SYNTHESIS_ARTIFACT_LIMIT);
+    const synthesisArtifactIds = new Set(
+      synthesisArtifactsForView.map((artifact) => artifact._id),
+    );
+    const synthesisQuotes =
+      synthesisVisible && synthesisArtifactIds.size > 0
+        ? selectedQuestionId
+          ? await ctx.db
+              .query("synthesisQuotes")
+              .withIndex("by_questionId", (q) => q.eq("questionId", selectedQuestionId))
+              .order("desc")
+              .take(SYNTHESIS_QUOTE_LIMIT)
+          : await ctx.db
+              .query("synthesisQuotes")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .order("desc")
+              .take(SYNTHESIS_QUOTE_LIMIT)
+        : [];
+    const synthesisQuotesByArtifact = new Map<
+      Id<"synthesisArtifacts">,
+      Doc<"synthesisQuotes">[]
+    >();
+
+    for (const quote of synthesisQuotes) {
+      if (!quote.isVisibleToParticipants || !synthesisArtifactIds.has(quote.artifactId)) {
+        continue;
+      }
+
+      const existing = synthesisQuotesByArtifact.get(quote.artifactId) ?? [];
+      existing.push(quote);
+      synthesisQuotesByArtifact.set(quote.artifactId, existing);
+    }
+
+    const toSynthesisQuote = (quote: Doc<"synthesisQuotes">) => ({
+      id: quote._id,
+      submissionId: quote.submissionId,
+      participantId: quote.participantId,
+      quote: quote.quote,
+      quoteRole: quote.quoteRole,
+      displayName:
+        session.anonymityMode === "anonymous_to_peers"
+          ? quote.anonymizedLabel
+          : quote.displayName,
+      createdAt: quote.createdAt,
+    });
+    const toSynthesisArtifactView = (artifact: Doc<"synthesisArtifacts">) => {
+      const quotes = (synthesisQuotesByArtifact.get(artifact._id) ?? []).sort(
+        (left, right) => left.createdAt - right.createdAt,
+      );
+
+      return {
+        id: artifact._id,
+        categoryId: artifact.categoryId,
+        kind: artifact.kind,
+        status: artifact.status,
+        title: artifact.title,
+        summary: artifact.summary,
+        keyPoints: artifact.keyPoints,
+        uniqueInsights: artifact.uniqueInsights,
+        opposingViews: artifact.opposingViews,
+        sourceCounts: artifact.sourceCounts,
+        supportingCommentCount: quotes.length,
+        supportingComments: quotes
+          .slice(0, SYNTHESIS_SUPPORTING_SNIPPET_LIMIT)
+          .map(toSynthesisQuote),
+        sourceSubmissionIds: quotes.map((quote) => quote.submissionId).slice(0, 10),
+        generatedAt: artifact.generatedAt,
+        publishedAt: artifact.publishedAt,
+        finalizedAt: artifact.finalizedAt,
+        updatedAt: artifact.updatedAt,
+      };
+    };
+    const synthesisViewArtifacts = synthesisArtifactsForView.map(toSynthesisArtifactView);
+    const synthesisView = {
+      visible: synthesisVisible,
+      artifacts: synthesisViewArtifacts,
+      classArtifacts: synthesisViewArtifacts.filter((artifact) => !artifact.categoryId),
+      categorySections: activeCategoriesOrdered
+        .map((category) => {
+          const artifacts = synthesisViewArtifacts.filter(
+            (artifact) => artifact.categoryId === category._id,
+          );
+
+          return {
+            category: toCategorySummary(category),
+            artifactCount: artifacts.length,
+            artifacts,
+          };
+        })
+        .filter((section) => section.artifactCount > 0),
+    };
     const peerResponses =
       session.visibilityMode === "raw_responses_visible"
         ? sessionSubmissions
@@ -773,6 +915,7 @@ export const overview = query({
       ),
       myThreads,
       peerThreads,
+      peerThreadsByCategory,
       activeFollowUps,
       feedbackBySubmission,
       assignmentsBySubmission: mySubmissions
@@ -793,18 +936,7 @@ export const overview = query({
       categorySummary:
         session.visibilityMode === "category_summary_only" ||
         session.visibilityMode === "raw_responses_visible"
-          ? activeCategories
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map((category) => ({
-                id: category._id,
-                questionId: category.questionId,
-                slug: category.slug,
-                name: category.name,
-                description: category.description,
-                color: category.color,
-                parentCategoryId: category.parentCategoryId,
-                assignmentCount: categoryCounts.get(category._id) ?? 0,
-              }))
+          ? activeCategoriesOrdered.map(toCategorySummary)
           : [],
       recentPeerResponses: peerResponses,
       recentJobs: jobs
@@ -869,6 +1001,7 @@ export const overview = query({
             updatedAt: artifact.updatedAt,
           })),
       },
+      synthesisView,
       personalReport: personalReports[0]
         ? {
             id: personalReports[0]._id,
