@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
+import { ChatCircleText, Sword } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "convex/react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { api } from "../../../convex/_generated/api";
+import { ParticipantThreadAction } from "@/components/messages/participant-thread-card";
 import { ReactionBar } from "@/components/reactions/reaction-bar";
 import {
   ResponseComposer,
@@ -16,7 +18,6 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { PresenceBar } from "@/components/stream/presence-bar";
 import { ResponseStreamItem } from "@/components/stream/response-stream-item";
 import { categoryColorToTone } from "@/lib/category-colors";
-import { DEMO_SESSION_SLUG } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 interface PeerResponse {
@@ -119,8 +120,6 @@ export function StreamTab({
     () => new Map((reactionState ?? []).map((row) => [row.submissionId, row] as const)),
     [reactionState],
   );
-  const isDemoMode = sessionSlug === DEMO_SESSION_SLUG && clientKey?.startsWith("demo-");
-
   const filtered = filter
     ? responses.filter((response) => response.categoryId === filter)
     : responses;
@@ -245,12 +244,6 @@ export function StreamTab({
 
             return (
               <div key={response.id} className="space-y-2">
-                {isDemoMode ? (
-                  <p className="text-[9px] font-medium text-[var(--c-sig-sky)]">
-                    {response.nickname}&apos;s response
-                  </p>
-                ) : null}
-
                 <ResponseStreamItem
                   nickname={response.nickname}
                   text={response.body}
@@ -260,24 +253,22 @@ export function StreamTab({
 
                 {sessionSlug && clientKey ? (
                   <div className="flex flex-wrap items-center gap-2 pl-1">
-                    <Button
+                    <ParticipantThreadAction
                       type="button"
-                      size="sm"
-                      variant="ghost"
                       disabled={!repliesEnabled}
                       onClick={() => setReplyParentId(replyOpen ? null : response.id)}
                     >
+                      <ChatCircleText size={12} />
                       {replyOpen ? "Cancel reply" : "Reply"}
-                    </Button>
-                    <Button
+                    </ParticipantThreadAction>
+                    <ParticipantThreadAction
                       type="button"
-                      size="sm"
-                      variant="ghost"
                       disabled={!fightEnabled || !mySubmissionId || creatingFight}
                       onClick={() => void handleFight(response)}
                     >
+                      <Sword size={12} />
                       {creatingFight ? "Starting..." : "Fight"}
-                    </Button>
+                    </ParticipantThreadAction>
                     <ReactionBar
                       submissionId={response.id}
                       sessionSlug={sessionSlug}
@@ -285,6 +276,7 @@ export function StreamTab({
                       counts={reaction?.counts}
                       myReactions={reaction?.myReactions}
                       mode="upvote"
+                      variant="compact"
                       disabled={!upvotesEnabled}
                     />
                   </div>

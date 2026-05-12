@@ -27,6 +27,7 @@ interface ReactionBarProps {
   counts?: Record<string, number>;
   myReactions?: string[];
   mode?: "upvote" | "all";
+  variant?: "pill" | "compact";
   disabled?: boolean;
 }
 
@@ -43,6 +44,7 @@ export function ReactionBar({
   counts,
   myReactions,
   mode = "upvote",
+  variant = "pill",
   disabled = false,
 }: ReactionBarProps) {
   const toggle = useMutation(api.reactions.toggle);
@@ -66,15 +68,19 @@ export function ReactionBar({
             title={label}
             disabled={disabled}
             onClick={() => handleToggle(kind)}
+            aria-label={`${active ? "Remove" : "Add"} ${label.toLowerCase()}`}
             className={cn(
-              "inline-flex cursor-pointer items-center gap-1 rounded-pill px-2 py-1 text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+              "inline-flex cursor-pointer items-center gap-1 rounded-pill text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+              variant === "compact" ? "min-h-8 px-2" : "px-2 py-1",
               active
                 ? "bg-[var(--c-primary)] text-[var(--c-on-primary)]"
                 : "bg-[var(--c-surface-strong)] text-[var(--c-muted)] hover:bg-[var(--c-border-strong)]",
             )}
           >
             <Icon size={12} weight={active ? "fill" : "regular"} />
-            <span>{mode === "upvote" ? "Upvote" : label}</span>
+            {variant === "compact" && mode === "upvote" ? null : (
+              <span>{mode === "upvote" ? "Upvote" : label}</span>
+            )}
             <span className="font-mono">{count}</span>
           </button>
         );

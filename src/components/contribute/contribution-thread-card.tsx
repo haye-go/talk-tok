@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { FeedbackCard } from "@/components/feedback/feedback-card";
+import { ParticipantThreadCard } from "@/components/messages/participant-thread-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -75,13 +76,6 @@ export interface ContributionThreadCardProps {
   children?: ReactNode;
 }
 
-function formatTime(timestamp: number) {
-  return new Date(timestamp).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function submissionLabel(kind: ContributionSubmission["kind"]) {
   return kind === "initial" ? "Original post" : "Additional point";
 }
@@ -152,30 +146,46 @@ export function ContributionThreadCard({
     }
   }
 
-  return (
-    <Card
-      eyebrow={submissionLabel(submission.kind)}
-      title={isLatest ? "Latest contribution" : "Contribution"}
-      action={
-        <span className="text-[10px] text-[var(--c-muted)]">{formatTime(submission.createdAt)}</span>
-      }
-      className="space-y-3"
-    >
-      <p className="text-sm leading-relaxed text-[var(--c-body)]">{submission.body}</p>
+  const actionSlot = (
+    <>
+      <Button type="button" size="sm" variant="secondary" onClick={onToggleExpanded}>
+        {expanded ? "Hide analysis" : "Open analysis"}
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={onAddFollowUp}>
+        Add follow-up
+      </Button>
+    </>
+  );
+  const replyItems = (followUps ?? []).map((followUp) => ({
+    id: followUp.id,
+    authorLabel: "You",
+    body: followUp.body,
+    createdAt: followUp.createdAt,
+    isOwn: true,
+  }));
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="secondary" onClick={onToggleExpanded}>
-          {expanded ? "Hide analysis" : "Open analysis"}
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onAddFollowUp}>
-          Add follow-up
-        </Button>
+  return (
+    <ParticipantThreadCard
+      authorLabel="You"
+      body={submission.body}
+      createdAt={submission.createdAt}
+      categoryName={assignment?.categoryName ?? undefined}
+      categoryTone={categoryColorToTone(undefined, 0)}
+      stats={{ replyCount: replyItems.length }}
+      replies={replyItems}
+      actions={actionSlot}
+      ownership="own"
+      className={isLatest ? "ring-1 ring-[var(--c-sig-sky)]/25" : undefined}
+    >
+      <div className="flex flex-wrap items-center gap-2 text-[10px] text-[var(--c-muted)]">
+        <span>{submissionLabel(submission.kind)}</span>
+        {isLatest ? <span>Latest contribution</span> : null}
       </div>
 
       {children}
 
       {expanded ? (
-        <div className="space-y-3 border-t border-[var(--c-hairline)] pt-3">
+        <div className="mt-3 flex flex-col gap-3 border-t border-[var(--c-hairline)] pt-3">
           {feedback ? (
             <FeedbackCard
               status={feedback.status}
@@ -192,7 +202,10 @@ export function ContributionThreadCard({
               retrying={feedbackRetrying}
             />
           ) : (
-            <Card title="AI feedback" description="Feedback will appear here after you submit this contribution." />
+            <Card
+              title="AI feedback"
+              description="Feedback will appear here after you submit this contribution."
+            />
           )}
 
           {assignment ? (
@@ -284,27 +297,8 @@ export function ContributionThreadCard({
                 )}
             </div>
           ) : null}
-
-          {followUps && followUps.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-[var(--c-muted)]">Follow-ups on this point</p>
-              {followUps.map((followUp) => (
-                <div
-                  key={followUp.id}
-                  className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] p-3"
-                >
-                  <p className="text-[10px] text-[var(--c-muted)]">
-                    {followUp.followUpTitle ?? "Follow-up"} - {formatTime(followUp.createdAt)}
-                  </p>
-                  <p className="mt-1 text-xs leading-relaxed text-[var(--c-body)]">
-                    {followUp.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : null}
         </div>
       ) : null}
-    </Card>
+    </ParticipantThreadCard>
   );
 }

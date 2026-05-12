@@ -1,5 +1,5 @@
 import { Lightning, Sparkle, Timer } from "@phosphor-icons/react";
-import { Badge } from "@/components/ui/badge";
+import { ParticipantThreadCard } from "@/components/messages/participant-thread-card";
 import type { BadgeProps } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -27,25 +27,15 @@ export function ResponseStreamItem({
   className,
 }: ResponseStreamItemProps) {
   return (
-    <div
-      className={cn(
-        "rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3",
-        isOwn && "border-l-[3px] border-l-[var(--c-sig-sky)]",
-        className,
-      )}
+    <ParticipantThreadCard
+      authorLabel={nickname}
+      body={text}
+      categoryName={categoryName}
+      categoryTone={categoryColor}
+      ownership={isOwn ? "own" : "peer"}
+      className={className}
     >
-      <div className="flex items-center justify-between">
-        <strong className="font-display text-xs text-[var(--c-ink)]">
-          {isOwn ? "You" : nickname}
-        </strong>
-        {categoryName && (
-          <Badge tone={categoryColor} className="text-[9px]">
-            {categoryName}
-          </Badge>
-        )}
-      </div>
-      <p className="mt-1 text-xs leading-relaxed text-[var(--c-body)]">{text}</p>
-      <div className="mt-1.5 flex items-center justify-between text-[10px]">
+      <div className={cn("flex flex-wrap items-center gap-2 text-[10px]", !telemetryLabel && !originality && "hidden")}>
         {telemetryLabel && (
           <span
             className={telemetryWarning ? "text-[var(--c-sig-coral)]" : "text-[var(--c-muted)]"}
@@ -65,6 +55,6 @@ export function ResponseStreamItem({
           </span>
         )}
       </div>
-    </div>
+    </ParticipantThreadCard>
   );
 }
