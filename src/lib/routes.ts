@@ -1,9 +1,13 @@
-import { DEMO_SESSION_SLUG } from "@/lib/constants";
+import { DEMO_SESSION_SLUG, type TabId } from "@/lib/constants";
 
 type ReadableSegment = string;
 
 export function cleanRouteSegment(segment: ReadableSegment) {
   return segment.trim().replace(/^\/+|\/+$/g, "");
+}
+
+export function buildParticipantTabQuery(tab: TabId) {
+  return tab === "contribute" ? "" : `?tab=${tab}`;
 }
 
 export const routes = {
@@ -12,6 +16,8 @@ export const routes = {
   join: (sessionCode: string) => `/join/${cleanRouteSegment(sessionCode).toUpperCase()}`,
   session: (sessionSlug: ReadableSegment = DEMO_SESSION_SLUG) =>
     `/session/${cleanRouteSegment(sessionSlug)}`,
+  sessionTab: (sessionSlug: ReadableSegment = DEMO_SESSION_SLUG, tab: TabId = "contribute") =>
+    `${routes.session(sessionSlug)}${buildParticipantTabQuery(tab)}`,
   sessionFight: (sessionSlug: ReadableSegment, fightSlug: ReadableSegment) =>
     `/session/${cleanRouteSegment(sessionSlug)}/fight/${cleanRouteSegment(fightSlug)}`,
   sessionReview: (sessionSlug: ReadableSegment) =>

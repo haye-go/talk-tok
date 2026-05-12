@@ -9,9 +9,10 @@ Routes must use readable words and short codes. Do not expose Convex document ID
 | `/`                                          | Public      | Entry and foundation preview                          |
 | `/join`                                      | Participant | Join-code entry screen                                |
 | `/join/:sessionCode`                         | Participant | QR/session-code join flow                             |
-| `/session/:sessionSlug`                      | Participant | Main participant session shell                        |
-| `/session/:sessionSlug/fight/:fightSlug`     | Participant | Fight Me thread                                       |
-| `/session/:sessionSlug/review`               | Participant | End-of-session personal review                        |
+| `/session/:sessionSlug`                      | Participant | Shared participant workspace shell                    |
+| `/session/:sessionSlug?tab=explore`          | Participant | Shared workspace with tab-addressed learner surface   |
+| `/session/:sessionSlug/fight/:fightSlug`     | Participant | Fight thread rendered inside the shared workspace     |
+| `/session/:sessionSlug/review`               | Participant | Report detail rendered inside the shared workspace    |
 | `/demo/personas`                             | Public      | Demo persona chooser                                  |
 | `/instructor`                                | Instructor  | Instructor session dashboard                          |
 | `/instructor/session/new`                    | Instructor  | Create/edit session shell                             |
@@ -29,5 +30,7 @@ Routes must use readable words and short codes. Do not expose Convex document ID
 
 - `src/lib/routes.ts` is the source for route builders.
 - `routeRegistry` in `src/lib/routes.ts` should stay aligned with this file.
+- Participant tabs are addressed through `?tab=` on `/session/:sessionSlug`, not through separate shell routes.
+- `fight/:fightSlug` and `review` are child-route detail states inside the same participant workspace shell.
 - Future Convex queries should resolve slugs and codes to internal document IDs.
 - UI components should receive data through props and avoid hardcoding route strings.

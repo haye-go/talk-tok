@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanRouteSegment, routeRegistry, routes } from "@/lib/routes";
+import { buildParticipantTabQuery, cleanRouteSegment, routeRegistry, routes } from "@/lib/routes";
 
 describe("routes", () => {
   it("builds readable participant routes", () => {
@@ -7,6 +7,12 @@ describe("routes", () => {
     expect(routes.join("spark")).toBe("/join/SPARK");
     expect(routes.demoPersonas()).toBe("/demo/personas");
     expect(routes.session("ethics-ai-healthcare")).toBe("/session/ethics-ai-healthcare");
+    expect(routes.sessionTab("ethics-ai-healthcare", "contribute")).toBe(
+      "/session/ethics-ai-healthcare",
+    );
+    expect(routes.sessionTab("ethics-ai-healthcare", "explore")).toBe(
+      "/session/ethics-ai-healthcare?tab=explore",
+    );
     expect(routes.sessionFight("ethics-ai-healthcare", "liability-gap")).toBe(
       "/session/ethics-ai-healthcare/fight/liability-gap",
     );
@@ -27,6 +33,11 @@ describe("routes", () => {
 
   it("trims accidental slashes from route segments", () => {
     expect(cleanRouteSegment("/ethics-ai-healthcare/")).toBe("ethics-ai-healthcare");
+  });
+
+  it("keeps participant tab query strings readable", () => {
+    expect(buildParticipantTabQuery("contribute")).toBe("");
+    expect(buildParticipantTabQuery("fight")).toBe("?tab=fight");
   });
 
   it("does not expose id-based param names in the route registry", () => {

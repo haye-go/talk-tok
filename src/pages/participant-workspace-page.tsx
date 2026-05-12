@@ -101,8 +101,7 @@ export function ParticipantWorkspacePage({
 
     if (sessionSlug === DEMO_SESSION_SLUG && demoClientKey?.startsWith("demo-")) {
       setDemoClientKey(demoClientKey);
-      const nextUrl = tab ? `${routes.session(sessionSlug)}?tab=${tab}` : routes.session(sessionSlug);
-      window.history.replaceState(null, "", nextUrl);
+      window.history.replaceState(null, "", routes.sessionTab(sessionSlug, tab ?? "contribute"));
     }
 
     if (sessionSlug !== DEMO_SESSION_SLUG && isDemoClientKey()) {
@@ -327,8 +326,7 @@ export function ParticipantWorkspacePage({
   function handleTabChange(nextTab: TabId) {
     setActiveTab(nextTab);
     void navigate({
-      to: routes.session(sessionSlug),
-      search: nextTab === "contribute" ? {} : { tab: nextTab },
+      to: routes.sessionTab(sessionSlug, nextTab),
     });
   }
 
