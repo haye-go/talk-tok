@@ -96,19 +96,28 @@ export function ParticipantShell({
           onTabChange={onActiveTabChange}
         />
 
-        <main className="min-h-0 flex-1 overflow-y-auto p-4">
-          <h2
-            className="font-display text-lg font-semibold"
-            style={{ color: tab?.color }}
-          >
-            {tab?.label}
-          </h2>
-          <ParticipantStatusBanner
-            activeTab={activeTab}
-            {...capabilities}
-          />
-          <div className="mt-3">
-            {content[activeTab]}
+        <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:px-6 lg:py-5">
+          <div className="mx-auto w-full max-w-3xl xl:max-w-4xl">
+            <div className="lg:flex lg:items-start lg:justify-between lg:gap-4">
+              <div>
+                <p className="hidden text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--c-muted)] lg:block">
+                  Participant workspace
+                </p>
+                <h2
+                  className="font-display text-lg font-semibold"
+                  style={{ color: tab?.color }}
+                >
+                  {tab?.label}
+                </h2>
+              </div>
+            </div>
+            <ParticipantStatusBanner
+              activeTab={activeTab}
+              {...capabilities}
+            />
+            <div className="mt-3">
+              {content[activeTab]}
+            </div>
           </div>
         </main>
 
