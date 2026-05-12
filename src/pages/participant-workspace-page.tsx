@@ -904,8 +904,7 @@ function ReviewDetail({ report, generating, onGenerate }: ReviewDetailProps) {
         <ChartBar size={32} className="text-[var(--c-success)]" />
         <p className="font-display text-sm font-medium text-[var(--c-ink)]">No report generated yet</p>
         <p className="text-xs text-[var(--c-muted)]">
-          Generate your private analysis for this session. This page is separate from the
-          instructor-controlled report release inside Me.
+          Generate a private analysis of your contributions for this session.
         </p>
         <Button
           style={{ background: "var(--c-success)", color: "white" }}
@@ -924,8 +923,7 @@ function ReviewDetail({ report, generating, onGenerate }: ReviewDetailProps) {
         <CircleNotch size={28} className="animate-spin text-[var(--c-success)]" />
         <p className="font-display text-sm font-medium text-[var(--c-ink)]">Generating your report...</p>
         <p className="text-xs text-[var(--c-muted)]">
-          AI is analyzing your contributions. This private report can exist before the instructor
-          releases report cards in the session view.
+          Analyzing your contributions — this usually takes a few moments.
         </p>
       </div>
     );
@@ -957,8 +955,7 @@ function ReviewDetail({ report, generating, onGenerate }: ReviewDetailProps) {
         <ChartBar size={24} className="mx-auto mb-1 text-[var(--c-success)]" />
         <h2 className="font-display text-base font-medium text-[var(--c-ink)]">Your Personal Analysis</h2>
         <p className="mt-1 text-xs text-[var(--c-muted)]">
-          Private report page. Instructor release controls determine whether this also appears inside
-          Me.
+          Your private analysis based on your contributions this session.
         </p>
       </div>
 
