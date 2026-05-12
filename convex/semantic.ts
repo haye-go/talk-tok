@@ -26,6 +26,9 @@ const SIGNAL_LIMIT = 240;
 const CATEGORY_LIMIT = 100;
 const FOLLOW_UP_LIMIT = 40;
 const POSITION_SHIFT_LIMIT = 120;
+const CLUSTER_LIMIT = 80;
+const CLUSTER_MEMBER_LIMIT = 300;
+const CLUSTER_JOIN_THRESHOLD = 0.82;
 
 const entityTypeValidator = v.union(
   v.literal("submission"),
@@ -470,6 +473,375 @@ export const runEmbeddingJob = internalAction({
       });
       throw error;
     }
+  },
+});
+
+export const loadSubmissionEmbeddingContext = internalQuery({
+  args: {
+    submissionId: v.id("submissions"),
+  },
+  handler: async (ctx, args) => {
+    const submission = await ctx.db.get(args.submissionId);
+
+    if (!submission) {
+      return null;
+    }
+
+    const session = await ctx.db.get(submission.sessionId);
+
+    if (!session) {
+      return null;
+    }
+
+    return { submission, session };
+  },
+});
+
+export const loadEmbeddingRowsById = internalQuery({
+  args: {
+    embeddingIds: v.array(v.id("semanticEmbeddings")),
+  },
+  handler: async (ctx, args) => {
+    const rows = await Promise.all(args.embeddingIds.map((embeddingId) => ctx.db.get(embeddingId)));
+
+    return rows.filter((row): row is Doc<"semanticEmbeddings"> => Boolean(row));
+  },
+});
+
+export const assignSubmissionToSemanticCluster = internalMutation({
+  args: {
+    submissionId: v.id("submissions"),
+    nearest: v.array(
+      v.object({
+        embeddingId: v.id("semanticEmbeddings"),
+        score: v.number(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const submission = await ctx.db.get(args.submissionId);
+
+    if (!submission || submission.kind === "fight_me_turn") {
+      return null;
+    }
+
+    const now = Date.now();
+    const isReply = Boolean(submission.parentSubmissionId);
+    const rootSubmissionId = submission.parentSubmissionId ?? submission._id;
+    const existingRows = await ctx.db
+      .query("semanticClusterMembers")
+      .withIndex("by_submission", (q) => q.eq("submissionId", submission._id))
+      .take(10);
+
+    for (const existing of existingRows) {
+      await ctx.db.delete(existing._id);
+    }
+
+    const parentMember = submission.parentSubmissionId
+      ? (
+          await ctx.db
+            .query("semanticClusterMembers")
+            .withIndex("by_submission", (q) => q.eq("submissionId", submission.parentSubmissionId!))
+            .take(1)
+        )[0]
+      : null;
+    const nearestMembers: Array<{
+      member: Doc<"semanticClusterMembers">;
+      score: number;
+    }> = [];
+
+    for (const neighbor of args.nearest) {
+      const embedding = await ctx.db.get(neighbor.embeddingId);
+      const neighborSubmissionId =
+        embedding?.entityType === "submission" &&
+        embedding.questionId === submission.questionId &&
+        embedding.sessionId === submission.sessionId
+          ? (embedding.entityId as Id<"submissions">)
+          : undefined;
+
+      if (!neighborSubmissionId || neighborSubmissionId === submission._id) {
+        continue;
+      }
+
+      const member = (
+        await ctx.db
+          .query("semanticClusterMembers")
+          .withIndex("by_submission", (q) => q.eq("submissionId", neighborSubmissionId))
+          .take(1)
+      )[0];
+
+      if (member) {
+        nearestMembers.push({ member, score: neighbor.score });
+      }
+    }
+
+    const nearestCluster =
+      nearestMembers.find((row) => row.score >= CLUSTER_JOIN_THRESHOLD)?.member.clusterId ?? null;
+    let clusterId = parentMember?.clusterId ?? nearestCluster;
+    const score =
+      parentMember && isReply
+        ? 1
+        : (nearestMembers.find((row) => row.member.clusterId === clusterId)?.score ?? 1);
+
+    if (!clusterId) {
+      const existingClusters = submission.questionId
+        ? await ctx.db
+            .query("semanticClusters")
+            .withIndex("by_questionId", (q) => q.eq("questionId", submission.questionId))
+            .take(CLUSTER_LIMIT)
+        : await ctx.db
+            .query("semanticClusters")
+            .withIndex("by_session", (q) => q.eq("sessionId", submission.sessionId))
+            .take(CLUSTER_LIMIT);
+
+      clusterId = await ctx.db.insert("semanticClusters", {
+        sessionId: submission.sessionId,
+        questionId: submission.questionId,
+        status: "active",
+        label: `Cluster ${existingClusters.length + 1}`,
+        source: "vector",
+        clusterKind: "provisional",
+        rootSubmissionCount: isReply ? 0 : 1,
+        messageCount: 0,
+        representativeSubmissionId: isReply ? submission.parentSubmissionId : submission._id,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    const membershipMode = isReply
+      ? parentMember
+        ? "reply_inherited"
+        : "reply_direct"
+      : "root_direct";
+    const memberId = await ctx.db.insert("semanticClusterMembers", {
+      sessionId: submission.sessionId,
+      questionId: submission.questionId,
+      clusterId,
+      submissionId: submission._id,
+      rootSubmissionId,
+      memberKind: isReply ? "reply" : "root",
+      membershipMode,
+      score,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const members = await ctx.db
+      .query("semanticClusterMembers")
+      .withIndex("by_cluster", (q) => q.eq("clusterId", clusterId))
+      .take(CLUSTER_MEMBER_LIMIT);
+    const rootSubmissionIds = new Set(members.map((member) => member.rootSubmissionId));
+
+    await ctx.db.patch(clusterId, {
+      rootSubmissionCount: rootSubmissionIds.size,
+      messageCount: members.length,
+      representativeSubmissionId: members.find((member) => member.memberKind === "root")
+        ?.submissionId,
+      updatedAt: now,
+    });
+
+    return await ctx.db.get(memberId);
+  },
+});
+
+export const embedSubmissionAndAssign = internalAction({
+  args: {
+    submissionId: v.id("submissions"),
+  },
+  handler: async (ctx, args) => {
+    const context = await ctx.runQuery(internal.semantic.loadSubmissionEmbeddingContext, {
+      submissionId: args.submissionId,
+    });
+
+    if (!context || context.submission.kind === "fight_me_turn") {
+      return null;
+    }
+
+    const { submission, session } = context;
+    const contentHash = await hashText(submission.body);
+    const result = await ctx.runAction(internal.llm.embedText, {
+      sessionId: session._id,
+      questionId: submission.questionId,
+      text: submission.body.slice(0, 8000),
+    });
+    const embeddingId: Id<"semanticEmbeddings"> = await ctx.runMutation(
+      internal.semantic.upsertEmbedding,
+      {
+        sessionId: session._id,
+        questionId: submission.questionId,
+        entityType: "submission",
+        entityId: submission._id,
+        contentHash,
+        textPreview: submission.body.slice(0, 240),
+        embeddingModel: result.model,
+        dimensions: result.dimensions,
+        embedding: result.embedding,
+      },
+    );
+    const nearest = await ctx.vectorSearch("semanticEmbeddings", "by_embedding", {
+      vector: result.embedding,
+      limit: 12,
+      filter: (q) => q.eq("sessionId", session._id),
+    });
+
+    await ctx.runMutation(internal.semantic.assignSubmissionToSemanticCluster, {
+      submissionId: submission._id,
+      nearest: nearest
+        .filter((neighbor) => neighbor._id !== embeddingId)
+        .map((neighbor) => ({
+          embeddingId: neighbor._id,
+          score: neighbor._score,
+        })),
+    });
+
+    return { embeddingId };
+  },
+});
+
+export const getSimilarityMap = query({
+  args: {
+    sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      return null;
+    }
+
+    const question = await resolveQuestionForRead(ctx, session, args.questionId);
+    const questionId = question?._id;
+    const [clusters, members, submissions, participants] = await Promise.all([
+      questionId
+        ? ctx.db
+            .query("semanticClusters")
+            .withIndex("by_questionId_and_status", (q) =>
+              q.eq("questionId", questionId).eq("status", "active"),
+            )
+            .take(CLUSTER_LIMIT)
+        : ctx.db
+            .query("semanticClusters")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(CLUSTER_LIMIT),
+      questionId
+        ? ctx.db
+            .query("semanticClusterMembers")
+            .withIndex("by_questionId", (q) => q.eq("questionId", questionId))
+            .take(CLUSTER_MEMBER_LIMIT)
+        : ctx.db
+            .query("semanticClusterMembers")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(CLUSTER_MEMBER_LIMIT),
+      questionId
+        ? ctx.db
+            .query("submissions")
+            .withIndex("by_questionId_and_createdAt", (q) => q.eq("questionId", questionId))
+            .order("desc")
+            .take(ENTITY_LIMIT)
+        : ctx.db
+            .query("submissions")
+            .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(ENTITY_LIMIT),
+      ctx.db
+        .query("participants")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(ENTITY_LIMIT),
+    ]);
+    const submissionsById = new Map(submissions.map((submission) => [submission._id, submission]));
+    const participantsById = new Map(participants.map((participant) => [participant._id, participant]));
+    const membersByCluster = new Map<Id<"semanticClusters">, typeof members>();
+
+    for (const member of members) {
+      const existing = membersByCluster.get(member.clusterId) ?? [];
+      existing.push(member);
+      membersByCluster.set(member.clusterId, existing);
+    }
+
+    const toMessage = (submission: Doc<"submissions">) => {
+      const participant = participantsById.get(submission.participantId);
+
+      return {
+        id: submission._id,
+        participantId: submission.participantId,
+        nickname: participant?.nickname ?? "Unknown",
+        body: submission.body,
+        parentSubmissionId: submission.parentSubmissionId,
+        kind: submission.kind,
+        wordCount: submission.wordCount,
+        createdAt: submission.createdAt,
+      };
+    };
+
+    return {
+      session: {
+        id: session._id,
+        slug: session.slug,
+        title: session.title,
+      },
+      question: question
+        ? {
+            id: question._id,
+            title: question.title,
+            prompt: question.prompt,
+            status: question.status,
+          }
+        : null,
+      clusters: clusters.map((cluster) => {
+        const clusterMembers = membersByCluster.get(cluster._id) ?? [];
+        const rootMembers = clusterMembers.filter((member) => member.memberKind === "root");
+        const replyMembersByRoot = new Map<Id<"submissions">, typeof members>();
+
+        for (const member of clusterMembers) {
+          if (member.memberKind !== "reply") {
+            continue;
+          }
+
+          const existing = replyMembersByRoot.get(member.rootSubmissionId) ?? [];
+          existing.push(member);
+          replyMembersByRoot.set(member.rootSubmissionId, existing);
+        }
+
+        return {
+          id: cluster._id,
+          label: cluster.label,
+          source: cluster.source,
+          clusterKind: cluster.clusterKind,
+          rootSubmissionCount: cluster.rootSubmissionCount,
+          messageCount: cluster.messageCount,
+          representativeSubmissionId: cluster.representativeSubmissionId,
+          threads: rootMembers
+            .map((member) => {
+              const rootSubmission = submissionsById.get(member.submissionId);
+
+              if (!rootSubmission) {
+                return null;
+              }
+
+              return {
+                root: toMessage(rootSubmission),
+                membership: {
+                  score: member.score,
+                  membershipMode: member.membershipMode,
+                },
+                replies: (replyMembersByRoot.get(member.rootSubmissionId) ?? [])
+                  .map((replyMember) => submissionsById.get(replyMember.submissionId))
+                  .filter((submission): submission is Doc<"submissions"> => Boolean(submission))
+                  .sort((left, right) => left.createdAt - right.createdAt)
+                  .map(toMessage),
+              };
+            })
+            .filter((thread): thread is NonNullable<typeof thread> => Boolean(thread)),
+          updatedAt: cluster.updatedAt,
+        };
+      }),
+      caps: {
+        clusters: clusters.length === CLUSTER_LIMIT,
+        members: members.length === CLUSTER_MEMBER_LIMIT,
+        submissions: submissions.length === ENTITY_LIMIT,
+      },
+    };
   },
 });
 

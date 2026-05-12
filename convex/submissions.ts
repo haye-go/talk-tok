@@ -422,6 +422,10 @@ export const create = mutation({
       lastSeenAt: now,
     });
 
+    await ctx.scheduler.runAfter(0, internal.semantic.embedSubmissionAndAssign, {
+      submissionId,
+    });
+
     const submission = await ctx.db.get(submissionId);
 
     if (!submission) {

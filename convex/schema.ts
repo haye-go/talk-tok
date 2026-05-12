@@ -344,6 +344,46 @@ export default defineSchema({
     .index("by_submission", ["submissionId"])
     .index("by_category", ["categoryId"]),
 
+  semanticClusters: defineTable({
+    sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
+    status: v.union(v.literal("active"), v.literal("archived")),
+    label: v.string(),
+    source: v.literal("vector"),
+    clusterKind: v.union(v.literal("provisional"), v.literal("promoted")),
+    rootSubmissionCount: v.number(),
+    messageCount: v.number(),
+    representativeSubmissionId: v.optional(v.id("submissions")),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
+    .index("by_questionId_and_status", ["questionId", "status"])
+    .index("by_representative_submission", ["representativeSubmissionId"]),
+
+  semanticClusterMembers: defineTable({
+    sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
+    clusterId: v.id("semanticClusters"),
+    submissionId: v.id("submissions"),
+    rootSubmissionId: v.id("submissions"),
+    memberKind: v.union(v.literal("root"), v.literal("reply")),
+    membershipMode: v.union(
+      v.literal("root_direct"),
+      v.literal("reply_inherited"),
+      v.literal("reply_direct"),
+    ),
+    score: v.number(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_questionId", ["questionId"])
+    .index("by_cluster", ["clusterId"])
+    .index("by_submission", ["submissionId"])
+    .index("by_root_submission", ["rootSubmissionId"]),
+
   argumentLinks: defineTable({
     sessionId: v.id("sessions"),
     questionId: v.optional(v.id("sessionQuestions")),
