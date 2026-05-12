@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { useInstructorOverview } from "@/hooks/use-instructor-overview";
+import { useInstructorRoom } from "@/hooks/use-instructor-room";
 import { categoryColorToTone } from "@/lib/category-colors";
 import { inputPatternLabel, type InputPattern } from "@/lib/submission-telemetry";
 import {
@@ -226,6 +227,7 @@ export function InstructorSessionPage() {
   const selectedQuestionId = (searchParams.get("questionId") as Id<"sessionQuestions"> | null) ?? undefined;
   const overview = useInstructorOverview(sessionSlug, selectedQuestionId);
   const activeQuestionId = overview?.selectedQuestion?.id ?? overview?.currentQuestion?.id;
+  const instructorRoom = useInstructorRoom(sessionSlug, activeQuestionId);
   const questionScopedArgs = activeQuestionId ? { sessionSlug, questionId: activeQuestionId } : { sessionSlug };
   const triggerCategorisation = useMutation(api.categorisation.triggerForSession);
   const updatePhase = useMutation(api.instructorControls.updatePhase);
@@ -385,6 +387,12 @@ export function InstructorSessionPage() {
       threads: roomRootThreads.filter((submission) => submission.categoryId === category.id),
     }))
     .filter((group) => group.threads.length > 0);
+  const roomLatestThreads = instructorRoom?.latestThreads ?? [];
+  const roomCategoryGroups =
+    instructorRoom?.threadsByCategory.filter((group) => group.threads.length > 0) ?? [];
+  const roomUncategorizedThreads = instructorRoom?.uncategorizedThreads ?? [];
+  const roomNeedsAttention = instructorRoom?.needsAttention;
+  const roomDataLoading = instructorRoom === undefined;
 
   const PHASE_ORDER = ["lobby", "submit", "discover", "challenge", "synthesize", "closed"] as const;
   type Phase = (typeof PHASE_ORDER)[number];
@@ -804,21 +812,22 @@ export function InstructorSessionPage() {
       questionId,
     });
 
-  function renderRoomThread(submission: (typeof recentSubmissions)[number]) {
-    const replies = repliesByParentId.get(submission.id) ?? [];
-
+  function renderRoomThread(thread: (typeof roomLatestThreads)[number]) {
+    const { root, replies, assignment } = thread;
+    const submission = root.submission;
     return (
       <div
         key={submission.id}
-        className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)]"
+        className="rounded-[18px] border border-[#d7e0ea] bg-white"
       >
         <SubmissionCard submission={submission} />
-        <div className="border-t border-[var(--c-hairline)] px-4 py-3 text-xs text-[var(--c-muted)]">
+        <div className="border-t border-[#e7edf3] px-4 py-3 text-xs text-[var(--c-muted)]">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={submission.categoryId ? "neutral" : "warning"}>
-              {submission.categoryName ?? "Uncategorized"}
+            <Badge tone={assignment ? "neutral" : "warning"}>
+              {assignment?.categoryName ?? "Uncategorized"}
             </Badge>
-            <span>{replies.length} replies</span>
+            <span>{root.stats.upvoteCount} upvotes</span>
+            <span>{root.stats.replyCount} replies</span>
             <span>
               {new Date(submission.createdAt).toLocaleTimeString([], {
                 hour: "2-digit",
@@ -834,10 +843,10 @@ export function InstructorSessionPage() {
               <div className="mt-3 grid gap-2">
                 {replies.map((reply) => (
                   <div
-                    key={reply.id}
-                    className="border-l-2 border-[var(--c-hairline)] pl-3"
+                    key={reply.submission.id}
+                    className="ml-4 border-l-2 border-[#dbe5ee] pl-3"
                   >
-                    <SubmissionCard submission={reply} />
+                    <SubmissionCard submission={reply.submission} />
                   </div>
                 ))}
               </div>
@@ -849,8 +858,8 @@ export function InstructorSessionPage() {
   }
 
   const needsAttentionCount =
-    recategorisation.pendingCount +
-    responses.uncategorized +
+    (roomNeedsAttention?.pendingRecategorisationCount ?? recategorisation.pendingCount) +
+    (roomNeedsAttention?.uncategorizedCount ?? responses.uncategorized) +
     (latestCategorisationJob?.status === "error" ? 1 : 0) +
     (latestSynthesisJob?.status === "error" ? 1 : 0) +
     (latestReportJob?.status === "error" ? 1 : 0);
@@ -920,10 +929,13 @@ export function InstructorSessionPage() {
               {recategorisation.pendingCount === 1 ? "" : "s"} pending review.
             </p>
           ) : null}
-          {responses.uncategorized > 0 ? (
+          {(roomNeedsAttention?.uncategorizedCount ?? responses.uncategorized) > 0 ? (
             <p className="text-[var(--c-body)]">
-              {responses.uncategorized} response{responses.uncategorized === 1 ? "" : "s"} need
-              categorisation.
+              {roomNeedsAttention?.uncategorizedCount ?? responses.uncategorized} root thread
+              {(roomNeedsAttention?.uncategorizedCount ?? responses.uncategorized) === 1
+                ? ""
+                : "s"}{" "}
+              need categorisation.
             </p>
           ) : null}
           {latestCategorisationJob?.status === "error" ||
@@ -941,14 +953,18 @@ export function InstructorSessionPage() {
         <section className="grid gap-3">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-display text-lg font-medium text-[var(--c-ink)]">Latest threads</h2>
-            <Badge tone="neutral">{roomRootThreads.length}</Badge>
+            <Badge tone="neutral">{roomLatestThreads.length}</Badge>
           </div>
-          {roomRootThreads.length === 0 ? (
+          {roomDataLoading ? (
+            <Card>
+              <p className="text-sm text-[var(--c-muted)]">Loading room threads...</p>
+            </Card>
+          ) : roomLatestThreads.length === 0 ? (
             <Card>
               <p className="text-sm text-[var(--c-muted)]">No submissions yet.</p>
             </Card>
           ) : (
-            roomRootThreads.map(renderRoomThread)
+            roomLatestThreads.map(renderRoomThread)
           )}
         </section>
       ) : null}
@@ -1014,7 +1030,7 @@ export function InstructorSessionPage() {
             </form>
           ) : null}
 
-          {roomThreadsByCategory.map(({ category, threads }, index) => (
+          {roomCategoryGroups.map(({ category, threads }, index) => (
             <section
               key={category.id}
               className="grid gap-3 border-l-4 pl-4"
@@ -1139,7 +1155,7 @@ export function InstructorSessionPage() {
             </section>
           ))}
 
-          {uncategorizedRoomThreads.length > 0 ? (
+          {roomUncategorizedThreads.length > 0 ? (
             <section className="grid gap-3 border-l-4 border-[var(--c-muted)] pl-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="font-display text-base font-medium text-[var(--c-ink)]">
@@ -1155,7 +1171,7 @@ export function InstructorSessionPage() {
                   {categorisationBusy ? "Categorising..." : "Run categorisation"}
                 </Button>
               </div>
-              {uncategorizedRoomThreads.map(renderRoomThread)}
+              {roomUncategorizedThreads.map(renderRoomThread)}
             </section>
           ) : null}
         </section>
