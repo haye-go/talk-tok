@@ -31,7 +31,7 @@ import {
   setDemoClientKey,
   storeParticipant,
 } from "@/lib/client-identity";
-import { DEMO_SESSION_SLUG, type TabId } from "@/lib/constants";
+import { DEMO_SESSION_SLUG, TABS, type TabId } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 
 const PARTICIPATION_LABELS: Record<string, string> = {
@@ -81,6 +81,11 @@ interface PersonalReportView {
   error?: string | null;
 }
 
+function parseParticipantTab(value: string | null): TabId | null {
+  if (!value) return null;
+  return TABS.some((tab) => tab.id === value) ? (value as TabId) : null;
+}
+
 export function ParticipantWorkspacePage({
   sessionSlug,
   initialTab = "contribute",
@@ -88,12 +93,16 @@ export function ParticipantWorkspacePage({
   showReviewDetail = false,
 }: ParticipantWorkspacePageProps) {
   const navigate = useNavigate();
+  const requestedTab = parseParticipantTab(new URLSearchParams(window.location.search).get("tab"));
   const clientKey = useMemo(() => {
-    const demoClientKey = new URLSearchParams(window.location.search).get("demoClientKey");
+    const searchParams = new URLSearchParams(window.location.search);
+    const demoClientKey = searchParams.get("demoClientKey");
+    const tab = parseParticipantTab(searchParams.get("tab"));
 
     if (sessionSlug === DEMO_SESSION_SLUG && demoClientKey?.startsWith("demo-")) {
       setDemoClientKey(demoClientKey);
-      window.history.replaceState(null, "", routes.session(sessionSlug));
+      const nextUrl = tab ? `${routes.session(sessionSlug)}?tab=${tab}` : routes.session(sessionSlug);
+      window.history.replaceState(null, "", nextUrl);
     }
 
     if (sessionSlug !== DEMO_SESSION_SLUG && isDemoClientKey()) {
@@ -142,7 +151,7 @@ export function ParticipantWorkspacePage({
   const [retryingFeedbackSubmissionId, setRetryingFeedbackSubmissionId] =
     useState<Id<"submissions"> | null>(null);
   const routeDrivenTab: TabId | null = fightSlug ? "fight" : showReviewDetail ? "me" : null;
-  const [activeTab, setActiveTab] = useState<TabId>(routeDrivenTab ?? initialTab);
+  const [activeTab, setActiveTab] = useState<TabId>(routeDrivenTab ?? requestedTab ?? initialTab);
   const [generatingReport, setGeneratingReport] = useState(false);
   const touchedPresenceKey = useRef<string | null>(null);
 
@@ -150,6 +159,11 @@ export function ParticipantWorkspacePage({
     if (!routeDrivenTab) return;
     setActiveTab(routeDrivenTab);
   }, [routeDrivenTab]);
+
+  useEffect(() => {
+    if (routeDrivenTab) return;
+    setActiveTab(requestedTab ?? initialTab);
+  }, [initialTab, requestedTab, routeDrivenTab]);
 
   useEffect(() => {
     if (!participant || !clientKey) return;
@@ -308,6 +322,14 @@ export function ParticipantWorkspacePage({
     } finally {
       setGeneratingReport(false);
     }
+  }
+
+  function handleTabChange(nextTab: TabId) {
+    setActiveTab(nextTab);
+    void navigate({
+      to: routes.session(sessionSlug),
+      search: nextTab === "contribute" ? {} : { tab: nextTab },
+    });
   }
 
   if (session === undefined || participant === undefined || (showReviewDetail && report === undefined)) {
@@ -494,7 +516,7 @@ export function ParticipantWorkspacePage({
       topBar={<DemoIdentityBar sessionSlug={sessionSlug} />}
       questionHeader={questionHeader}
       activeTab={activeTab}
-      onActiveTabChange={setActiveTab}
+      onActiveTabChange={handleTabChange}
       contribute={
         <div className="grid gap-4">
           <div className="rounded-md bg-[var(--c-sig-cream)] p-3.5">
@@ -547,7 +569,7 @@ export function ParticipantWorkspacePage({
                   ) : (
                     <Badge tone="neutral">New top-level posts are paused</Badge>
                   )}
-                  <Button type="button" variant="ghost" onClick={() => setActiveTab("explore")}>
+                  <Button type="button" variant="ghost" onClick={() => handleTabChange("explore")}>
                     Go to Explore
                   </Button>
                 </div>
@@ -583,8 +605,8 @@ export function ParticipantWorkspacePage({
                     handleRequestRecategorisation(submission.id, request)
                   }
                   onAddFollowUp={() => setFollowUpParentId(submission.id)}
-                  onViewExplore={() => setActiveTab("explore")}
-                  onStartFight={canUseFight ? () => setActiveTab("fight") : undefined}
+                  onViewExplore={() => handleTabChange("explore")}
+                  onStartFight={canUseFight ? () => handleTabChange("fight") : undefined}
                   onRetryFeedback={() => handleRetryFeedback(submission.id)}
                   feedbackRetrying={retryingFeedbackSubmissionId === submission.id}
                 >
