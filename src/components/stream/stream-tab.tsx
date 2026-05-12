@@ -99,6 +99,7 @@ export function StreamTab({
   const [replyParentId, setReplyParentId] = useState<Id<"submissions"> | null>(null);
   const [replyError, setReplyError] = useState<string | null>(null);
   const [creatingFightFor, setCreatingFightFor] = useState<Id<"submissions"> | null>(null);
+  const [showSynthesis, setShowSynthesis] = useState(false);
 
   const createReply = useMutation(api.submissions.create);
   const createChallenge = useMutation(api.fightMe.createChallenge);
@@ -166,17 +167,25 @@ export function StreamTab({
     }
   }
 
+  const synthesisAvailable = synthesisVisible && !synthesisBlockedBySession && artifacts.length > 0;
+
   return (
     <div className="space-y-3">
+      <div className="flex items-center gap-3 text-xs text-[var(--c-muted)]">
+        <span>{responses.length} {responses.length === 1 ? "response" : "responses"}</span>
+        {cats.length > 0 ? <span>{cats.length} {cats.length === 1 ? "category" : "categories"}</span> : null}
+        {synthesisAvailable ? <Badge tone="sky">Synthesis available</Badge> : null}
+      </div>
+
       <PresenceBar typing={presenceTyping} submitted={presenceSubmitted} idle={presenceIdle} />
 
       {canSeeCategorySummary && cats.length > 0 ? (
-        <div className="flex gap-1.5 overflow-x-auto">
+        <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             onClick={() => setFilter(null)}
             className={cn(
-              "shrink-0 cursor-pointer rounded-pill px-2.5 py-1 text-[10px] font-medium transition-colors",
+              "cursor-pointer rounded-pill px-2.5 py-1 text-[10px] font-medium transition-colors",
               !filter
                 ? "bg-[var(--c-primary)] text-[var(--c-on-primary)]"
                 : "bg-[var(--c-surface-strong)] text-[var(--c-muted)]",
@@ -189,7 +198,7 @@ export function StreamTab({
               key={category.id}
               type="button"
               onClick={() => setFilter(filter === category.id ? null : category.id)}
-              className="shrink-0 cursor-pointer"
+              className="cursor-pointer"
             >
               <Badge
                 tone={categoryColorToTone(category.color, index)}
@@ -216,28 +225,6 @@ export function StreamTab({
           </div>
         </Card>
       ) : null}
-
-      {!synthesisVisible ? (
-        <ParticipantStateSection kind="waiting" title="Class synthesis">
-          The instructor has not released synthesis for this question yet.
-        </ParticipantStateSection>
-      ) : synthesisBlockedBySession ? (
-        <ParticipantStateSection kind="locked" title="Class synthesis">
-          Synthesis is released for this question, but the session is still in private visibility.
-        </ParticipantStateSection>
-      ) : artifacts.length === 0 ? (
-        <ParticipantStateSection kind="empty" title="Class synthesis">
-          No synthesis has been generated for this question yet.
-        </ParticipantStateSection>
-      ) : (
-        <Card title="Class synthesis">
-          <div className="space-y-2">
-            {artifacts.map((artifact) => (
-              <SynthesisArtifactCard key={artifact.id} artifact={artifact} sessionSlug={sessionSlug ?? ""} />
-            ))}
-          </div>
-        </Card>
-      )}
 
       {!canSeeRawPeerResponses ? (
         <ParticipantStateSection kind="hidden" title="Peer responses">
@@ -269,13 +256,6 @@ export function StreamTab({
                   text={response.body}
                   categoryColor={categoryColorToTone(response.categoryColor)}
                   categoryName={response.categoryName ?? undefined}
-                  originality={response.inputPattern === "likely_pasted" ? "med" : "high"}
-                  telemetryLabel={
-                    response.inputPattern === "likely_pasted"
-                      ? "Likely pasted"
-                      : "Composed gradually"
-                  }
-                  telemetryWarning={response.inputPattern === "likely_pasted"}
                 />
 
                 {sessionSlug && clientKey ? (
@@ -326,6 +306,28 @@ export function StreamTab({
           })}
         </div>
       )}
+
+      {synthesisAvailable ? (
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSynthesis((v) => !v)}
+          >
+            {showSynthesis ? "Hide class synthesis" : "View class synthesis"}
+          </Button>
+          {showSynthesis ? (
+            <Card title="Class synthesis">
+              <div className="space-y-2">
+                {artifacts.map((artifact) => (
+                  <SynthesisArtifactCard key={artifact.id} artifact={artifact} sessionSlug={sessionSlug ?? ""} />
+                ))}
+              </div>
+            </Card>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }
