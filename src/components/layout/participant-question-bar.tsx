@@ -48,10 +48,7 @@ export function ParticipantQuestionBar({
             &ldquo;{prompt}&rdquo;
           </p>
         </div>
-        <Caret
-          size={14}
-          className="mt-1 shrink-0 text-[var(--c-question-ink)]"
-        />
+        <Caret size={14} className="mt-1 shrink-0 text-[var(--c-question-ink)]" />
       </button>
 
       {expanded && hasMultipleQuestions ? (
@@ -62,9 +59,7 @@ export function ParticipantQuestionBar({
               <button
                 key={question.id}
                 type="button"
-                onClick={() =>
-                  onSelectQuestion(question.isCurrent ? null : question.id)
-                }
+                onClick={() => onSelectQuestion(question.isCurrent ? null : question.id)}
                 className={cn(
                   "rounded-pill border px-2.5 py-1 text-[10px] font-medium transition-colors",
                   active

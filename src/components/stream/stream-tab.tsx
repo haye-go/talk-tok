@@ -193,8 +193,7 @@ export function StreamTab({
   const cats = categories ?? [];
   const latestThreads = peerThreads ?? (peerResponses ?? []).map(threadFromPeerResponse);
   const categorySections = peerThreadsByCategory ?? [];
-  const synthesisArtifactsForView =
-    synthesisView?.artifacts ?? synthesisArtifacts ?? [];
+  const synthesisArtifactsForView = synthesisView?.artifacts ?? synthesisArtifacts ?? [];
   const synthesisAvailable =
     (synthesisView?.visible ?? synthesisVisible) &&
     !synthesisBlockedBySession &&
@@ -304,9 +303,7 @@ export function StreamTab({
               softWordLimit={softWordLimit}
               submitLabel="Send reply"
               placeholder="Respond directly to this point..."
-              onSubmit={(_text, _tone, replySubmission) =>
-                handleReply(thread, replySubmission)
-              }
+              onSubmit={(_text, _tone, replySubmission) => handleReply(thread, replySubmission)}
             />
           </Card>
         ) : null}
@@ -391,16 +388,24 @@ export function StreamTab({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--c-muted)]">
         <div className="flex flex-wrap items-center gap-3">
-          <span>{latestThreads.length} {latestThreads.length === 1 ? "message" : "messages"}</span>
-          {cats.length > 0 ? <span>{cats.length} {cats.length === 1 ? "category" : "categories"}</span> : null}
+          <span>
+            {latestThreads.length} {latestThreads.length === 1 ? "message" : "messages"}
+          </span>
+          {cats.length > 0 ? (
+            <span>
+              {cats.length} {cats.length === 1 ? "category" : "categories"}
+            </span>
+          ) : null}
           {synthesisAvailable ? <Badge tone="sky">Synthesis ready</Badge> : null}
         </div>
         <div className="flex rounded-pill border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-0.5">
-          {([
-            ["latest", TextAlignLeft, "Latest"],
-            ["category", SquaresFour, "By category"],
-            ["synthesis", TextAlignLeft, "Synthesis"],
-          ] as const).map(([mode, Icon, label]) => (
+          {(
+            [
+              ["latest", TextAlignLeft, "Latest"],
+              ["category", SquaresFour, "By category"],
+              ["synthesis", TextAlignLeft, "Synthesis"],
+            ] as const
+          ).map(([mode, Icon, label]) => (
             <button
               key={mode}
               type="button"

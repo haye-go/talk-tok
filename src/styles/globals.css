@@ -76,7 +76,7 @@
   --c-sig-mustard: oklch(0.7507 0.13 79.85);
 
   --c-tab-contribute: oklch(0.45 0.07 230);
-  --c-tab-explore: oklch(0.50 0.11 52);
+  --c-tab-explore: oklch(0.5 0.11 52);
   --c-tab-fight: oklch(0.45 0.16 36);
   --c-tab-me: oklch(0.48 0.11 80);
 
@@ -118,8 +118,8 @@ html.dark {
   --c-question-ink: oklch(0.9 0.035 230);
 
   --c-tab-contribute: oklch(0.75 0.06 230);
-  --c-tab-explore: oklch(0.78 0.10 52);
-  --c-tab-fight: oklch(0.70 0.15 36);
+  --c-tab-explore: oklch(0.78 0.1 52);
+  --c-tab-fight: oklch(0.7 0.15 36);
   --c-tab-me: oklch(0.76 0.11 80);
 
   --c-link: oklch(0.68 0.176 259.09);

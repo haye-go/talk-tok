@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  ArrowsClockwise,
-  ChatText,
-  ListBullets,
-  Sword,
-  Timer,
-} from "@phosphor-icons/react";
+import { ArrowsClockwise, ChatText, ListBullets, Sword, Timer } from "@phosphor-icons/react";
 import { ParticipantStateSection } from "@/components/layout/participant-state-section";
 import { LoadingState } from "@/components/state/loading-state";
 import { Badge } from "@/components/ui/badge";
@@ -132,9 +126,15 @@ export function MyZoneTab({
   onViewFight,
   onViewReport,
 }: MyZoneTabProps) {
-  const feedbackMap = new Map((feedbackBySubmission ?? []).map((feedback) => [feedback.submissionId, feedback]));
-  const assignmentMap = new Map((assignmentsBySubmission ?? []).map((assignment) => [assignment.submissionId, assignment]));
-  const recatMap = new Map((recategorisationRequests ?? []).map((request) => [request.submissionId, request]));
+  const feedbackMap = new Map(
+    (feedbackBySubmission ?? []).map((feedback) => [feedback.submissionId, feedback]),
+  );
+  const assignmentMap = new Map(
+    (assignmentsBySubmission ?? []).map((assignment) => [assignment.submissionId, assignment]),
+  );
+  const recatMap = new Map(
+    (recategorisationRequests ?? []).map((request) => [request.submissionId, request]),
+  );
   const initials = initialResponses ?? [];
   const followUps = followUpResponses ?? [];
   const fights = fightThreads ?? [];
@@ -155,7 +155,7 @@ export function MyZoneTab({
         onViewReport={onViewReport}
       />
 
-      {(contributionCount > 0 || followUpCount > 0 || fightCount > 0 || shiftCount > 0) ? (
+      {contributionCount > 0 || followUpCount > 0 || fightCount > 0 || shiftCount > 0 ? (
         <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--c-muted)]">
           {contributionCount > 0 ? (
             <span className="flex items-center gap-1">
@@ -216,7 +216,10 @@ export function MyZoneTab({
       ) : null}
 
       {followUps.length > 0 ? (
-        <Card title="Reply archive" description="Thread replies are archived here; active thread work stays in Contribute.">
+        <Card
+          title="Reply archive"
+          description="Thread replies are archived here; active thread work stays in Contribute."
+        >
           <div className="flex flex-col gap-2">
             {followUps.map((submission) => (
               <div
@@ -224,8 +227,10 @@ export function MyZoneTab({
                 className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
               >
                 <p className="text-[10px] text-[var(--c-muted)]">
-                  {submission.followUpTitle ? `Follow-up: ${submission.followUpTitle}` : "Follow-up"} -{" "}
-                  {formatTime(submission.createdAt)}
+                  {submission.followUpTitle
+                    ? `Follow-up: ${submission.followUpTitle}`
+                    : "Follow-up"}{" "}
+                  - {formatTime(submission.createdAt)}
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-[var(--c-body)]">
                   {submission.body}
@@ -369,8 +374,7 @@ function PersonalReportSection({
           ) : null}
           {personalReport.responsivenessBand ? (
             <Badge tone="cream">
-              {BAND_LABELS[personalReport.responsivenessBand] ??
-                personalReport.responsivenessBand}
+              {BAND_LABELS[personalReport.responsivenessBand] ?? personalReport.responsivenessBand}
             </Badge>
           ) : null}
         </div>
@@ -401,7 +405,13 @@ function PersonalReportSection({
 
   if (personalReport?.status === "error") {
     return (
-      <Card title="Report unavailable" description={personalReport.error ?? "Your report could not be generated. The instructor has been notified."} />
+      <Card
+        title="Report unavailable"
+        description={
+          personalReport.error ??
+          "Your report could not be generated. The instructor has been notified."
+        }
+      />
     );
   }
 
@@ -427,9 +437,8 @@ function ContributionRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const snippet = submission.body.length > 120
-    ? submission.body.slice(0, 120) + "..."
-    : submission.body;
+  const snippet =
+    submission.body.length > 120 ? submission.body.slice(0, 120) + "..." : submission.body;
 
   const feedbackBadge = feedback
     ? feedback.status === "success"
@@ -460,12 +469,14 @@ function ContributionRow({
             ) : null}
             {feedbackBadge ? (
               <Badge tone={feedbackBadge as "sky" | "error" | "neutral"}>
-                {feedback?.status === "success" ? "Feedback ready" : feedback?.status === "error" ? "Feedback failed" : "Pending"}
+                {feedback?.status === "success"
+                  ? "Feedback ready"
+                  : feedback?.status === "error"
+                    ? "Feedback failed"
+                    : "Pending"}
               </Badge>
             ) : null}
-            {recat ? (
-              <Badge tone="mustard">Recat {recat.status}</Badge>
-            ) : null}
+            {recat ? <Badge tone="mustard">Recat {recat.status}</Badge> : null}
           </div>
         </div>
         <span className="shrink-0 text-[10px] text-[var(--c-muted)]">
@@ -483,7 +494,15 @@ function ContributionRow({
           {feedback ? (
             <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-canvas)] p-3">
               <div className="flex flex-wrap items-center gap-1.5">
-                <Badge tone={feedback.status === "success" ? "sky" : feedback.status === "error" ? "error" : "neutral"}>
+                <Badge
+                  tone={
+                    feedback.status === "success"
+                      ? "sky"
+                      : feedback.status === "error"
+                        ? "error"
+                        : "neutral"
+                  }
+                >
                   Feedback {feedback.status}
                 </Badge>
                 {feedback.reasoningBand ? (

@@ -35,7 +35,12 @@ export function ResponseStreamItem({
       ownership={isOwn ? "own" : "peer"}
       className={className}
     >
-      <div className={cn("flex flex-wrap items-center gap-2 text-[10px]", !telemetryLabel && !originality && "hidden")}>
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2 text-[10px]",
+          !telemetryLabel && !originality && "hidden",
+        )}
+      >
         {telemetryLabel && (
           <span
             className={telemetryWarning ? "text-[var(--c-sig-coral)]" : "text-[var(--c-muted)]"}

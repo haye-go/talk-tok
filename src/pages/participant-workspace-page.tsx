@@ -111,9 +111,8 @@ export function ParticipantWorkspacePage({
     return getOrCreateClientKey();
   }, [sessionSlug]);
 
-  const [selectedQuestionOverrideId, setSelectedQuestionOverrideId] = useState<
-    Id<"sessionQuestions"> | null
-  >(null);
+  const [selectedQuestionOverrideId, setSelectedQuestionOverrideId] =
+    useState<Id<"sessionQuestions"> | null>(null);
   const workspace = useParticipantWorkspace(sessionSlug, clientKey, selectedQuestionOverrideId);
 
   const session = useQuery(api.sessions.getBySlug, { sessionSlug });
@@ -208,7 +207,8 @@ export function ParticipantWorkspacePage({
       });
       if (!result.feedbackQueued) {
         setFeedbackQueueWarning(
-          result.feedbackQueueError ?? "Your response was saved, but AI feedback could not be queued.",
+          result.feedbackQueueError ??
+            "Your response was saved, but AI feedback could not be queued.",
         );
       }
     } catch (cause) {
@@ -233,7 +233,8 @@ export function ParticipantWorkspacePage({
       });
       if (!result.feedbackQueued) {
         setFeedbackQueueWarning(
-          result.feedbackQueueError ?? "Your response was saved, but AI feedback could not be queued.",
+          result.feedbackQueueError ??
+            "Your response was saved, but AI feedback could not be queued.",
         );
       }
       setShowAdditionalComposer(false);
@@ -321,7 +322,11 @@ export function ParticipantWorkspacePage({
     });
   }
 
-  if (session === undefined || participant === undefined || (showReviewDetail && report === undefined)) {
+  if (
+    session === undefined ||
+    participant === undefined ||
+    (showReviewDetail && report === undefined)
+  ) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[var(--c-canvas)] p-4">
         <LoadingState
@@ -413,7 +418,7 @@ export function ParticipantWorkspacePage({
     ...(ws?.synthesis.finalArtifacts ?? []),
   ];
   const canUseFight =
-    selectedQuestion?.fightEnabled ?? (ws?.session.fightMeEnabled ?? session.fightMeEnabled);
+    selectedQuestion?.fightEnabled ?? ws?.session.fightMeEnabled ?? session.fightMeEnabled;
   const contributionsOpen = selectedQuestion?.contributionsOpen ?? true;
   const repliesEnabled = selectedQuestion?.repliesEnabled ?? false;
   const upvotesEnabled = selectedQuestion?.upvotesEnabled ?? false;
@@ -465,9 +470,7 @@ export function ParticipantWorkspacePage({
       }))}
       selectedQuestionId={selectedQuestion?.id ?? null}
       onSelectQuestion={(questionId) =>
-        setSelectedQuestionOverrideId(
-          questionId as typeof selectedQuestionOverrideId,
-        )
+        setSelectedQuestionOverrideId(questionId as typeof selectedQuestionOverrideId)
       }
       activeTab={activeTab}
       onActiveTabChange={handleTabChange}
@@ -647,7 +650,9 @@ interface FightTabContentProps {
   clientKey: string;
   myParticipantId: string;
   myFights: NonNullable<ReturnType<typeof useParticipantWorkspace>>["fightMe"]["mine"];
-  pendingIncoming: NonNullable<ReturnType<typeof useParticipantWorkspace>>["fightMe"]["pendingIncoming"];
+  pendingIncoming: NonNullable<
+    ReturnType<typeof useParticipantWorkspace>
+  >["fightMe"]["pendingIncoming"];
   currentFight: NonNullable<ReturnType<typeof useParticipantWorkspace>>["fightMe"]["current"];
   fightMeEnabled: boolean;
   mySubmissionId?: Id<"submissions">;
@@ -732,11 +737,21 @@ interface MeTabContentProps {
   report: PersonalReportView | null;
   generatingReport: boolean;
   onGenerateReport: () => Promise<void>;
-  initialResponses: NonNullable<ReturnType<typeof useParticipantWorkspace>>["myZoneHistory"]["initialResponses"];
-  followUpResponses: NonNullable<ReturnType<typeof useParticipantWorkspace>>["myZoneHistory"]["followUpResponses"];
-  feedbackBySubmission: NonNullable<ReturnType<typeof useParticipantWorkspace>>["feedbackBySubmission"];
-  assignmentsBySubmission: NonNullable<ReturnType<typeof useParticipantWorkspace>>["assignmentsBySubmission"];
-  recategorisationRequests: NonNullable<ReturnType<typeof useParticipantWorkspace>>["recategorisationRequests"];
+  initialResponses: NonNullable<
+    ReturnType<typeof useParticipantWorkspace>
+  >["myZoneHistory"]["initialResponses"];
+  followUpResponses: NonNullable<
+    ReturnType<typeof useParticipantWorkspace>
+  >["myZoneHistory"]["followUpResponses"];
+  feedbackBySubmission: NonNullable<
+    ReturnType<typeof useParticipantWorkspace>
+  >["feedbackBySubmission"];
+  assignmentsBySubmission: NonNullable<
+    ReturnType<typeof useParticipantWorkspace>
+  >["assignmentsBySubmission"];
+  recategorisationRequests: NonNullable<
+    ReturnType<typeof useParticipantWorkspace>
+  >["recategorisationRequests"];
   fightThreads?: ComponentProps<typeof MyZoneTab>["fightThreads"];
   positionShifts?: ComponentProps<typeof MyZoneTab>["positionShifts"];
   personalReport?: ComponentProps<typeof MyZoneTab>["personalReport"];
@@ -822,7 +837,9 @@ function ReviewDetail({ report, generating, onGenerate }: ReviewDetailProps) {
     return (
       <div className="grid place-items-center gap-4 py-8">
         <ChartBar size={32} className="text-[var(--c-success)]" />
-        <p className="font-display text-sm font-medium text-[var(--c-ink)]">No report generated yet</p>
+        <p className="font-display text-sm font-medium text-[var(--c-ink)]">
+          No report generated yet
+        </p>
         <p className="text-xs text-[var(--c-muted)]">
           Generate a private analysis of your contributions for this session.
         </p>
@@ -841,7 +858,9 @@ function ReviewDetail({ report, generating, onGenerate }: ReviewDetailProps) {
     return (
       <div className="grid place-items-center gap-3 py-8">
         <CircleNotch size={28} className="animate-spin text-[var(--c-success)]" />
-        <p className="font-display text-sm font-medium text-[var(--c-ink)]">Generating your report...</p>
+        <p className="font-display text-sm font-medium text-[var(--c-ink)]">
+          Generating your report...
+        </p>
         <p className="text-xs text-[var(--c-muted)]">
           Analyzing your contributions — this usually takes a few moments.
         </p>
@@ -873,7 +892,9 @@ function ReviewDetail({ report, generating, onGenerate }: ReviewDetailProps) {
     <div className="grid gap-4">
       <div className="text-center">
         <ChartBar size={24} className="mx-auto mb-1 text-[var(--c-success)]" />
-        <h2 className="font-display text-base font-medium text-[var(--c-ink)]">Your Personal Analysis</h2>
+        <h2 className="font-display text-base font-medium text-[var(--c-ink)]">
+          Your Personal Analysis
+        </h2>
         <p className="mt-1 text-xs text-[var(--c-muted)]">
           Your private analysis based on your contributions this session.
         </p>

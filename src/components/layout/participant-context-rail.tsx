@@ -49,9 +49,7 @@ export function ParticipantContextRail({
                 <button
                   key={question.id}
                   type="button"
-                  onClick={() =>
-                    onSelectQuestion(question.isCurrent ? null : question.id)
-                  }
+                  onClick={() => onSelectQuestion(question.isCurrent ? null : question.id)}
                   className={cn(
                     "rounded-pill border px-2.5 py-1 text-[11px] transition",
                     active

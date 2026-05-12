@@ -228,12 +228,7 @@ function PastFights({
                 {fight.status.replace(/_/g, " ")}
               </Badge>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigate(fight.slug)}
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={() => onNavigate(fight.slug)}>
               View
             </Button>
           </div>

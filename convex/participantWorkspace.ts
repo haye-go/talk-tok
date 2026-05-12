@@ -298,7 +298,9 @@ function matchesSelectedQuestion(
   submission: Doc<"submissions">,
   selectedQuestionId?: Id<"sessionQuestions">,
 ) {
-  return !selectedQuestionId || !submission.questionId || submission.questionId === selectedQuestionId;
+  return (
+    !selectedQuestionId || !submission.questionId || submission.questionId === selectedQuestionId
+  );
 }
 
 function isTopLevelMessage(submission: Doc<"submissions">) {
@@ -712,7 +714,8 @@ export const overview = query({
 
     const myThreads = selectedQuestionSubmissions
       .filter(
-        (submission) => submission.participantId === participant._id && isTopLevelMessage(submission),
+        (submission) =>
+          submission.participantId === participant._id && isTopLevelMessage(submission),
       )
       .sort((left, right) => right.createdAt - left.createdAt)
       .map(toThread);
@@ -775,9 +778,7 @@ export const overview = query({
     const synthesisArtifactsForView = [...synthesisArtifactsById.values()]
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, SYNTHESIS_ARTIFACT_LIMIT);
-    const synthesisArtifactIds = new Set(
-      synthesisArtifactsForView.map((artifact) => artifact._id),
-    );
+    const synthesisArtifactIds = new Set(synthesisArtifactsForView.map((artifact) => artifact._id));
     const synthesisQuotes =
       synthesisVisible && synthesisArtifactIds.size > 0
         ? selectedQuestionId
@@ -792,10 +793,7 @@ export const overview = query({
               .order("desc")
               .take(SYNTHESIS_QUOTE_LIMIT)
         : [];
-    const synthesisQuotesByArtifact = new Map<
-      Id<"synthesisArtifacts">,
-      Doc<"synthesisQuotes">[]
-    >();
+    const synthesisQuotesByArtifact = new Map<Id<"synthesisArtifacts">, Doc<"synthesisQuotes">[]>();
 
     for (const quote of synthesisQuotes) {
       if (!quote.isVisibleToParticipants || !synthesisArtifactIds.has(quote.artifactId)) {
@@ -814,9 +812,7 @@ export const overview = query({
       quote: quote.quote,
       quoteRole: quote.quoteRole,
       displayName:
-        session.anonymityMode === "anonymous_to_peers"
-          ? quote.anonymizedLabel
-          : quote.displayName,
+        session.anonymityMode === "anonymous_to_peers" ? quote.anonymizedLabel : quote.displayName,
       createdAt: quote.createdAt,
     });
     const toSynthesisArtifactView = (artifact: Doc<"synthesisArtifacts">) => {

@@ -74,11 +74,10 @@ export function ParticipantThreadReplies({ replies }: { replies: ParticipantThre
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
       >
-        <CaretDown
-          size={12}
-          className={cn("transition-transform", expanded && "rotate-180")}
-        />
-        {expanded ? "Hide replies" : `Show ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
+        <CaretDown size={12} className={cn("transition-transform", expanded && "rotate-180")} />
+        {expanded
+          ? "Hide replies"
+          : `Show ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
       </button>
 
       {expanded ? (
