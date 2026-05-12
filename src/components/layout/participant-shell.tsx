@@ -1,18 +1,16 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
-import { Card } from "@/components/ui/card";
 import { type TabId } from "@/lib/constants";
 
 export interface ParticipantShellProps {
   topBar?: ReactNode;
   questionHeader?: ReactNode;
-  contribute?: ReactNode;
-  explore?: ReactNode;
-  fight?: ReactNode;
-  me?: ReactNode;
-  defaultTab?: TabId;
-  activeTab?: TabId;
-  onActiveTabChange?: (tab: TabId) => void;
+  contribute: ReactNode;
+  explore: ReactNode;
+  fight: ReactNode;
+  me: ReactNode;
+  activeTab: TabId;
+  onActiveTabChange: (tab: TabId) => void;
 }
 
 export function ParticipantShell({
@@ -22,31 +20,14 @@ export function ParticipantShell({
   explore,
   fight,
   me,
-  defaultTab = "contribute",
-  activeTab: controlledActiveTab,
+  activeTab,
   onActiveTabChange,
 }: ParticipantShellProps) {
-  const [internalActiveTab, setInternalActiveTab] = useState<TabId>(defaultTab);
-  const activeTab = controlledActiveTab ?? internalActiveTab;
-
-  function handleTabChange(tab: TabId) {
-    setInternalActiveTab(tab);
-    onActiveTabChange?.(tab);
-  }
-
   const content: Record<TabId, ReactNode> = {
-    contribute: contribute ?? (
-      <Card title="Contribute placeholder">Participant contribution surface goes here.</Card>
-    ),
-    explore: explore ?? (
-      <Card title="Explore placeholder">Response stream and published class signals go here.</Card>
-    ),
-    fight: fight ?? (
-      <Card title="Fight placeholder">Structured challenge flow goes here.</Card>
-    ),
-    me: me ?? (
-      <Card title="Me placeholder">Private participant history and reflection go here.</Card>
-    ),
+    contribute,
+    explore,
+    fight,
+    me,
   };
 
   return (
@@ -54,7 +35,7 @@ export function ParticipantShell({
       {topBar}
       {questionHeader}
       <main className="flex-1 overflow-y-auto p-4">{content[activeTab]}</main>
-      <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} />
+      <BottomTabBar activeTab={activeTab} onTabChange={onActiveTabChange} />
     </div>
   );
 }
