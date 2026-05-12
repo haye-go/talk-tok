@@ -1623,6 +1623,337 @@ export function InstructorSessionPage() {
     </div>
   );
 
+  const setupWorkspace = (
+    <div className="mx-auto grid w-full max-w-6xl gap-5 p-5 lg:p-7">
+      <header className="border-b border-[#d7e0ea] pb-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
+          Setup / Prepare
+        </p>
+        <h1 className="mt-2 font-display text-2xl font-semibold text-[var(--c-ink)]">
+          Prepare the session model
+        </h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--c-body)]">
+          Setup owns question management, session configuration, category taxonomy, join access,
+          templates, baselines, and AI readiness. Live discussion and review artifacts live
+          elsewhere.
+        </p>
+      </header>
+
+      <QuestionManagerPanel
+        session={session}
+        currentQuestion={overview.currentQuestion}
+        metrics={{
+          submitted: responses.total,
+          categories: activeCategories.length,
+          recategorisationRequests: recategorisation.pendingCount,
+          followUps: followUps.activeCount,
+        }}
+        onVisibilityChange={handleVisibilityChange}
+        onSettingsSave={handleSettingsSave}
+      />
+
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <Card title="Category Taxonomy" eyebrow={`${activeCategories.length} active`}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <p className="text-xs leading-5 text-[var(--c-muted)]">
+              Category editing lives in Setup. Room Categories is a live reading board.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setCategoryError(null);
+                setShowAddCategory((value) => !value);
+              }}
+            >
+              + Add
+            </Button>
+          </div>
+
+          {showAddCategory ? (
+            <form
+              className="mb-4 grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleCreateCategory();
+              }}
+            >
+              <input
+                value={addCategoryName}
+                onChange={(event) => setAddCategoryName(event.target.value)}
+                placeholder="Category name"
+                className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+              />
+              <textarea
+                value={addCategoryDescription}
+                onChange={(event) => setAddCategoryDescription(event.target.value)}
+                placeholder="Short description"
+                rows={2}
+                className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+              />
+              {categoryError ? <p className="text-xs text-[var(--c-error)]">{categoryError}</p> : null}
+              <div className="flex gap-2">
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={savingCategory || addCategoryName.trim().length < 2}
+                >
+                  {savingCategory ? "Saving..." : "Create"}
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setShowAddCategory(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : null}
+
+          <div className="grid gap-3">
+            {activeCategories.map((category, index) => (
+              <div
+                key={category.id}
+                className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
+                style={{
+                  borderLeft: `4px solid var(--c-sig-${categoryColorToTone(category.color, index)})`,
+                }}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-display text-sm font-semibold text-[var(--c-ink)]">
+                      {category.name}
+                    </p>
+                    {category.description ? (
+                      <p className="mt-1 text-xs leading-5 text-[var(--c-muted)]">
+                        {category.description}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Badge tone="neutral">{category.assignmentCount}</Badge>
+                </div>
+
+                {editingCategoryId === category.id ? (
+                  <form
+                    className="mt-3 grid gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void handleRenameCategory(category.id);
+                    }}
+                  >
+                    <input
+                      value={editingCategoryName}
+                      onChange={(event) => setEditingCategoryName(event.target.value)}
+                      className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+                    />
+                    <textarea
+                      value={editingCategoryDescription}
+                      onChange={(event) => setEditingCategoryDescription(event.target.value)}
+                      rows={2}
+                      className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+                    />
+                    {categoryError ? (
+                      <p className="text-xs text-[var(--c-error)]">{categoryError}</p>
+                    ) : null}
+                    <div className="flex gap-2">
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={savingCategory || editingCategoryName.trim().length < 2}
+                      >
+                        Save
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setEditingCategoryId(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {followUpCategoryId === category.id ? (
+                  <form
+                    className="mt-3 grid gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void handleCreateCategoryFollowUp(category.id);
+                    }}
+                  >
+                    <textarea
+                      value={followUpPrompt}
+                      onChange={(event) => setFollowUpPrompt(event.target.value)}
+                      rows={3}
+                      placeholder="Follow-up question for this category"
+                      className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+                    />
+                    {followUpError ? (
+                      <p className="text-xs text-[var(--c-error)]">{followUpError}</p>
+                    ) : null}
+                    <div className="flex gap-2">
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={savingFollowUp || followUpPrompt.trim().length < 5}
+                      >
+                        {savingFollowUp ? "Sending..." : "Send"}
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setFollowUpCategoryId(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                ) : null}
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="ghost" onClick={() => startRenameCategory(category)}>
+                    Rename
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => startCategoryFollowUp(category)}
+                  >
+                    Follow-up
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handleGenerateCategorySummary(category.id)}
+                    disabled={generatingCategoryId === category.id}
+                  >
+                    {generatingCategoryId === category.id ? "Summarizing..." : "Summarize"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <div className="grid content-start gap-5">
+          <Card title="Join Access" eyebrow={session.joinCode}>
+            <div className="grid justify-items-start gap-3">
+              <div className="rounded-md bg-white p-3">
+                <QRCodeSVG value={joinUrl} size={140} />
+              </div>
+              <p className="break-all text-xs text-[var(--c-muted)]">{joinUrl}</p>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => (window.location.href = routes.instructorProjector(session.slug))}
+              >
+                Open projector
+              </Button>
+            </div>
+          </Card>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            icon={<FloppyDisk size={14} />}
+            onClick={handleSaveTemplate}
+            disabled={savingTemplate}
+          >
+            {templateSaved ? "Template saved!" : savingTemplate ? "Saving..." : "Save as Template"}
+          </Button>
+        </div>
+      </section>
+
+      <section className="grid gap-5 lg:grid-cols-2">
+        <Card title="Hidden Baseline Diagnostics">
+          <p className="text-xs leading-5 text-[var(--c-muted)]">
+            The baseline is the instructor-side reference answer used by private feedback and
+            personal reports. Learners never see the baseline text.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+            <MetricTile label="Status" value={questionBaseline?.status ?? "missing"} />
+            <MetricTile label="Provider" value={questionBaseline?.provider ?? "none"} />
+            <MetricTile label="Model" value={questionBaseline?.model ?? "none"} />
+            <MetricTile
+              label="Generated"
+              value={
+                questionBaseline?.generatedAt
+                  ? new Date(questionBaseline.generatedAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "not yet"
+              }
+            />
+          </div>
+          <Button
+            className="mt-3 w-full"
+            size="sm"
+            variant="secondary"
+            onClick={() => void handleGenerateBaseline(Boolean(questionBaseline))}
+            disabled={baselineBusy || !baselineCanGenerate}
+          >
+            {baselineBusy ? "Queued" : questionBaseline ? "Regenerate Baseline" : "Generate Baseline"}
+          </Button>
+        </Card>
+
+        <Card title="AI Readiness">
+          <p className="text-xs leading-5 text-[var(--c-muted)]">
+            Operational prerequisites that commonly block AI work: API key, enabled models, prompt
+            templates, budget stops, demo failure toggles, and recent LLM errors.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+            <MetricTile label="OpenAI key" value={openAiKeyState} />
+            <MetricTile label="Models" value={String(modelSettings?.length ?? 0)} />
+            <MetricTile label="Prompts" value={String(promptTemplates?.length ?? 0)} />
+            <MetricTile label="Budget" value={`${budgetUsagePercent}%`} />
+          </div>
+          <div className="mt-3 grid gap-2 text-xs">
+            <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-[var(--c-ink)]">Model coverage</span>
+                <Badge tone={missingModelFeatures.length === 0 ? "success" : "warning"}>
+                  {missingModelFeatures.length === 0 ? "ready" : "missing"}
+                </Badge>
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--c-muted)]">
+                {missingModelFeatures.length === 0
+                  ? "Enabled models cover all AI workflow features."
+                  : `Missing enabled model features: ${missingModelFeatures.map((item) => item.label).join(", ")}.`}
+              </p>
+            </div>
+
+            <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-[var(--c-ink)]">Prompt templates</span>
+                <Badge tone={missingPromptKeys.length === 0 ? "success" : "warning"}>
+                  {missingPromptKeys.length === 0 ? "ready" : "missing"}
+                </Badge>
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--c-muted)]">
+                {missingPromptKeys.length === 0
+                  ? "Required prompt templates are present."
+                  : `Missing prompts: ${missingPromptKeys
+                      .map((item) => item.promptKey)
+                      .filter(Boolean)
+                      .join(", ")}.`}
+              </p>
+            </div>
+
+            <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-[var(--c-ink)]">Budget and demo controls</span>
+                <Badge tone={budgetHardStopActive || activeDemoToggles.length > 0 ? "warning" : "success"}>
+                  {budgetHardStopActive || activeDemoToggles.length > 0 ? "attention" : "clear"}
+                </Badge>
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--c-muted)]">
+                {budgetHardStopActive
+                  ? "Budget hard stop is active for this session."
+                  : "No budget hard stop is currently blocking this session."}
+              </p>
+            </div>
+          </div>
+        </Card>
+      </section>
+    </div>
+  );
+
   return (
     <InstructorShell
       sessionTitle={session.title}
@@ -1984,7 +2315,9 @@ export function InstructorSessionPage() {
         ) : workspaceTab === "reports" ? (
           reportsWorkspace
         ) : (
-          <div className="grid gap-3 p-5 lg:p-7">
+          <>
+          {setupWorkspace}
+          <div className="hidden">
           <QuestionManagerPanel
             session={session}
             currentQuestion={overview.currentQuestion}
@@ -2710,6 +3043,7 @@ export function InstructorSessionPage() {
             </Card>
           )}
           </div>
+          </>
         )
       }
       right={
