@@ -159,6 +159,8 @@ export function FightHome({
         </div>
       ))}
 
+      <FightRulesBlock />
+
       {/* Start new fight CTAs */}
       <div className="rounded-md border border-[var(--c-tab-fight)] bg-[var(--c-surface-soft)] p-4 text-center">
         <Lightning size={28} weight="fill" className="mx-auto mb-1 text-[var(--c-tab-fight)]" />
@@ -183,8 +185,6 @@ export function FightHome({
           </Button>
         </div>
       </div>
-
-      <FightRulesBlock />
 
       {myFights.length > 0 && <PastFights fights={myFights} onNavigate={onNavigateToThread} />}
     </div>

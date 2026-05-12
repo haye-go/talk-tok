@@ -6,7 +6,6 @@ import {
   Sword,
   Timer,
 } from "@phosphor-icons/react";
-import { FeedbackCard } from "@/components/feedback/feedback-card";
 import { ParticipantStateSection } from "@/components/layout/participant-state-section";
 import { LoadingState } from "@/components/state/loading-state";
 import { Badge } from "@/components/ui/badge";
@@ -217,8 +216,8 @@ export function MyZoneTab({
       ) : null}
 
       {followUps.length > 0 ? (
-        <Card title="Follow-ups">
-          <div className="space-y-2">
+        <Card title="Reply archive" description="Thread replies are archived here; active thread work stays in Contribute.">
+          <div className="flex flex-col gap-2">
             {followUps.map((submission) => (
               <div
                 key={submission.id}
@@ -475,25 +474,34 @@ function ContributionRow({
       </button>
 
       {expanded ? (
-        <div className="space-y-3 border-t border-[var(--c-hairline)] p-3">
+        <div className="flex flex-col gap-3 border-t border-[var(--c-hairline)] p-3">
           <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--c-muted)]">
             <span>{submission.wordCount} words</span>
             <span>{submission.kind === "initial" ? "Original post" : "Additional point"}</span>
           </div>
 
           {feedback ? (
-            <FeedbackCard
-              status={feedback.status}
-              tone={feedback.tone}
-              reasoningBand={feedback.reasoningBand}
-              originalityBand={feedback.originalityBand}
-              specificityBand={feedback.specificityBand}
-              summary={feedback.summary}
-              strengths={feedback.strengths}
-              improvement={feedback.improvement}
-              nextQuestion={feedback.nextQuestion}
-              error={feedback.error}
-            />
+            <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-canvas)] p-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge tone={feedback.status === "success" ? "sky" : feedback.status === "error" ? "error" : "neutral"}>
+                  Feedback {feedback.status}
+                </Badge>
+                {feedback.reasoningBand ? (
+                  <Badge tone="neutral">
+                    {BAND_LABELS[feedback.reasoningBand] ?? feedback.reasoningBand}
+                  </Badge>
+                ) : null}
+              </div>
+              {feedback.summary ? (
+                <p className="mt-2 text-xs leading-relaxed text-[var(--c-body)]">
+                  {feedback.summary}
+                </p>
+              ) : feedback.error ? (
+                <p className="mt-2 text-xs leading-relaxed text-[var(--c-error)]">
+                  {feedback.error}
+                </p>
+              ) : null}
+            </div>
           ) : null}
 
           {recat ? (
