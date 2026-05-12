@@ -33,7 +33,7 @@ export function ParticipantStatusBanner({
   if (!message) return null;
 
   return (
-    <p className="hidden px-1 py-1 text-xs text-[var(--c-muted)] lg:block">
+    <p className="px-1 py-1 text-xs text-[var(--c-muted)]">
       {message}
     </p>
   );

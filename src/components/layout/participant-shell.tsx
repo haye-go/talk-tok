@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { BottomTabBar } from "@/components/layout/bottom-tab-bar";
 import { ParticipantContextRail } from "@/components/layout/participant-context-rail";
 import { ParticipantNavRail } from "@/components/layout/participant-nav-rail";
+import { ParticipantQuestionBar } from "@/components/layout/participant-question-bar";
 import { ParticipantStatusBanner } from "@/components/layout/participant-status-banner";
 import { ParticipantTopBar } from "@/components/layout/participant-top-bar";
 import { TABS, type TabId } from "@/lib/constants";
@@ -34,7 +35,6 @@ export interface ParticipantShellProps {
   releasedQuestions?: ReleasedQuestion[];
   selectedQuestionId?: string | null;
   onSelectQuestion?: (questionId: string | null) => void;
-  questionHeader?: ReactNode;
 
   contribute: ReactNode;
   explore: ReactNode;
@@ -55,7 +55,6 @@ export function ParticipantShell({
   releasedQuestions,
   selectedQuestionId,
   onSelectQuestion,
-  questionHeader,
   contribute,
   explore,
   fight,
@@ -81,7 +80,15 @@ export function ParticipantShell({
         sessionSlug={sessionSlug}
       />
 
-      <div className="lg:hidden">{questionHeader}</div>
+      <div className="lg:hidden">
+        <ParticipantQuestionBar
+          prompt={prompt}
+          promptLabel={promptLabel}
+          releasedQuestions={releasedQuestions}
+          selectedQuestionId={selectedQuestionId}
+          onSelectQuestion={onSelectQuestion}
+        />
+      </div>
 
       <div className="flex min-h-0 flex-1">
         <ParticipantNavRail

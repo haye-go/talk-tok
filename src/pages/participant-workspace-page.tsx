@@ -478,37 +478,6 @@ export function ParticipantWorkspacePage({
     </Card>
   ) : null;
 
-  const questionHeader =
-    releasedQuestions.length > 0 ? (
-      <div className="border-b border-[var(--c-hairline)] bg-[var(--c-surface-soft)] px-4 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {releasedQuestions.map((question) => {
-            const active = selectedQuestion?.id === question.id;
-
-            return (
-              <button
-                key={question.id}
-                type="button"
-                onClick={() => setSelectedQuestionOverrideId(question.isCurrent ? null : question.id)}
-                className={`rounded-pill border px-3 py-1 text-xs transition ${
-                  active
-                    ? "border-[var(--c-primary)] bg-[var(--c-primary)] text-[var(--c-on-primary)]"
-                    : "border-[var(--c-hairline)] bg-[var(--c-canvas)] text-[var(--c-ink)]"
-                }`}
-              >
-                {question.title}
-                {question.isCurrent ? " (current)" : ""}
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-2 text-[11px] text-[var(--c-muted)]">
-          The current question is highlighted. Released questions stay browseable without locking the
-          rest of the interface.
-        </p>
-      </div>
-    ) : null;
-
   const promptLabel = selectedQuestion?.isCurrent ? "Current question" : "Released question";
 
   return (
@@ -539,17 +508,10 @@ export function ParticipantWorkspacePage({
           questionId as typeof selectedQuestionOverrideId,
         )
       }
-      questionHeader={questionHeader}
       activeTab={activeTab}
       onActiveTabChange={handleTabChange}
       contribute={
         <div className="grid gap-4">
-          <Card tone="cream" eyebrow={promptLabel}>
-            <p className="text-sm font-medium leading-relaxed text-[var(--c-ink)]">
-              &ldquo;{selectedPrompt}&rdquo;
-            </p>
-          </Card>
-
           {submissionError ? <InlineAlert tone="error">{submissionError}</InlineAlert> : null}
           {feedbackQueueWarning ? (
             <InlineAlert tone="warning">
