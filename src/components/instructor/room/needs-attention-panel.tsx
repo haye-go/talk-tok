@@ -69,16 +69,16 @@ export function NeedsAttentionPanel({
   return (
     <details
       open
-      className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)]"
+      className="rounded-2xl border border-[#ead7b8] bg-gradient-to-b from-[#fffaf2] to-[#fffdf8]"
     >
-      <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3">
-        <span className="inline-flex items-center gap-2 font-display text-sm font-medium text-[var(--c-ink)]">
+      <summary className="flex cursor-pointer items-center justify-between gap-3 px-5 py-3">
+        <span className="inline-flex items-center gap-2 font-display text-sm font-semibold text-[var(--c-ink)]">
           <WarningCircle size={16} />
           Needs Attention
         </span>
         <Badge tone={totalCount > 0 ? "warning" : "success"}>{totalCount}</Badge>
       </summary>
-      <div className="grid gap-3 border-t border-[var(--c-hairline)] px-4 py-3 text-sm">
+      <div className="grid gap-3 border-t border-[#ead7b8] px-5 py-3 text-sm">
         {uncategorizedCount > 0 ? (
           <div className="flex items-center justify-between gap-3">
             <div>
