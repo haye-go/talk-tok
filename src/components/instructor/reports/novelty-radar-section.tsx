@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 
 interface NoveltyRadarItem {
   signalId: string;
@@ -26,17 +27,12 @@ export function NoveltyRadarSection({ radar }: NoveltyRadarSectionProps) {
   }
 
   return (
-    <section>
-      <header className="border-b border-[var(--c-hairline)] pb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-          Novelty Radar
-        </p>
-        <p className="mt-1 text-xs text-[var(--c-muted)]">
-          Highlights novel signals across categories relative to baseline.
-        </p>
-      </header>
+    <Card title="Novelty Radar">
+      <p className="-mt-1 mb-3 text-xs text-[var(--c-muted)]">
+        Highlights novel signals across categories relative to baseline.
+      </p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="text-[var(--c-muted)]">Distribution:</span>
         <span className="rounded-pill bg-[var(--c-surface-strong)] px-2 py-0.5 font-semibold text-[var(--c-ink)]">
           Low {radar.distribution.low}
@@ -70,6 +66,6 @@ export function NoveltyRadarSection({ radar }: NoveltyRadarSectionProps) {
           ))}
         </ul>
       </div>
-    </section>
+    </Card>
   );
 }

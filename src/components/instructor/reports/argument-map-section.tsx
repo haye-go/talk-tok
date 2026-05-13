@@ -8,6 +8,7 @@ import {
   type ArgumentMapGraphNode,
 } from "@/components/instructor/argument-map-graph";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export interface ArgumentMapSectionProps {
   sessionSlug: string;
@@ -43,22 +44,19 @@ export function ArgumentMapSection({
   }
 
   return (
-    <section>
-      <header className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[var(--c-hairline)] pb-2">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-            Argument Map
-          </p>
-          <p className="mt-1 text-xs text-[var(--c-muted)]">
-            Post-processed reasoning artifact across responses, categories, and synthesis. Distinct
-            from live Similarity clusters in Room.
-          </p>
-        </div>
+    <Card
+      title="Argument Map"
+      action={
         <Button size="sm" variant="secondary" onClick={() => void handleGenerate()} disabled={busy}>
           {busy ? "Queued" : graph ? "Regenerate" : "Generate Argument Map"}
         </Button>
-      </header>
-      <p className="mt-3 text-xs text-[var(--c-muted)]">
+      }
+    >
+      <p className="-mt-1 mb-2 text-xs text-[var(--c-muted)]">
+        Post-processed reasoning artifact across responses, categories, and synthesis. Distinct
+        from live Similarity clusters in Room.
+      </p>
+      <p className="text-xs text-[var(--c-muted)]">
         <strong className="text-[var(--c-ink)]">{linkCount}</strong> argument link
         {linkCount === 1 ? "" : "s"} ·{" "}
         <span className={ready ? "text-[var(--c-success)]" : "text-[var(--c-muted)]"}>
@@ -68,7 +66,7 @@ export function ArgumentMapSection({
       {errorMessage ? (
         <p className="mt-2 text-xs text-[var(--c-error)]">{errorMessage}</p>
       ) : null}
-      <div className="mt-4 overflow-hidden rounded-xl border border-[var(--c-hairline)] bg-[var(--c-surface-soft)]">
+      <div className="mt-3 overflow-hidden rounded-md border border-[var(--c-hairline)] bg-[var(--c-canvas)]">
         {graph ? (
           <ArgumentMapGraph
             nodes={graph.nodes}
@@ -87,6 +85,6 @@ export function ArgumentMapSection({
           </div>
         )}
       </div>
-    </section>
+    </Card>
   );
 }

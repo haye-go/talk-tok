@@ -1,3 +1,5 @@
+import { Card } from "@/components/ui/card";
+
 interface CategoryCountCell {
   categoryId: string;
   categoryName?: string;
@@ -39,18 +41,16 @@ export function CategoryDriftSection({ drift }: CategoryDriftSectionProps) {
   );
 
   return (
-    <section>
-      <header className="border-b border-[var(--c-hairline)] pb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-          Category Drift · {drift.slices.length} slice{drift.slices.length === 1 ? "" : "s"}
-        </p>
-        <p className="mt-1 text-xs text-[var(--c-muted)]">
-          Share of threads per category across the discussion. Bars total to 100%.
-        </p>
-      </header>
+    <Card
+      title="Category Drift"
+      eyebrow={`${drift.slices.length} slice${drift.slices.length === 1 ? "" : "s"}`}
+    >
+      <p className="-mt-1 mb-3 text-xs text-[var(--c-muted)]">
+        Share of threads per category across the discussion. Bars total to 100%.
+      </p>
 
       {grandTotal > 0 ? (
-        <div className="mt-4 grid gap-3">
+        <div className="grid gap-3">
           {Array.from(totalsByCategory.entries()).map(([id, entry]) => {
             const share = entry.total / grandTotal;
             const percent = Math.round(share * 100);
@@ -73,6 +73,6 @@ export function CategoryDriftSection({ drift }: CategoryDriftSectionProps) {
           })}
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }
