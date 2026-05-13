@@ -4,6 +4,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 interface CategoryItem {
   id: Id<"categories">;
@@ -73,15 +74,10 @@ export function FollowUpDraftEditor({
   }
 
   return (
-    <section>
-      <header className="border-b border-[var(--c-hairline)] pb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-          Follow-up Prompts · {followUps.length} total
-        </p>
-        <p className="mt-1 text-xs text-[var(--c-muted)]">
-          Draft per category. Launch them from Room or the right rail during live facilitation.
-        </p>
-      </header>
+    <Card title="Follow-up Prompts" eyebrow={`${followUps.length} total`}>
+      <p className="-mt-1 mb-3 text-xs text-[var(--c-muted)]">
+        Draft per category. Launch them from Room or the right rail during live facilitation.
+      </p>
 
       {followUps.length > 0 ? (
         <div className="mt-4">
@@ -179,6 +175,6 @@ export function FollowUpDraftEditor({
           ) : null}
         </ul>
       </div>
-    </section>
+    </Card>
   );
 }

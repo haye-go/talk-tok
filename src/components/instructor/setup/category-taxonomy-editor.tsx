@@ -3,6 +3,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { categoryColorToTone } from "@/lib/category-colors";
 
 interface CategoryItem {
@@ -82,16 +83,10 @@ export function CategoryTaxonomyEditor({
   }
 
   return (
-    <section>
-      <header className="flex items-baseline justify-between gap-3 border-b border-[var(--c-hairline)] pb-2">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-            Category Taxonomy · {categories.length} active
-          </p>
-          <p className="mt-1 text-xs text-[var(--c-muted)]">
-            Category editing lives in Setup. Room Categories is a live reading board.
-          </p>
-        </div>
+    <Card
+      title="Category Taxonomy"
+      eyebrow={`${categories.length} active`}
+      action={
         <Button
           type="button"
           size="sm"
@@ -103,7 +98,11 @@ export function CategoryTaxonomyEditor({
         >
           + Add
         </Button>
-      </header>
+      }
+    >
+      <p className="-mt-1 mb-3 text-xs text-[var(--c-muted)]">
+        Category editing lives in Setup. Room Categories is a live reading board.
+      </p>
 
       {showAddCategory ? (
         <form
@@ -239,6 +238,6 @@ export function CategoryTaxonomyEditor({
           </li>
         ) : null}
       </ul>
-    </section>
+    </Card>
   );
 }
