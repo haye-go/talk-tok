@@ -1,5 +1,3 @@
-import { Card } from "@/components/ui/card";
-import { MetricTile } from "@/components/ui/metric-tile";
 import {
   SessionControlsCard,
   type SessionControlSnapshot,
@@ -49,15 +47,42 @@ export function QuestionManagerPanel({
   onSettingsSave,
 }: QuestionManagerPanelProps) {
   return (
-    <div className="grid gap-3">
-      <Card title={currentQuestion?.title ?? "Current Question"} eyebrow={session.joinCode}>
-        <p className="text-sm leading-relaxed text-[var(--c-body)]">
+    <div className="grid gap-4">
+      <header>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
+          {session.joinCode}
+        </p>
+        <h2 className="mt-1 font-display text-lg font-semibold text-[var(--c-ink)]">
+          {currentQuestion?.title ?? "Current Question"}
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-[var(--c-body)]">
           {currentQuestion?.prompt ?? session.openingPrompt}
         </p>
-        <p className="mt-2 text-[10px] text-[var(--c-muted)]">
+        <p className="mt-2 text-[11px] text-[var(--c-muted)]">
           AI controls target this question unless a panel explicitly says otherwise.
         </p>
-      </Card>
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-[var(--c-hairline)] pt-3 text-xs">
+          <span>
+            <strong className="text-[var(--c-ink)]">{metrics.submitted}</strong>{" "}
+            <span className="text-[var(--c-muted)]">submitted</span>
+          </span>
+          <span aria-hidden className="text-[var(--c-muted)]">·</span>
+          <span>
+            <strong className="text-[var(--c-ink)]">{metrics.categories}</strong>{" "}
+            <span className="text-[var(--c-muted)]">categories</span>
+          </span>
+          <span aria-hidden className="text-[var(--c-muted)]">·</span>
+          <span>
+            <strong className="text-[var(--c-ink)]">{metrics.recategorisationRequests}</strong>{" "}
+            <span className="text-[var(--c-muted)]">recat pending</span>
+          </span>
+          <span aria-hidden className="text-[var(--c-muted)]">·</span>
+          <span>
+            <strong className="text-[var(--c-ink)]">{metrics.followUps}</strong>{" "}
+            <span className="text-[var(--c-muted)]">follow-ups</span>
+          </span>
+        </div>
+      </header>
 
       <SessionControlsCard
         key={getSessionControlsKey(session)}
@@ -65,13 +90,6 @@ export function QuestionManagerPanel({
         onVisibilityChange={onVisibilityChange}
         onSettingsSave={onSettingsSave}
       />
-
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <MetricTile label="Submitted" value={String(metrics.submitted)} />
-        <MetricTile label="Categories" value={String(metrics.categories)} />
-        <MetricTile label="Recat Req" value={String(metrics.recategorisationRequests)} />
-        <MetricTile label="Follow-ups" value={String(metrics.followUps)} />
-      </div>
     </div>
   );
 }
