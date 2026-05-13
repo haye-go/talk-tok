@@ -29,7 +29,7 @@ export function InstructorShell({
   const resolvedRail = rail ?? right;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--c-canvas)]">
+    <div className="flex min-h-dvh flex-col bg-[#eef3f8]">
       <InstructorTopBar
         sessionTitle={sessionTitle}
         sessionCode={sessionCode}
@@ -42,7 +42,7 @@ export function InstructorShell({
         <main className="min-h-0 overflow-y-auto bg-gradient-to-b from-[var(--c-surface-soft)] to-[var(--c-canvas)]">
           {resolvedMain}
         </main>
-        <aside className="min-h-0 overflow-y-auto border-t border-[var(--c-hairline)] bg-[var(--c-surface-soft)] lg:border-l lg:border-t-0">
+        <aside className="min-h-0 overflow-y-auto border-t border-[#d7e0ea] bg-[#f3f7fb] lg:border-l lg:border-t-0">
           {resolvedRail}
         </aside>
       </div>
