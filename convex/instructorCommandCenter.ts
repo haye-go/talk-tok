@@ -916,31 +916,42 @@ export const shell = query({
     }
 
     const now = Date.now();
-    const [questions, currentQuestion, participants, submissions, pendingRequests, auditEvents] =
-      await Promise.all([
-        listQuestionsForSession(ctx, session._id),
-        getCurrentQuestionForSession(ctx, session),
-        ctx.db
-          .query("participants")
-          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-          .take(PARTICIPANT_LIMIT),
-        ctx.db
-          .query("submissions")
-          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(SUBMISSION_LIMIT),
-        ctx.db
-          .query("recategorizationRequests")
-          .withIndex("by_session_and_status", (q) =>
-            q.eq("sessionId", session._id).eq("status", "pending"),
-          )
-          .take(50),
-        ctx.db
-          .query("auditEvents")
-          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-          .order("desc")
-          .take(AUDIT_LIMIT),
-      ]);
+    const [
+      questions,
+      currentQuestion,
+      participants,
+      submissions,
+      assignments,
+      pendingRequests,
+      auditEvents,
+    ] = await Promise.all([
+      listQuestionsForSession(ctx, session._id),
+      getCurrentQuestionForSession(ctx, session),
+      ctx.db
+        .query("participants")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(PARTICIPANT_LIMIT),
+      ctx.db
+        .query("submissions")
+        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(SUBMISSION_LIMIT),
+      ctx.db
+        .query("submissionCategories")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(SUBMISSION_LIMIT),
+      ctx.db
+        .query("recategorizationRequests")
+        .withIndex("by_session_and_status", (q) =>
+          q.eq("sessionId", session._id).eq("status", "pending"),
+        )
+        .take(50),
+      ctx.db
+        .query("auditEvents")
+        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(AUDIT_LIMIT),
+    ]);
 
     const selectedQuestion =
       args.questionId && questions.some((question) => question._id === args.questionId)
@@ -980,6 +991,15 @@ export const shell = query({
     const scopedSubmissions = selectedQuestionId
       ? submissions.filter((submission) => submission.questionId === selectedQuestionId)
       : submissions;
+    const scopedAssignments = selectedQuestionId
+      ? assignments.filter((assignment) => assignment.questionId === selectedQuestionId)
+      : assignments;
+    const assignedSubmissionIds = new Set(
+      scopedAssignments.map((assignment) => assignment.submissionId),
+    );
+    const uncategorizedCount = scopedSubmissions.filter(
+      (submission) => !assignedSubmissionIds.has(submission._id),
+    ).length;
     const scopedPendingRecat = selectedQuestionId
       ? pendingRequests.filter((request) => request.questionId === selectedQuestionId)
       : pendingRequests;
@@ -1001,6 +1021,7 @@ export const shell = query({
         submitted: scopedSubmissions.length,
         idle: presenceAggregate.idle,
         offline: presenceAggregate.offline,
+        uncategorized: uncategorizedCount,
         pendingRecategorisation: scopedPendingRecat.length,
         connected: presenceAggregate.typing + presenceAggregate.submitted + presenceAggregate.idle,
         total: participants.length,

@@ -15,6 +15,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { AiJobStatusPanel, type AiJobStatusItem } from "@/components/instructor/ai-job-status-panel";
+import { InstructorRightRail } from "@/components/instructor/instructor-right-rail";
 import { InstructorShell } from "@/components/layout/instructor-shell";
 import { QuestionManagerPanel } from "@/components/instructor/question-manager-panel";
 import {
@@ -245,8 +246,6 @@ export function InstructorSessionPage() {
   const [generatingReports, setGeneratingReports] = useState(false);
   const [reportGenerationError, setReportGenerationError] = useState<string | null>(null);
   const [triggeringCategorisation, setTriggeringCategorisation] = useState(false);
-  const [categorisationMessage, setCategorisationMessage] = useState<string | null>(null);
-  const [categorisationError, setCategorisationError] = useState<string | null>(null);
   const [generatingCategoryId, setGeneratingCategoryId] = useState<Id<"categories"> | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
@@ -312,14 +311,11 @@ export function InstructorSessionPage() {
 
   const {
     session,
-    questions,
-    questionSummaries,
     presence,
     responses,
     categories,
     recategorisation,
     recentSubmissions,
-    activity,
     followUps,
     synthesis,
     reports,
@@ -333,9 +329,6 @@ export function InstructorSessionPage() {
   const patternCounts = responses.inputPatterns as Record<InputPattern, number>;
   const activeCategories = categories;
   const categoryById = new Map(activeCategories.map((category) => [category.id, category]));
-  const selectedQuestionSummary = questionSummaries.find(
-    (summary) => summary.question.id === selectedQuestion?.id,
-  );
   const roomLatestThreads = instructorRoom?.latestThreads ?? [];
   const roomCategoryGroups =
     instructorRoom?.threadsByCategory.filter((group) => group.threads.length > 0) ?? [];
@@ -434,16 +427,9 @@ export function InstructorSessionPage() {
   }
 
   async function handleTriggerCategorisation() {
-    setCategorisationError(null);
-    setCategorisationMessage(null);
     setTriggeringCategorisation(true);
     try {
-      const job = await triggerCategorisation({ sessionSlug, questionId: activeQuestionId });
-      setCategorisationMessage(`Categorisation ${job?.status ?? "queued"}.`);
-    } catch (cause) {
-      setCategorisationError(
-        cause instanceof Error ? cause.message : "Could not start categorisation.",
-      );
+      await triggerCategorisation({ sessionSlug, questionId: activeQuestionId });
     } finally {
       setTriggeringCategorisation(false);
     }
@@ -620,7 +606,6 @@ export function InstructorSessionPage() {
     ? Boolean(sessionBudget.hardStopEnabled) &&
       sessionBudget.totalEstimatedCostUsd >= sessionBudget.perSessionEstimatedCostUsd
     : false;
-  const studentActivity = activity.filter((event) => event.actorType === "participant");
   const aiJobStatusItems: AiJobStatusItem[] = [
     {
       label: "Categorisation",
@@ -2097,201 +2082,11 @@ export function InstructorSessionPage() {
         )
       }
       right={
-        <div className="flex min-h-full flex-col gap-5 p-5 text-[var(--c-body)]">
-          <section className="border-b border-[#d7e0ea] pb-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
-              Persistent Live Rail
-            </p>
-            <h2 className="mt-2 font-display text-base font-semibold text-[var(--c-ink)]">
-              Quick actions from any tab
-            </h2>
-            <p className="mt-2 text-xs leading-5 text-[var(--c-muted)]">
-              Live controls stay reachable without forcing a workspace switch. Deep setup and
-              review surfaces live in the center tabs.
-            </p>
-          </section>
-
-          <section className="rounded-2xl border border-[#dbe5ef] bg-white/75 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">
-              Selected Question
-            </p>
-            <p className="mt-2 font-display text-sm font-semibold leading-5 text-[var(--c-ink)]">
-              {selectedQuestion?.title ?? "No question selected"}
-            </p>
-            <p className="mt-2 text-xs leading-5 text-[var(--c-muted)]">
-              {selectedQuestionSummary?.counts.submissions ?? 0} submissions /{" "}
-              {selectedQuestionSummary?.counts.uncategorized ?? responses.uncategorized}{" "}
-              uncategorized
-            </p>
-          </section>
-
-          <section className="border-b border-[#d7e0ea] pb-5">
-            <p className="mb-2 text-xs font-semibold text-[var(--c-ink)]">Question switcher</p>
-            <div className="grid gap-2">
-              {questions.map((question) => (
-                <a
-                  key={question.id}
-                  href={questionHref(question.id)}
-                  className={cn(
-                    "rounded-xl border px-3 py-2 text-xs transition",
-                    selectedQuestion?.id === question.id
-                      ? "border-[#17212b] bg-white text-[var(--c-ink)]"
-                      : "border-[#d7e0ea] text-[var(--c-muted)] hover:bg-white hover:text-[var(--c-ink)]",
-                  )}
-                >
-                  <span className="block truncate font-medium">{question.title}</span>
-                  <span className="mt-0.5 block text-[10px]">{question.status}</span>
-                </a>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-[#dbe5ef] bg-white/75 p-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">
-              Release + Interaction
-            </p>
-            <div className="grid gap-2.5">
-              {[
-                ["Contributions", session.phase === "submit" ? "Open" : "Not submit"],
-                [
-                  "Peer responses",
-                  session.visibilityMode === "raw_responses_visible" ? "Visible" : "Hidden",
-                ],
-                [
-                  "Category board",
-                  session.visibilityMode === "private_until_released" ? "Hidden" : "Visible",
-                ],
-                ["Synthesis", synthesisReleasedForQuestion ? "Visible" : "Hidden"],
-                ["Reports", reportsReleasedForQuestion ? "Visible" : "Hidden"],
-                ["Replies", "On"],
-                ["Upvotes", "On"],
-                ["Fight", session.fightMeEnabled ? "On" : "Off"],
-                ["Reports gate", session.summaryGateEnabled ? "On" : "Off"],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="flex items-center justify-between gap-3 border-b border-[#e5edf4] pb-2 last:border-b-0 last:pb-0"
-                >
-                  <span className="text-sm text-[var(--c-ink)]">{label}</span>
-                  <span
-                    className={cn(
-                      "rounded-full px-2.5 py-1 text-[10px] font-bold",
-                      ["Open", "Visible", "On"].includes(value)
-                        ? "bg-[#dff6f0] text-[#0f766e]"
-                        : "bg-[#edf2f7] text-[var(--c-muted)]",
-                    )}
-                  >
-                    {value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-[#dbe5ef] bg-white/75 p-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">
-              Live Counters
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ["Typing now", presence.typing],
-                ["Submitted", presence.submitted],
-                ["Idle", presence.idle],
-                ["Uncategorized", selectedQuestionSummary?.counts.uncategorized ?? responses.uncategorized],
-                ["Pending recat", recategorisation.pendingCount],
-              ].map(([label, value]) => (
-                <div key={label} className="border-t border-[#d7e0ea] py-2">
-                  <strong className="block font-display text-xl text-[var(--c-ink)]">{value}</strong>
-                  <span className="text-[10px] text-[var(--c-muted)]">{label}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-[#eadfcb] bg-[#fffaf2]/75 p-4">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">
-              Quick Live Actions
-            </p>
-            <div className="grid gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => void handleVisibilityChange("category_summary_only")}
-                disabled={session.visibilityMode === "category_summary_only"}
-              >
-                Release summaries
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => void handleVisibilityChange("raw_responses_visible")}
-                disabled={session.visibilityMode === "raw_responses_visible"}
-              >
-                Release responses
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => void handleVisibilityChange("private_until_released")}
-                disabled={session.visibilityMode === "private_until_released"}
-              >
-                Hide room
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => void handleTriggerCategorisation()}
-                disabled={categorisationBusy}
-              >
-                {categorisationBusy ? "Categorising..." : "Run categorisation"}
-              </Button>
-              {categorisationMessage ? (
-                <p className="text-xs text-[var(--c-success)]">{categorisationMessage}</p>
-              ) : null}
-              {categorisationError ? (
-                <p className="text-xs text-[var(--c-error)]">{categorisationError}</p>
-              ) : null}
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => handleGenerateClassSynthesis()}
-                disabled={generatingClass}
-              >
-                {generatingClass ? "Generating..." : "Generate synthesis"}
-              </Button>
-            </div>
-          </section>
-
-          <section className="grid gap-2">
-            <p className="text-xs font-semibold text-[var(--c-muted)]">Live Activity</p>
-            {studentActivity.length === 0 ? (
-              <p className="text-sm text-[var(--c-muted)]">No student activity yet.</p>
-            ) : (
-              studentActivity.slice(0, 8).map((event) => (
-                <div
-                  key={event.id}
-                  className="border-b border-[#d7e0ea] pb-2 text-xs text-[var(--c-body)]"
-                >
-                  <strong>{event.actorType}</strong> {event.action.replace(/_/g, " ")}
-                  {event.targetType ? (
-                    <span className="text-[var(--c-muted)]"> on {event.targetType}</span>
-                  ) : null}
-                  <span className="ml-1.5 text-[10px] text-[var(--c-muted)]">
-                    {new Date(event.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </div>
-              ))
-            )}
-          </section>
-        </div>
+        <InstructorRightRail
+          sessionSlug={session.slug}
+          selectedQuestionId={selectedQuestion?.id}
+          questionHref={questionHref}
+        />
       }
     />
   );
