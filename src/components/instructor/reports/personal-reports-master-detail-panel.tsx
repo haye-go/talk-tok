@@ -127,10 +127,43 @@ export function PersonalReportsMasterDetailPanel({
         Reports can be generated before they are released. Select a learner to preview their
         report.
       </p>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <Badge tone={reportsReleasedForQuestion ? "success" : "warning"}>
           {reportsReleasedForQuestion ? "Reports released" : "Reports hidden in Me"}
         </Badge>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+          <span>
+            <strong className="text-[var(--c-ink)]">{counts.total}</strong>{" "}
+            <span className="text-[var(--c-muted)]">total</span>
+          </span>
+          <span aria-hidden className="text-[var(--c-muted)]">·</span>
+          <span>
+            <strong className="text-[var(--c-ink)]">{counts.success}</strong>{" "}
+            <span className="text-[var(--c-muted)]">success</span>
+          </span>
+          <span aria-hidden className="text-[var(--c-muted)]">·</span>
+          <span>
+            <strong
+              className={
+                counts.queued + counts.processing > 0
+                  ? "text-[var(--c-warning)]"
+                  : "text-[var(--c-ink)]"
+              }
+            >
+              {counts.queued + counts.processing}
+            </strong>{" "}
+            <span className="text-[var(--c-muted)]">processing</span>
+          </span>
+          <span aria-hidden className="text-[var(--c-muted)]">·</span>
+          <span>
+            <strong
+              className={counts.error > 0 ? "text-[var(--c-error)]" : "text-[var(--c-ink)]"}
+            >
+              {counts.error}
+            </strong>{" "}
+            <span className="text-[var(--c-muted)]">error</span>
+          </span>
+        </div>
         <Button
           size="sm"
           variant="coral"
@@ -142,13 +175,6 @@ export function PersonalReportsMasterDetailPanel({
         </Button>
       </div>
       {error ? <p className="mb-3 text-xs text-[var(--c-error)]">{error}</p> : null}
-
-      <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-        <MetricTile label="Total" value={String(counts.total)} />
-        <MetricTile label="Success" value={String(counts.success)} />
-        <MetricTile label="Processing" value={String(counts.queued + counts.processing)} />
-        <MetricTile label="Error" value={String(counts.error)} />
-      </div>
 
       <div className="grid grid-cols-1 overflow-hidden rounded-lg border border-[var(--c-hairline)] md:grid-cols-[200px_minmax(0,1fr)] md:min-h-[300px]">
         {/* Master list */}
