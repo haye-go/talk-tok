@@ -2,9 +2,7 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { categoryColorToTone } from "@/lib/category-colors";
 
 interface CategoryItem {
@@ -84,11 +82,16 @@ export function CategoryTaxonomyEditor({
   }
 
   return (
-    <Card title="Category Taxonomy" eyebrow={`${categories.length} active`}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-xs leading-5 text-[var(--c-muted)]">
-          Category editing lives in Setup. Room Categories is a live reading board.
-        </p>
+    <section>
+      <header className="flex items-baseline justify-between gap-3 border-b border-[var(--c-hairline)] pb-2">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
+            Category Taxonomy · {categories.length} active
+          </p>
+          <p className="mt-1 text-xs text-[var(--c-muted)]">
+            Category editing lives in Setup. Room Categories is a live reading board.
+          </p>
+        </div>
         <Button
           type="button"
           size="sm"
@@ -100,11 +103,11 @@ export function CategoryTaxonomyEditor({
         >
           + Add
         </Button>
-      </div>
+      </header>
 
       {showAddCategory ? (
         <form
-          className="mb-4 grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
+          className="mt-3 grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
           onSubmit={(event) => {
             event.preventDefault();
             void handleCreateCategory();
@@ -146,73 +149,78 @@ export function CategoryTaxonomyEditor({
         </form>
       ) : null}
 
-      <div className="grid gap-3">
+      <ul className="mt-3 grid gap-0">
         {categories.map((category, index) => (
-          <div
+          <li
             key={category.id}
-            className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
-            style={{
-              borderLeft: `4px solid var(--c-sig-${categoryColorToTone(category.color, index)})`,
-            }}
+            className="flex items-start gap-3 border-b border-[var(--c-hairline)] py-3 last:border-b-0"
           >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-display text-sm font-semibold text-[var(--c-ink)]">
-                  {category.name}
-                </p>
-                {category.description ? (
-                  <p className="mt-1 text-xs leading-5 text-[var(--c-muted)]">
-                    {category.description}
+            <span
+              aria-hidden
+              className="mt-1 h-4 w-[3px] shrink-0 rounded-pill"
+              style={{
+                background: `var(--c-sig-${categoryColorToTone(category.color, index)})`,
+              }}
+            />
+            <div className="min-w-0 flex-1">
+              {editingCategoryId === category.id ? (
+                <form
+                  className="grid gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleRenameCategory(category.id);
+                  }}
+                >
+                  <input
+                    value={editingCategoryName}
+                    onChange={(event) => setEditingCategoryName(event.target.value)}
+                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+                  />
+                  <textarea
+                    value={editingCategoryDescription}
+                    onChange={(event) => setEditingCategoryDescription(event.target.value)}
+                    rows={2}
+                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+                  />
+                  {categoryError ? (
+                    <p className="text-xs text-[var(--c-error)]">{categoryError}</p>
+                  ) : null}
+                  <div className="flex gap-2">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={savingCategory || editingCategoryName.trim().length < 2}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditingCategoryId(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <p className="font-display text-sm font-medium text-[var(--c-ink)]">
+                    {category.name}
                   </p>
-                ) : null}
-              </div>
-              {category.assignmentCount !== undefined ? (
-                <Badge tone="neutral">{category.assignmentCount}</Badge>
-              ) : null}
+                  {category.description ? (
+                    <p className="mt-0.5 text-xs leading-5 text-[var(--c-muted)]">
+                      {category.description}
+                    </p>
+                  ) : null}
+                </>
+              )}
             </div>
-
-            {editingCategoryId === category.id ? (
-              <form
-                className="mt-3 grid gap-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void handleRenameCategory(category.id);
-                }}
-              >
-                <input
-                  value={editingCategoryName}
-                  onChange={(event) => setEditingCategoryName(event.target.value)}
-                  className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
-                />
-                <textarea
-                  value={editingCategoryDescription}
-                  onChange={(event) => setEditingCategoryDescription(event.target.value)}
-                  rows={2}
-                  className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
-                />
-                {categoryError ? (
-                  <p className="text-xs text-[var(--c-error)]">{categoryError}</p>
+            {editingCategoryId === category.id ? null : (
+              <div className="flex shrink-0 items-center gap-3 text-xs text-[var(--c-muted)]">
+                {category.assignmentCount !== undefined ? (
+                  <span>{category.assignmentCount} assigned</span>
                 ) : null}
-                <div className="flex gap-2">
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={savingCategory || editingCategoryName.trim().length < 2}
-                  >
-                    Save
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditingCategoryId(null)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <div className="mt-3 flex flex-wrap gap-2">
                 <Button
                   type="button"
                   size="sm"
@@ -223,14 +231,14 @@ export function CategoryTaxonomyEditor({
                 </Button>
               </div>
             )}
-          </div>
+          </li>
         ))}
         {categories.length === 0 ? (
-          <p className="rounded-sm bg-[var(--c-surface-strong)] px-3 py-2 text-xs text-[var(--c-muted)]">
+          <li className="py-3 text-xs text-[var(--c-muted)]">
             No categories yet. Use + Add to create one.
-          </p>
+          </li>
         ) : null}
-      </div>
-    </Card>
+      </ul>
+    </section>
   );
 }
