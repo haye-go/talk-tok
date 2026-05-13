@@ -895,3 +895,421 @@ export const overview = query({
     };
   },
 });
+
+/**
+ * Shell query — data shared by every tab and the persistent right rail.
+ *
+ * Smaller than `overview` on purpose. Returns only what the shell, top bar,
+ * left rail navigation, and right rail components need to render. Workspace
+ * tabs use their own focused queries (`setup`, `reports`) and `room`.
+ */
+export const shell = query({
+  args: {
+    sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      return null;
+    }
+
+    const now = Date.now();
+    const [questions, currentQuestion, participants, submissions, pendingRequests, auditEvents] =
+      await Promise.all([
+        listQuestionsForSession(ctx, session._id),
+        getCurrentQuestionForSession(ctx, session),
+        ctx.db
+          .query("participants")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .take(PARTICIPANT_LIMIT),
+        ctx.db
+          .query("submissions")
+          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+          .order("desc")
+          .take(SUBMISSION_LIMIT),
+        ctx.db
+          .query("recategorizationRequests")
+          .withIndex("by_session_and_status", (q) =>
+            q.eq("sessionId", session._id).eq("status", "pending"),
+          )
+          .take(50),
+        ctx.db
+          .query("auditEvents")
+          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+          .order("desc")
+          .take(AUDIT_LIMIT),
+      ]);
+
+    const selectedQuestion =
+      args.questionId && questions.some((question) => question._id === args.questionId)
+        ? (questions.find((question) => question._id === args.questionId) ?? null)
+        : currentQuestion;
+
+    const presenceAggregate: Record<PresenceState, number> = {
+      typing: 0,
+      submitted: 0,
+      idle: 0,
+      offline: 0,
+    };
+
+    const presenceSamples: Array<{
+      participantId: Id<"participants">;
+      participantSlug: string;
+      nickname: string;
+      state: PresenceState;
+    }> = [];
+
+    for (const participant of participants) {
+      const derivedState =
+        now - participant.lastSeenAt > OFFLINE_AFTER_MS ? "offline" : participant.presenceState;
+      presenceAggregate[derivedState] += 1;
+
+      if (derivedState !== "offline" && presenceSamples.length < 24) {
+        presenceSamples.push({
+          participantId: participant._id,
+          participantSlug: participant.participantSlug,
+          nickname: participant.nickname,
+          state: derivedState,
+        });
+      }
+    }
+
+    const selectedQuestionId = selectedQuestion?._id;
+    const scopedSubmissions = selectedQuestionId
+      ? submissions.filter((submission) => submission.questionId === selectedQuestionId)
+      : submissions;
+    const scopedPendingRecat = selectedQuestionId
+      ? pendingRequests.filter((request) => request.questionId === selectedQuestionId)
+      : pendingRequests;
+
+    return {
+      session: toSessionSnapshot(session, participants.length),
+      questions: questions.map(toPublicQuestion),
+      currentQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
+      selectedQuestion: selectedQuestion ? toPublicQuestion(selectedQuestion) : null,
+      visibility: {
+        visibilityMode: session.visibilityMode,
+        anonymityMode: session.anonymityMode,
+        fightMeEnabled: session.fightMeEnabled,
+        summaryGateEnabled: session.summaryGateEnabled,
+        telemetryEnabled: session.telemetryEnabled,
+      },
+      counters: {
+        typing: presenceAggregate.typing,
+        submitted: scopedSubmissions.length,
+        idle: presenceAggregate.idle,
+        offline: presenceAggregate.offline,
+        pendingRecategorisation: scopedPendingRecat.length,
+        connected: presenceAggregate.typing + presenceAggregate.submitted + presenceAggregate.idle,
+        total: participants.length,
+      },
+      presence: {
+        aggregate: presenceAggregate,
+        samples: presenceSamples,
+      },
+      activity: auditEvents.map(toAuditEvent),
+    };
+  },
+});
+
+/**
+ * Setup query — preparation and configuration data.
+ *
+ * Returns the data needed by the Setup workspace: question list, selected
+ * question full config, categories, follow-up drafts, baseline status, and
+ * AI readiness summary. The live thread stream is not included here — that
+ * belongs to `room`.
+ */
+export const setup = query({
+  args: {
+    sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      return null;
+    }
+
+    const [questions, currentQuestion, categories, followUpPrompts, jobs] = await Promise.all([
+      listQuestionsForSession(ctx, session._id),
+      getCurrentQuestionForSession(ctx, session),
+      ctx.db
+        .query("categories")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(CATEGORY_LIMIT),
+      ctx.db
+        .query("followUpPrompts")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(FOLLOW_UP_LIMIT),
+      ctx.db
+        .query("aiJobs")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(JOB_LIMIT),
+    ]);
+
+    const selectedQuestion =
+      args.questionId && questions.some((question) => question._id === args.questionId)
+        ? (questions.find((question) => question._id === args.questionId) ?? null)
+        : currentQuestion;
+    const selectedQuestionId = selectedQuestion?._id;
+
+    const baselineJobs = jobs.filter((job) => job.type === "question_baseline");
+    const scopedBaselineJobs = selectedQuestionId
+      ? baselineJobs.filter((job) => job.questionId === selectedQuestionId)
+      : baselineJobs;
+
+    return {
+      session: toSessionSnapshot(session, 0),
+      questions: questions.map(toPublicQuestion),
+      currentQuestion: currentQuestion ? toPublicQuestion(currentQuestion) : null,
+      selectedQuestion: selectedQuestion ? toPublicQuestion(selectedQuestion) : null,
+      categories: categories
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((category) => ({
+          id: category._id,
+          questionId: category.questionId,
+          slug: category.slug,
+          name: category.name,
+          description: category.description,
+          color: category.color,
+          parentCategoryId: category.parentCategoryId,
+          smartTagId: category.smartTagId,
+          source: category.source,
+          status: category.status,
+          createdAt: category.createdAt,
+          updatedAt: category.updatedAt,
+        })),
+      followUpPrompts: followUpPrompts.map((prompt) => ({
+        id: prompt._id,
+        questionId: prompt.questionId,
+        slug: prompt.slug,
+        title: prompt.title,
+        prompt: prompt.prompt,
+        targetMode: prompt.targetMode,
+        status: prompt.status,
+        roundNumber: prompt.roundNumber,
+        activatedAt: prompt.activatedAt,
+        closedAt: prompt.closedAt,
+        createdAt: prompt.createdAt,
+        updatedAt: prompt.updatedAt,
+      })),
+      baseline: {
+        latestJob: scopedBaselineJobs[0] ? toJob(scopedBaselineJobs[0]) : null,
+        successCount: scopedBaselineJobs.filter((job) => job.status === "success").length,
+        errorCount: scopedBaselineJobs.filter((job) => job.status === "error").length,
+      },
+      jobsRecent: jobs.slice(0, 12).map(toJob),
+    };
+  },
+});
+
+/**
+ * Reports query — review and generated artifact data.
+ *
+ * Returns synthesis artifacts, personal reports, semantic counts, and AI job
+ * history. Argument map graph data, novelty radar, and category drift remain
+ * served by their dedicated query modules (`api.argumentMap.*`, `api.semantic.*`).
+ */
+export const reports = query({
+  args: {
+    sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      return null;
+    }
+
+    const [
+      questions,
+      currentQuestion,
+      participants,
+      submissions,
+      synthesisArtifacts,
+      personalReports,
+      semanticEmbeddings,
+      semanticSignals,
+      argumentLinks,
+      jobs,
+      fightThreads,
+    ] = await Promise.all([
+      listQuestionsForSession(ctx, session._id),
+      getCurrentQuestionForSession(ctx, session),
+      ctx.db
+        .query("participants")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(PARTICIPANT_LIMIT),
+      ctx.db
+        .query("submissions")
+        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(SUBMISSION_LIMIT),
+      ctx.db
+        .query("synthesisArtifacts")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(SYNTHESIS_ARTIFACT_LIMIT),
+      ctx.db
+        .query("personalReports")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(PERSONAL_REPORT_LIMIT),
+      ctx.db
+        .query("semanticEmbeddings")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(SEMANTIC_ROW_LIMIT),
+      ctx.db
+        .query("semanticSignals")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(SEMANTIC_ROW_LIMIT),
+      ctx.db
+        .query("argumentLinks")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .take(SEMANTIC_ROW_LIMIT),
+      ctx.db
+        .query("aiJobs")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(JOB_LIMIT),
+      ctx.db
+        .query("fightThreads")
+        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(FIGHT_THREAD_LIMIT),
+    ]);
+
+    const selectedQuestion =
+      args.questionId && questions.some((question) => question._id === args.questionId)
+        ? (questions.find((question) => question._id === args.questionId) ?? null)
+        : currentQuestion;
+    const selectedQuestionId = selectedQuestion?._id;
+
+    const participantsById = new Map(
+      participants.map((participant) => [participant._id, participant]),
+    );
+
+    const scopedSynthesisArtifacts = selectedQuestionId
+      ? synthesisArtifacts.filter((artifact) => artifact.questionId === selectedQuestionId)
+      : synthesisArtifacts;
+    const synthesisCounts = emptyArtifactStatusCounts();
+    for (const artifact of scopedSynthesisArtifacts) {
+      synthesisCounts[artifact.status] += 1;
+    }
+
+    const reportCounts: Record<JobStatus, number> = emptyStatusCounts();
+    for (const report of personalReports) {
+      reportCounts[report.status] += 1;
+    }
+
+    const submissionCountsByParticipant = new Map<Id<"participants">, number>();
+    const followUpCountsByParticipant = new Map<Id<"participants">, number>();
+
+    for (const submission of submissions) {
+      submissionCountsByParticipant.set(
+        submission.participantId,
+        (submissionCountsByParticipant.get(submission.participantId) ?? 0) + 1,
+      );
+
+      if (submission.kind !== "initial") {
+        followUpCountsByParticipant.set(
+          submission.participantId,
+          (followUpCountsByParticipant.get(submission.participantId) ?? 0) + 1,
+        );
+      }
+    }
+
+    const fightCountsByParticipant = new Map<Id<"participants">, number>();
+    for (const thread of fightThreads) {
+      fightCountsByParticipant.set(
+        thread.attackerParticipantId,
+        (fightCountsByParticipant.get(thread.attackerParticipantId) ?? 0) + 1,
+      );
+
+      if (thread.defenderParticipantId) {
+        fightCountsByParticipant.set(
+          thread.defenderParticipantId,
+          (fightCountsByParticipant.get(thread.defenderParticipantId) ?? 0) + 1,
+        );
+      }
+    }
+
+    return {
+      session: toSessionSnapshot(session, participants.length),
+      selectedQuestion: selectedQuestion ? toPublicQuestion(selectedQuestion) : null,
+      synthesis: {
+        counts: synthesisCounts,
+        artifacts: scopedSynthesisArtifacts.map((artifact) => ({
+          id: artifact._id,
+          questionId: artifact.questionId,
+          categoryId: artifact.categoryId,
+          kind: artifact.kind,
+          status: artifact.status,
+          title: artifact.title,
+          summary: artifact.summary,
+          keyPoints: artifact.keyPoints,
+          uniqueInsights: artifact.uniqueInsights,
+          opposingViews: artifact.opposingViews,
+          sourceCounts: artifact.sourceCounts,
+          error: artifact.error,
+          generatedAt: artifact.generatedAt,
+          publishedAt: artifact.publishedAt,
+          finalizedAt: artifact.finalizedAt,
+          createdAt: artifact.createdAt,
+          updatedAt: artifact.updatedAt,
+        })),
+      },
+      personalReports: {
+        counts: {
+          ...reportCounts,
+          total: personalReports.length,
+          capped: personalReports.length === PERSONAL_REPORT_LIMIT,
+        },
+        items: personalReports.map((report) => ({
+          id: report._id,
+          participantId: report.participantId,
+          nickname: participantsById.get(report.participantId)?.nickname ?? "Unknown",
+          participantSlug:
+            participantsById.get(report.participantId)?.participantSlug ?? "unknown",
+          status: report.status,
+          participationBand: report.participationBand,
+          reasoningBand: report.reasoningBand,
+          originalityBand: report.originalityBand,
+          responsivenessBand: report.responsivenessBand,
+          summary: report.summary,
+          contributionTrace: report.contributionTrace,
+          argumentEvolution: report.argumentEvolution,
+          growthOpportunity: report.growthOpportunity,
+          submissionCount: submissionCountsByParticipant.get(report.participantId) ?? 0,
+          followUpCount: followUpCountsByParticipant.get(report.participantId) ?? 0,
+          fightCount: fightCountsByParticipant.get(report.participantId) ?? 0,
+          hasReportableActivity:
+            (submissionCountsByParticipant.get(report.participantId) ?? 0) > 0 ||
+            (fightCountsByParticipant.get(report.participantId) ?? 0) > 0,
+          error: report.error,
+          generatedAt: report.generatedAt,
+          updatedAt: report.updatedAt,
+        })),
+      },
+      semantic: {
+        embeddingsCount: semanticEmbeddings.length,
+        signalsCount: semanticSignals.length,
+        argumentLinkCount: argumentLinks.length,
+        embeddingsCapped: semanticEmbeddings.length === SEMANTIC_ROW_LIMIT,
+        signalsCapped: semanticSignals.length === SEMANTIC_ROW_LIMIT,
+        argumentLinksCapped: argumentLinks.length === SEMANTIC_ROW_LIMIT,
+      },
+      jobs: {
+        recent: jobs.slice(0, 12).map(toJob),
+        all: jobs.map(toJob),
+      },
+    };
+  },
+});
