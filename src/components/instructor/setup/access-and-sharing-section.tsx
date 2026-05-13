@@ -5,7 +5,6 @@ import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { routes } from "@/lib/routes";
 
 export interface AccessAndSharingSectionProps {
   sessionSlug: string;
@@ -58,14 +57,6 @@ export function AccessAndSharingSection({
         <div className="grid gap-1.5">
           <Button type="button" size="sm" variant="ghost" onClick={() => void handleCopyUrl()}>
             {urlCopied ? "URL copied!" : "Copy URL"}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => (window.location.href = routes.instructorProjector(sessionSlug))}
-          >
-            Open projector
           </Button>
           <Button
             type="button"

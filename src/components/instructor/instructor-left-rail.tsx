@@ -1,8 +1,10 @@
-import type { InstructorRoomModeId, InstructorWorkspaceTabId } from "@/lib/routes";
+import { Presentation } from "@phosphor-icons/react";
+import { routes, type InstructorRoomModeId, type InstructorWorkspaceTabId } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { INSTRUCTOR_WORKSPACE_TABS, ROOM_MODES } from "./instructor-nav";
 
 export interface InstructorLeftRailProps {
+  sessionSlug: string;
   sessionTitle: string;
   workspaceTab: InstructorWorkspaceTabId;
   roomMode: InstructorRoomModeId;
@@ -11,6 +13,7 @@ export interface InstructorLeftRailProps {
 }
 
 export function InstructorLeftRail({
+  sessionSlug,
   sessionTitle,
   workspaceTab,
   roomMode,
@@ -84,10 +87,19 @@ export function InstructorLeftRail({
         </section>
       ) : null}
 
-      <p className="mt-auto border-t border-white/10 pt-5 text-xs leading-5 text-[#8ea4bb]">
-        Room is for live reading and intervention. Setup holds drafting and configuration. Reports
-        holds synthesis, argument map, personal reports, and AI review surfaces.
-      </p>
+      <div className="mt-auto grid gap-3 border-t border-white/10 pt-5">
+        <p className="text-xs leading-5 text-[#8ea4bb]">
+          Room is for live reading and intervention. Setup holds drafting and configuration.
+          Reports holds synthesis, argument map, personal reports, and AI review surfaces.
+        </p>
+        <a
+          href={routes.instructorProjector(sessionSlug)}
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-[#d9e7f3] transition hover:bg-white/10 hover:text-white"
+        >
+          <Presentation size={15} />
+          Open projector
+        </a>
+      </div>
     </div>
   );
 }

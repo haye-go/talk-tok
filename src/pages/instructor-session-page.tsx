@@ -118,6 +118,7 @@ export function InstructorSessionPage() {
       participantCount={session.participantCount}
       left={
         <InstructorLeftRail
+          sessionSlug={sessionSlug}
           sessionTitle={session.title}
           workspaceTab={workspaceTab}
           roomMode={roomMode}
