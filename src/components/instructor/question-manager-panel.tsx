@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import {
   SessionControlsCard,
   type SessionControlSnapshot,
@@ -48,14 +49,11 @@ export function QuestionManagerPanel({
 }: QuestionManagerPanelProps) {
   return (
     <div className="grid gap-4">
-      <header>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-          {session.joinCode}
-        </p>
-        <h2 className="mt-1 font-display text-lg font-semibold text-[var(--c-ink)]">
-          {currentQuestion?.title ?? "Current Question"}
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-[var(--c-body)]">
+      <Card
+        title={currentQuestion?.title ?? "Current Question"}
+        eyebrow={session.joinCode}
+      >
+        <p className="text-sm leading-6 text-[var(--c-body)]">
           {currentQuestion?.prompt ?? session.openingPrompt}
         </p>
         <p className="mt-2 text-[11px] text-[var(--c-muted)]">
@@ -82,7 +80,7 @@ export function QuestionManagerPanel({
             <span className="text-[var(--c-muted)]">follow-ups</span>
           </span>
         </div>
-      </header>
+      </Card>
 
       <SessionControlsCard
         key={getSessionControlsKey(session)}
