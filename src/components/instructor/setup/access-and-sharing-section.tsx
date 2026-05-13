@@ -4,6 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { routes } from "@/lib/routes";
 
 export interface AccessAndSharingSectionProps {
@@ -44,43 +45,40 @@ export function AccessAndSharingSection({
   }
 
   return (
-    <div className="grid content-start gap-4">
-      <header className="border-b border-[var(--c-hairline)] pb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-          Join Access
+    <Card title="Join Access" eyebrow={joinCode}>
+      <div className="grid content-start gap-3">
+        <div className="self-start rounded-md bg-white p-3">
+          <QRCodeSVG value={joinUrl} size={140} />
+        </div>
+
+        <p className="break-all font-mono text-[11px] leading-5 text-[var(--c-muted)]">
+          {joinUrl}
         </p>
-        <p className="mt-1 font-mono text-sm font-semibold text-[var(--c-ink)]">{joinCode}</p>
-      </header>
 
-      <div className="self-start rounded-md bg-white p-3">
-        <QRCodeSVG value={joinUrl} size={140} />
+        <div className="grid gap-1.5">
+          <Button type="button" size="sm" variant="ghost" onClick={() => void handleCopyUrl()}>
+            {urlCopied ? "URL copied!" : "Copy URL"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => (window.location.href = routes.instructorProjector(sessionSlug))}
+          >
+            Open projector
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            icon={<FloppyDisk size={14} />}
+            onClick={() => void handleSaveTemplate()}
+            disabled={savingTemplate}
+          >
+            {templateSaved ? "Template saved!" : savingTemplate ? "Saving..." : "Save as Template"}
+          </Button>
+        </div>
       </div>
-
-      <p className="break-all font-mono text-[11px] leading-5 text-[var(--c-muted)]">{joinUrl}</p>
-
-      <div className="grid gap-1.5">
-        <Button type="button" size="sm" variant="ghost" onClick={() => void handleCopyUrl()}>
-          {urlCopied ? "URL copied!" : "Copy URL"}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          onClick={() => (window.location.href = routes.instructorProjector(sessionSlug))}
-        >
-          Open projector
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          icon={<FloppyDisk size={14} />}
-          onClick={() => void handleSaveTemplate()}
-          disabled={savingTemplate}
-        >
-          {templateSaved ? "Template saved!" : savingTemplate ? "Saving..." : "Save as Template"}
-        </Button>
-      </div>
-    </div>
+    </Card>
   );
 }

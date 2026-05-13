@@ -4,6 +4,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 const AI_READINESS_FEATURES = [
@@ -177,18 +178,10 @@ export function AiReadinessSection({
           : "neutral";
 
   return (
-    <div className="grid gap-6">
-      <section>
-        <header className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[var(--c-hairline)] pb-2">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-              Hidden Baseline Diagnostics
-            </p>
-            <p className="mt-1 text-xs text-[var(--c-muted)]">
-              Instructor-side reference answer used by private feedback and personal reports. Never
-              shown to learners.
-            </p>
-          </div>
+    <div className="grid gap-5">
+      <Card
+        title="Hidden Baseline Diagnostics"
+        action={
           <Button
             size="sm"
             variant="secondary"
@@ -197,8 +190,13 @@ export function AiReadinessSection({
           >
             {baselineBusy ? "Queued" : baseline ? "Regenerate Baseline" : "Generate Baseline"}
           </Button>
-        </header>
-        <div className="mt-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs">
+        }
+      >
+        <p className="-mt-1 mb-3 text-xs text-[var(--c-muted)]">
+          Instructor-side reference answer used by private feedback and personal reports. Never
+          shown to learners.
+        </p>
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs">
           <StatPair label="Status" value={baseline?.status ?? "missing"} />
           <StatPair label="Provider" value={baseline?.provider ?? "none"} />
           <StatPair label="Model" value={baseline?.model ?? "none"} />
@@ -215,18 +213,13 @@ export function AiReadinessSection({
           />
         </div>
         {error ? <p className="mt-2 text-xs text-[var(--c-error)]">{error}</p> : null}
-      </section>
+      </Card>
 
-      <section>
-        <header className="border-b border-[var(--c-hairline)] pb-2">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-            AI Readiness
-          </p>
-          <p className="mt-1 text-xs text-[var(--c-muted)]">
-            Operational prerequisites that commonly block AI work.
-          </p>
-        </header>
-        <ul className="mt-3 divide-y divide-[var(--c-hairline)] rounded-2xl border border-[var(--c-hairline)] bg-[var(--c-surface-soft)]">
+      <Card title="AI Readiness">
+        <p className="-mt-1 mb-3 text-xs text-[var(--c-muted)]">
+          Operational prerequisites that commonly block AI work.
+        </p>
+        <ul className="divide-y divide-[var(--c-hairline)] rounded-md border border-[var(--c-hairline)] bg-[var(--c-canvas)]">
           <ReadinessRow tone={openAiKeyTone} label="OpenAI key" badge={openAiKeyState} />
           <ReadinessRow
             tone={modelsCount > 0 ? "success" : "warning"}
@@ -286,7 +279,7 @@ export function AiReadinessSection({
             }
           />
         </ul>
-      </section>
+      </Card>
     </div>
   );
 }
