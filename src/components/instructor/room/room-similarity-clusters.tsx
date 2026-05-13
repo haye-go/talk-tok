@@ -52,7 +52,7 @@ export function RoomSimilarityClusters({
           onClick={() => void handleQueueEmbeddings()}
           disabled={embeddingBusy}
         >
-          {embeddingBusy ? "Queued" : "Generate embeddings"}
+          {embeddingBusy ? "Queued" : "Rebuild similarity map"}
         </Button>
       </div>
 
@@ -83,8 +83,8 @@ export function RoomSimilarityClusters({
       {similarityMap && similarityMap.clusters.length === 0 ? (
         <Card>
           <p className="text-sm text-[var(--c-muted)]">
-            No semantic clusters yet. New submissions are embedded asynchronously; existing
-            messages can be processed with Generate embeddings.
+            No semantic clusters yet. New submissions are embedded asynchronously; existing messages
+            can be processed with Rebuild similarity map.
           </p>
         </Card>
       ) : null}

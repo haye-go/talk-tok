@@ -29,6 +29,7 @@ const POSITION_SHIFT_LIMIT = 120;
 const CLUSTER_LIMIT = 80;
 const CLUSTER_MEMBER_LIMIT = 300;
 const CLUSTER_JOIN_THRESHOLD = 0.82;
+const NEAREST_EMBEDDING_LIMIT = 64;
 
 const entityTypeValidator = v.union(
   v.literal("submission"),
@@ -417,6 +418,47 @@ export const markEmbeddingJobError = internalMutation({
   },
 });
 
+export const clearSemanticClustersForScope = internalMutation({
+  args: {
+    sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
+  },
+  handler: async (ctx, args) => {
+    const members = args.questionId
+      ? await ctx.db
+          .query("semanticClusterMembers")
+          .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
+          .take(CLUSTER_MEMBER_LIMIT)
+      : await ctx.db
+          .query("semanticClusterMembers")
+          .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+          .take(CLUSTER_MEMBER_LIMIT);
+    const clusters = args.questionId
+      ? await ctx.db
+          .query("semanticClusters")
+          .withIndex("by_questionId", (q) => q.eq("questionId", args.questionId))
+          .take(CLUSTER_LIMIT)
+      : await ctx.db
+          .query("semanticClusters")
+          .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+          .take(CLUSTER_LIMIT);
+
+    for (const member of members) {
+      if (member.sessionId === args.sessionId) {
+        await ctx.db.delete(member._id);
+      }
+    }
+
+    for (const cluster of clusters) {
+      if (cluster.sessionId === args.sessionId) {
+        await ctx.db.delete(cluster._id);
+      }
+    }
+
+    return { deletedMembers: members.length, deletedClusters: clusters.length };
+  },
+});
+
 export const runEmbeddingJob = internalAction({
   args: {
     jobId: v.id("semanticEmbeddingJobs"),
@@ -435,6 +477,11 @@ export const runEmbeddingJob = internalAction({
       });
 
       let progressDone = 0;
+      const submissionEmbeddings: Array<{
+        submissionId: Id<"submissions">;
+        embeddingId: Id<"semanticEmbeddings">;
+        embedding: number[];
+      }> = [];
 
       for (const target of targets) {
         const contentHash = await hashText(target.text);
@@ -444,18 +491,55 @@ export const runEmbeddingJob = internalAction({
           text: target.text.slice(0, 8000),
         });
 
-        await ctx.runMutation(internal.semantic.upsertEmbedding, {
+        const embeddingId: Id<"semanticEmbeddings"> = await ctx.runMutation(
+          internal.semantic.upsertEmbedding,
+          {
+            sessionId: session._id,
+            questionId: job.questionId,
+            entityType: target.entityType,
+            entityId: target.entityId,
+            contentHash,
+            textPreview: target.text.slice(0, 240),
+            embeddingModel: result.model,
+            dimensions: result.dimensions,
+            embedding: result.embedding,
+          },
+        );
+
+        if (target.entityType === "submission") {
+          submissionEmbeddings.push({
+            submissionId: target.entityId as Id<"submissions">,
+            embeddingId,
+            embedding: result.embedding,
+          });
+        }
+        progressDone += 1;
+      }
+
+      if (submissionEmbeddings.length > 0) {
+        await ctx.runMutation(internal.semantic.clearSemanticClustersForScope, {
           sessionId: session._id,
           questionId: job.questionId,
-          entityType: target.entityType,
-          entityId: target.entityId,
-          contentHash,
-          textPreview: target.text.slice(0, 240),
-          embeddingModel: result.model,
-          dimensions: result.dimensions,
-          embedding: result.embedding,
         });
-        progressDone += 1;
+
+        for (const submissionEmbedding of submissionEmbeddings) {
+          const nearest = await ctx.vectorSearch("semanticEmbeddings", "by_embedding", {
+            vector: submissionEmbedding.embedding,
+            limit: NEAREST_EMBEDDING_LIMIT,
+            filter: (q) =>
+              job.questionId ? q.eq("questionId", job.questionId) : q.eq("sessionId", session._id),
+          });
+
+          await ctx.runMutation(internal.semantic.assignSubmissionToSemanticCluster, {
+            submissionId: submissionEmbedding.submissionId,
+            nearest: nearest
+              .filter((neighbor) => neighbor._id !== submissionEmbedding.embeddingId)
+              .map((neighbor) => ({
+                embeddingId: neighbor._id,
+                score: neighbor._score,
+              })),
+          });
+        }
       }
 
       await ctx.runMutation(internal.semantic.refreshNoveltySignals, {
@@ -680,8 +764,11 @@ export const embedSubmissionAndAssign = internalAction({
     );
     const nearest = await ctx.vectorSearch("semanticEmbeddings", "by_embedding", {
       vector: result.embedding,
-      limit: 12,
-      filter: (q) => q.eq("sessionId", session._id),
+      limit: NEAREST_EMBEDDING_LIMIT,
+      filter: (q) =>
+        submission.questionId
+          ? q.eq("questionId", submission.questionId)
+          : q.eq("sessionId", session._id),
     });
 
     await ctx.runMutation(internal.semantic.assignSubmissionToSemanticCluster, {
@@ -750,7 +837,9 @@ export const getSimilarityMap = query({
         .take(ENTITY_LIMIT),
     ]);
     const submissionsById = new Map(submissions.map((submission) => [submission._id, submission]));
-    const participantsById = new Map(participants.map((participant) => [participant._id, participant]));
+    const participantsById = new Map(
+      participants.map((participant) => [participant._id, participant]),
+    );
     const membersByCluster = new Map<Id<"semanticClusters">, typeof members>();
 
     for (const member of members) {

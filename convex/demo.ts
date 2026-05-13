@@ -39,6 +39,8 @@ type SessionScopedTable =
   | "auditEvents"
   | "semanticEmbeddingJobs"
   | "semanticEmbeddings"
+  | "semanticClusters"
+  | "semanticClusterMembers"
   | "semanticSignals"
   | "argumentLinks";
 
@@ -1020,6 +1022,58 @@ export const seed = mutation({
       updatedAt: now - 72_000,
     });
 
+    const semanticClusterSpecs = [
+      {
+        label: "Practical systems",
+        nicknames: ["Maya", "Priya", "Leah"],
+      },
+      {
+        label: "Digital and culture",
+        nicknames: ["Sam", "Rina"],
+      },
+      {
+        label: "Playful critique",
+        nicknames: ["Alex"],
+      },
+    ];
+
+    for (const clusterSpec of semanticClusterSpecs) {
+      const clusterSubmissionIds = clusterSpec.nicknames
+        .map((nickname) => submissionIdsByNickname.get(nickname))
+        .filter((submissionId): submissionId is Id<"submissions"> => Boolean(submissionId));
+
+      if (clusterSubmissionIds.length === 0) continue;
+
+      const clusterId = await ctx.db.insert("semanticClusters", {
+        sessionId,
+        questionId,
+        status: "active",
+        label: clusterSpec.label,
+        source: "vector",
+        clusterKind: "provisional",
+        rootSubmissionCount: clusterSubmissionIds.length,
+        messageCount: clusterSubmissionIds.length,
+        representativeSubmissionId: clusterSubmissionIds[0],
+        createdAt: now - 70_000,
+        updatedAt: now - 70_000,
+      });
+
+      for (const [memberIndex, submissionId] of clusterSubmissionIds.entries()) {
+        await ctx.db.insert("semanticClusterMembers", {
+          sessionId,
+          questionId,
+          clusterId,
+          submissionId,
+          rootSubmissionId: submissionId,
+          memberKind: "root",
+          membershipMode: "root_direct",
+          score: memberIndex === 0 ? 1 : 0.86,
+          createdAt: now - 70_000 + memberIndex * 1000,
+          updatedAt: now - 70_000 + memberIndex * 1000,
+        });
+      }
+    }
+
     const noveltySpecs = [
       {
         nickname: "Maya",
@@ -1455,6 +1509,8 @@ async function resetDemoSessionData(ctx: MutationCtx, sessionId: Id<"sessions">)
   const tables: SessionScopedTable[] = [
     "argumentLinks",
     "semanticSignals",
+    "semanticClusterMembers",
+    "semanticClusters",
     "semanticEmbeddings",
     "semanticEmbeddingJobs",
     "synthesisQuotes",
