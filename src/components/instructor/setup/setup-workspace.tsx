@@ -1,3 +1,5 @@
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { QuestionManagerPanel } from "@/components/instructor/question-manager-panel";
 import {
@@ -6,7 +8,7 @@ import {
   type VisibilityMode,
 } from "@/components/instructor/session-controls-card";
 import { AccessAndSharingSection } from "./access-and-sharing-section";
-import { AiReadinessSection, type AiReadinessSectionProps } from "./ai-readiness-section";
+import { AiReadinessSection } from "./ai-readiness-section";
 import { CategoryTaxonomyEditor } from "./category-taxonomy-editor";
 import { FollowUpDraftEditor } from "./follow-up-draft-editor";
 
@@ -36,23 +38,29 @@ interface CurrentQuestionInfo {
   isCurrent: boolean;
 }
 
+interface SelectedQuestionStatus {
+  status?: string;
+}
+
 export interface SetupWorkspaceProps {
   sessionSlug: string;
   selectedQuestionId: Id<"sessionQuestions"> | undefined;
-  session: SessionControlSnapshot & { joinCode: string };
+  session: SessionControlSnapshot & { joinCode: string; id: Id<"sessions"> };
   currentQuestion: CurrentQuestionInfo | null;
+  selectedQuestion: SelectedQuestionStatus | null;
   metrics: {
     submitted: number;
     categories: number;
     recategorisationRequests: number;
     followUps: number;
   };
-  onVisibilityChange: (visibilityMode: VisibilityMode) => Promise<void>;
-  onSettingsSave: (settings: SessionSettingsUpdate) => Promise<void>;
   joinUrl: string;
   categories: CategoryItem[];
   followUps: FollowUpPrompt[];
-  aiReadiness: Omit<AiReadinessSectionProps, "sessionSlug" | "selectedQuestionId">;
+}
+
+function isBusyStatus(status?: string) {
+  return status === "queued" || status === "processing";
 }
 
 export function SetupWorkspace({
@@ -60,14 +68,41 @@ export function SetupWorkspace({
   selectedQuestionId,
   session,
   currentQuestion,
+  selectedQuestion,
   metrics,
-  onVisibilityChange,
-  onSettingsSave,
   joinUrl,
   categories,
   followUps,
-  aiReadiness,
 }: SetupWorkspaceProps) {
+  const updateVisibility = useMutation(api.instructorControls.updateVisibility);
+  const updateSettings = useMutation(api.instructorControls.updateSettings);
+  const questionScopedArgs = selectedQuestionId
+    ? { sessionSlug, questionId: selectedQuestionId }
+    : { sessionSlug };
+  const questionBaseline = useQuery(api.questionBaselines.getForQuestion, questionScopedArgs);
+  const aiJobs = useQuery(api.jobs.listForSession, { ...questionScopedArgs, limit: 80 });
+
+  const latestBaselineJob = aiJobs?.find((job) => job.type === "question_baseline") ?? null;
+  const baselineBusy =
+    isBusyStatus(latestBaselineJob?.status) || isBusyStatus(questionBaseline?.status);
+  const baselineCanGenerate = selectedQuestion?.status === "released";
+  const baselineSnapshot = questionBaseline
+    ? {
+        status: questionBaseline.status,
+        provider: questionBaseline.provider ?? undefined,
+        model: questionBaseline.model ?? undefined,
+        generatedAt: questionBaseline.generatedAt ?? undefined,
+      }
+    : null;
+
+  async function handleVisibilityChange(visibilityMode: VisibilityMode) {
+    await updateVisibility({ sessionSlug, visibilityMode });
+  }
+
+  async function handleSettingsSave(settings: SessionSettingsUpdate) {
+    await updateSettings({ sessionSlug, ...settings });
+  }
+
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-5 p-5 lg:p-7">
       <header className="border-b border-[#d7e0ea] pb-5">
@@ -88,8 +123,8 @@ export function SetupWorkspace({
         session={session}
         currentQuestion={currentQuestion}
         metrics={metrics}
-        onVisibilityChange={onVisibilityChange}
-        onSettingsSave={onSettingsSave}
+        onVisibilityChange={handleVisibilityChange}
+        onSettingsSave={handleSettingsSave}
       />
 
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -116,7 +151,10 @@ export function SetupWorkspace({
       <AiReadinessSection
         sessionSlug={sessionSlug}
         selectedQuestionId={selectedQuestionId}
-        {...aiReadiness}
+        sessionId={session.id}
+        baseline={baselineSnapshot}
+        baselineBusy={baselineBusy}
+        baselineCanGenerate={baselineCanGenerate}
       />
     </div>
   );

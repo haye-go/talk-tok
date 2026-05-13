@@ -1,11 +1,21 @@
-import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useEffect, useState } from "react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
+
+const AI_READINESS_FEATURES = [
+  { feature: "feedback", label: "Feedback", promptKey: "feedback.private.v1" },
+  { feature: "question_baseline", label: "Baseline", promptKey: "question.baseline.v1" },
+  { feature: "categorisation", label: "Categorisation", promptKey: "categorisation.session.v1" },
+  { feature: "synthesis", label: "Synthesis", promptKey: "synthesis.class.v1" },
+  { feature: "personal_report", label: "Reports", promptKey: "report.personal.v1" },
+  { feature: "argument_map", label: "Argument map", promptKey: "argument_map.session.v1" },
+  { feature: "embedding", label: "Embeddings", promptKey: null },
+] as const;
 
 interface BaselineSnapshot {
   status?: string;
@@ -14,47 +24,86 @@ interface BaselineSnapshot {
   generatedAt?: number;
 }
 
-interface LlmFailure {
-  id: string;
-  feature: string;
-  error?: string | null;
-}
-
 export interface AiReadinessSectionProps {
   sessionSlug: string;
   selectedQuestionId: Id<"sessionQuestions"> | undefined;
+  sessionId: Id<"sessions"> | undefined;
   baseline: BaselineSnapshot | null;
   baselineBusy: boolean;
   baselineCanGenerate: boolean;
-  openAiKeyState: "checking" | "ready" | "missing" | "error";
-  modelsCount: number;
-  promptsCount: number;
-  budgetUsagePercent: number;
-  missingModelFeatureLabels: string[];
-  missingPromptKeys: string[];
-  budgetHardStopActive: boolean;
-  activeDemoToggleCount: number;
-  recentLlmFailures: LlmFailure[];
 }
 
 export function AiReadinessSection({
   sessionSlug,
   selectedQuestionId,
+  sessionId,
   baseline,
   baselineBusy,
   baselineCanGenerate,
-  openAiKeyState,
-  modelsCount,
-  promptsCount,
-  budgetUsagePercent,
-  missingModelFeatureLabels,
-  missingPromptKeys,
-  budgetHardStopActive,
-  activeDemoToggleCount,
-  recentLlmFailures,
 }: AiReadinessSectionProps) {
   const generateBaseline = useMutation(api.questionBaselines.generateForQuestion);
+  const checkOpenAiKey = useAction(api.modelSettings.checkOpenAiKey);
+  const modelSettings = useQuery(api.modelSettings.list);
+  const promptTemplates = useQuery(api.promptTemplates.list);
+  const sessionBudget = useQuery(
+    api.budget.getSessionSpend,
+    sessionId ? { sessionId } : "skip",
+  );
+  const recentLlmCalls = useQuery(api.llmObservability.recentCalls, { sessionSlug, limit: 12 });
+  const demoToggles = useQuery(api.demo.listToggles, {});
+
+  const [openAiKeyState, setOpenAiKeyState] = useState<
+    "checking" | "ready" | "missing" | "error"
+  >("checking");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void checkOpenAiKey()
+      .then((result) => {
+        if (!cancelled) setOpenAiKeyState(result.hasKey ? "ready" : "missing");
+      })
+      .catch(() => {
+        if (!cancelled) setOpenAiKeyState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [checkOpenAiKey]);
+
+  const enabledModelFeatures = new Set(
+    (modelSettings ?? []).filter((setting) => setting.enabled).flatMap((setting) => setting.features ?? []),
+  );
+  const promptKeys = new Set((promptTemplates ?? []).map((template) => template.key));
+  const missingModelFeatureLabels = AI_READINESS_FEATURES.filter(
+    (item) => !enabledModelFeatures.has(item.feature),
+  ).map((item) => item.label);
+  const missingPromptKeys = AI_READINESS_FEATURES.filter(
+    (item) => item.promptKey && !promptKeys.has(item.promptKey),
+  )
+    .map((item) => item.promptKey)
+    .filter(Boolean) as string[];
+  const activeDemoToggleCount = (demoToggles ?? []).filter(
+    (toggle) =>
+      toggle.enabled &&
+      ["simulateAiFailure", "simulateBudgetExceeded", "simulateSlowAi"].includes(toggle.key),
+  ).length;
+  const recentLlmFailures = (recentLlmCalls ?? [])
+    .filter((call) => call.status === "error")
+    .slice(0, 3)
+    .map((call) => ({ id: call.id, feature: call.feature, error: call.error ?? undefined }));
+  const budgetUsagePercent =
+    sessionBudget && sessionBudget.perSessionEstimatedCostUsd > 0
+      ? Math.round(
+          (sessionBudget.totalEstimatedCostUsd / sessionBudget.perSessionEstimatedCostUsd) * 100,
+        )
+      : 0;
+  const budgetHardStopActive = sessionBudget
+    ? Boolean(sessionBudget.hardStopEnabled) &&
+      sessionBudget.totalEstimatedCostUsd >= sessionBudget.perSessionEstimatedCostUsd
+    : false;
+  const modelsCount = modelSettings?.length ?? 0;
+  const promptsCount = promptTemplates?.length ?? 0;
 
   async function handleGenerateBaseline(forceRegenerate = false) {
     setError(null);

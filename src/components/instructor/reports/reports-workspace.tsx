@@ -20,18 +20,30 @@ export interface ReportsWorkspaceProps {
   sessionSlug: string;
   selectedQuestionId: Id<"sessionQuestions"> | undefined;
   categories: CategoryRef[];
-  aiJobStatusItems: AiJobStatusItem[];
   currentQuestionTitle: string;
   sessionPrivateVisibility: boolean;
   synthesisReleasedForQuestion: boolean;
   reportsReleasedForQuestion: boolean;
 }
 
+function isBusyStatus(status?: string) {
+  return status === "queued" || status === "processing";
+}
+
+function jobTone(
+  job?: { status: string } | null,
+  fallback: AiJobStatusItem["tone"] = "neutral",
+): AiJobStatusItem["tone"] {
+  if (!job) return fallback;
+  if (job.status === "error") return "error";
+  if (isBusyStatus(job.status)) return "warning";
+  return "success";
+}
+
 export function ReportsWorkspace({
   sessionSlug,
   selectedQuestionId,
   categories,
-  aiJobStatusItems,
   currentQuestionTitle,
   sessionPrivateVisibility,
   synthesisReleasedForQuestion,
@@ -66,6 +78,70 @@ export function ReportsWorkspace({
   const hasArgumentLinks = argumentLinkCount > 0;
 
   const latestArgumentMapJob = reports.jobs.all.find((job) => job.type === "argument_map") ?? null;
+  const latestCategorisationJob = reports.jobs.all.find((job) => job.type === "categorisation") ?? null;
+  const latestSynthesisJob = reports.jobs.all.find((job) => job.type === "synthesis") ?? null;
+  const latestReportJob = reports.jobs.all.find((job) => job.type === "personal_report") ?? null;
+  const latestBaselineJob = reports.jobs.all.find((job) => job.type === "question_baseline") ?? null;
+
+  const synthesisCounts = reports.synthesis.counts;
+
+  const aiJobStatusItems: AiJobStatusItem[] = [
+    {
+      label: "Categorisation",
+      status: latestCategorisationJob?.status ?? "idle",
+      detail: latestCategorisationJob ? `Last ${latestCategorisationJob.status}` : "No categorisation runs yet",
+      tone: jobTone(latestCategorisationJob),
+      error: latestCategorisationJob?.error,
+      updatedAt: latestCategorisationJob?.updatedAt,
+    },
+    {
+      label: "Synthesis",
+      status: latestSynthesisJob?.status ?? "idle",
+      detail: `${synthesisCounts.draft ?? 0} draft, ${synthesisCounts.published ?? 0} published, ${synthesisCounts.final ?? 0} final`,
+      tone: jobTone(
+        latestSynthesisJob,
+        synthesisCounts.draft || synthesisCounts.published || synthesisCounts.final
+          ? "sky"
+          : "neutral",
+      ),
+      error: latestSynthesisJob?.error,
+      updatedAt: latestSynthesisJob?.updatedAt,
+    },
+    {
+      label: "Personal reports",
+      status: latestReportJob?.status ?? "idle",
+      detail: `${personalReportCounts.success ?? 0} ready, ${
+        (personalReportCounts.queued ?? 0) + (personalReportCounts.processing ?? 0)
+      } in flight`,
+      tone: jobTone(latestReportJob, isBusyStatus(latestReportJob?.status) ? "warning" : "sky"),
+      error: latestReportJob?.error,
+      updatedAt: latestReportJob?.updatedAt,
+    },
+    {
+      label: "Question baseline",
+      status: latestBaselineJob?.status ?? "idle",
+      detail: latestBaselineJob ? `Last ${latestBaselineJob.status}` : "No baseline generated yet",
+      tone: jobTone(latestBaselineJob),
+      error: latestBaselineJob?.error,
+      updatedAt: latestBaselineJob?.updatedAt,
+    },
+    {
+      label: "Embeddings and signals",
+      status: hasEmbeddings ? "success" : "idle",
+      detail: `${embeddingCount} embeddings, ${signalCount} signals`,
+      tone: hasEmbeddings ? "success" : "neutral",
+    },
+    {
+      label: "Argument map",
+      status: latestArgumentMapJob?.status ?? "idle",
+      detail: argumentGraph
+        ? `${argumentGraph.nodes.length} nodes, ${argumentGraph.edges.length} edges`
+        : "No argument graph generated yet",
+      tone: jobTone(latestArgumentMapJob, argumentGraph ? "success" : "neutral"),
+      error: latestArgumentMapJob?.error,
+      updatedAt: latestArgumentMapJob?.updatedAt,
+    },
+  ];
 
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-5 p-5 lg:p-7">
