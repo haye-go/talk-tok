@@ -67,8 +67,12 @@ export function ReactionBar({
               "inline-flex cursor-pointer items-center gap-1 rounded-pill text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-45",
               variant === "compact" ? "min-h-8 px-2" : "px-2 py-1",
               active
-                ? "bg-[var(--c-primary)] text-[var(--c-on-primary)]"
-                : "bg-[var(--c-surface-strong)] text-[var(--c-muted)] hover:bg-[var(--c-border-strong)]",
+                ? kind === "agree"
+                  ? "bg-[var(--c-upvote-active)] text-[var(--c-on-sig-light)]"
+                  : "bg-[var(--c-primary)] text-[var(--c-on-primary)]"
+                : kind === "agree"
+                  ? "bg-[var(--c-upvote)] text-[var(--c-muted)] hover:bg-[var(--c-upvote-hover)]"
+                  : "bg-[var(--c-surface-strong)] text-[var(--c-muted)] hover:bg-[var(--c-border-strong)]",
             )}
           >
             <Icon size={12} weight={active ? "fill" : "regular"} />

@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { Presentation } from "@phosphor-icons/react";
+import { QRCodeSVG } from "qrcode.react";
+import { Button } from "@/components/ui/button";
 import { routes, type InstructorRoomModeId, type InstructorWorkspaceTabId } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { INSTRUCTOR_WORKSPACE_TABS, ROOM_MODES } from "./instructor-nav";
@@ -6,6 +9,7 @@ import { INSTRUCTOR_WORKSPACE_TABS, ROOM_MODES } from "./instructor-nav";
 export interface InstructorLeftRailProps {
   sessionSlug: string;
   sessionTitle: string;
+  joinCode: string;
   workspaceTab: InstructorWorkspaceTabId;
   roomMode: InstructorRoomModeId;
   workspaceHref: (tab: InstructorWorkspaceTabId) => string;
@@ -15,11 +19,27 @@ export interface InstructorLeftRailProps {
 export function InstructorLeftRail({
   sessionSlug,
   sessionTitle,
+  joinCode,
   workspaceTab,
   roomMode,
   workspaceHref,
   roomModeHref,
 }: InstructorLeftRailProps) {
+  const [urlCopied, setUrlCopied] = useState(false);
+
+  const joinPath = routes.join(joinCode);
+  const joinUrl =
+    typeof window === "undefined" ? joinPath : new URL(joinPath, window.location.origin).toString();
+
+  async function handleCopyUrl() {
+    try {
+      await navigator.clipboard.writeText(joinUrl);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
+    } catch {
+      // clipboard may be blocked
+    }
+  }
   return (
     <div className="flex min-h-full flex-col gap-6 bg-gradient-to-b from-[#18324c] to-[#12263a] p-5 text-[#d9e7f3]">
       <section className="border-b border-white/10 pb-5">
@@ -87,19 +107,35 @@ export function InstructorLeftRail({
         </section>
       ) : null}
 
-      <div className="mt-auto grid gap-3 border-t border-white/10 pt-5">
-        <p className="text-xs leading-5 text-[#8ea4bb]">
-          Room is for live reading and intervention. Setup holds drafting and configuration.
-          Reports holds synthesis, argument map, personal reports, and AI review surfaces.
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b8cadb]">
+          Join Access
         </p>
+        <div className="mt-3 flex justify-center rounded-md bg-white p-3">
+          <QRCodeSVG value={joinUrl} size={110} />
+        </div>
+        <p className="mt-3 break-all text-center font-mono text-[10px] leading-4 text-[#8ea4bb]">
+          {joinUrl}
+        </p>
+        <div className="mt-3 grid gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="w-full justify-center text-[#b8cadb] hover:text-white"
+            onClick={() => void handleCopyUrl()}
+          >
+            {urlCopied ? "URL copied!" : "Copy URL"}
+          </Button>
+        </div>
         <a
           href={routes.instructorProjector(sessionSlug)}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-[#d9e7f3] transition hover:bg-white/10 hover:text-white"
+          className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-semibold text-[#d9e7f3] transition hover:bg-white/10 hover:text-white"
         >
           <Presentation size={15} />
           Open projector
         </a>
-      </div>
+      </section>
     </div>
   );
 }

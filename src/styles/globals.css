@@ -47,10 +47,11 @@
 :root {
   color-scheme: light;
 
-  --c-canvas: oklch(0.95 0.012 81.75);
-  --c-surface-soft: oklch(0.975 0.006 81.75);
+  --c-canvas: oklch(0.96 0.008 81.75);
+  --c-surface-soft: oklch(0.995 0.003 82.2);
   --c-surface-strong: oklch(0.9124 0.0058 81.75);
   --c-surface-dark: oklch(0.2299 0.019 82.2);
+  --c-surface-dark-elevated: oklch(0.2398 0.0119 270.88);
 
   --c-ink: oklch(0.2299 0.019 82.2);
   --c-body: oklch(0.3391 0.016 82.2);
@@ -63,9 +64,9 @@
   --c-hairline: oklch(0.8975 0 0);
   --c-border-strong: oklch(0.6752 0.014 82.2);
   --c-topbar: oklch(0.938 0.031 81.75);
-  --c-question-surface: oklch(0.985 0.022 230);
-  --c-question-surface-strong: oklch(0.92 0.055 230);
-  --c-question-ink: oklch(0.26 0.055 252);
+  --c-question-surface: oklch(0.94 0.015 260);
+  --c-question-surface-strong: oklch(0.75 0.035 260);
+  --c-question-ink: oklch(0.2299 0.019 82.2);
 
   --c-sig-coral: oklch(0.4894 0.168 36.02);
   --c-sig-slate: oklch(0.3 0.065 260);
@@ -79,6 +80,10 @@
   --c-tab-explore: oklch(0.5 0.11 52);
   --c-tab-fight: oklch(0.45 0.16 36);
   --c-tab-me: oklch(0.48 0.11 80);
+
+  --c-upvote: oklch(0.93 0.04 80);
+  --c-upvote-hover: oklch(0.86 0.08 80);
+  --c-upvote-active: var(--c-sig-mustard);
 
   /* Fixed text colors for signature surfaces (theme-independent) */
   --c-on-sig-light: oklch(0.2299 0.019 82.2);
@@ -97,30 +102,35 @@
 html.dark {
   color-scheme: dark;
 
-  --c-canvas: oklch(0.15 0.005 82.2);
-  --c-surface-soft: oklch(0.18 0.006 82.2);
-  --c-surface-strong: oklch(0.22 0.008 82.2);
+  --c-canvas: oklch(0.18 0.005 82.2);
+  --c-surface-soft: oklch(0.22 0.007 82.2);
+  --c-surface-strong: oklch(0.27 0.009 82.2);
   --c-surface-dark: oklch(0.9 0.01 82.2);
+  --c-surface-dark-elevated: oklch(0.15 0.005 82.2);
 
   --c-ink: oklch(0.95 0.008 82.2);
   --c-body: oklch(0.85 0.008 82.2);
-  --c-muted: oklch(0.7 0.008 82.2);
-  --c-on-primary: oklch(0.15 0.005 82.2);
-  --c-on-dark: oklch(0.15 0.005 82.2);
+  --c-muted: oklch(0.65 0.008 82.2);
+  --c-on-primary: oklch(0.18 0.005 82.2);
+  --c-on-dark: oklch(0.18 0.005 82.2);
 
   --c-primary: oklch(0.95 0.008 82.2);
-  --c-primary-active: oklch(0.9 0.008 82.2);
-  --c-hairline: oklch(0.25 0.006 82.2);
-  --c-border-strong: oklch(0.4 0.008 82.2);
-  --c-topbar: oklch(0.2 0.012 82.2);
-  --c-question-surface: oklch(0.18 0.025 252);
-  --c-question-surface-strong: oklch(0.32 0.055 252);
-  --c-question-ink: oklch(0.9 0.035 230);
+  --c-primary-active: oklch(0.88 0.01 82.2);
+  --c-hairline: oklch(0.30 0.007 82.2);
+  --c-border-strong: oklch(0.42 0.009 82.2);
+  --c-topbar: oklch(0.22 0.012 82.2);
+  --c-question-surface: oklch(0.24 0.015 260);
+  --c-question-surface-strong: oklch(0.40 0.035 260);
+  --c-question-ink: oklch(0.92 0.015 82.2);
 
   --c-tab-contribute: oklch(0.75 0.06 230);
   --c-tab-explore: oklch(0.78 0.1 52);
   --c-tab-fight: oklch(0.7 0.15 36);
   --c-tab-me: oklch(0.76 0.11 80);
+
+  --c-upvote: oklch(0.3 0.04 80);
+  --c-upvote-hover: oklch(0.4 0.07 80);
+  --c-upvote-active: var(--c-sig-mustard);
 
   --c-link: oklch(0.68 0.176 259.09);
   --c-success: oklch(0.65 0.148 142.5);
@@ -132,6 +142,25 @@ html.dark {
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--c-border-strong);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
 }
 
 body {

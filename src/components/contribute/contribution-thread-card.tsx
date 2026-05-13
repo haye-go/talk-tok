@@ -76,10 +76,6 @@ export interface ContributionThreadCardProps {
   children?: ReactNode;
 }
 
-function submissionLabel(kind: ContributionSubmission["kind"]) {
-  return kind === "initial" ? "Original post" : "Additional point";
-}
-
 export function ContributionThreadCard({
   submission,
   feedback,
@@ -166,22 +162,15 @@ export function ContributionThreadCard({
 
   return (
     <ParticipantThreadCard
-      authorLabel="You"
+      authorLabel=""
       body={submission.body}
-      createdAt={submission.createdAt}
       categoryName={assignment?.categoryName ?? undefined}
       categoryTone={categoryColorToTone(undefined, 0)}
-      stats={{ replyCount: replyItems.length }}
       replies={replyItems}
       actions={actionSlot}
       ownership="own"
       className={isLatest ? "ring-1 ring-[var(--c-sig-sky)]/25" : undefined}
     >
-      <div className="flex flex-wrap items-center gap-2 text-[10px] text-[var(--c-muted)]">
-        <span>{submissionLabel(submission.kind)}</span>
-        {isLatest ? <span>Latest contribution</span> : null}
-      </div>
-
       {children}
 
       {expanded ? (

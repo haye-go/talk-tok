@@ -8,8 +8,6 @@ import {
 } from "@/components/instructor/session-controls-card";
 import { useInstructorSetup } from "@/hooks/use-instructor-setup";
 import { useInstructorShell } from "@/hooks/use-instructor-shell";
-import { routes } from "@/lib/routes";
-import { AccessAndSharingSection } from "./access-and-sharing-section";
 import { AiReadinessSection } from "./ai-readiness-section";
 import { CategoryTaxonomyEditor } from "./category-taxonomy-editor";
 import { FollowUpDraftEditor } from "./follow-up-draft-editor";
@@ -43,9 +41,6 @@ export function SetupWorkspace({ sessionSlug, selectedQuestionId }: SetupWorkspa
   }
 
   const session = setup.session;
-  const joinPath = routes.join(session.joinCode);
-  const joinUrl =
-    typeof window === "undefined" ? joinPath : new URL(joinPath, window.location.origin).toString();
 
   const selectedQuestion = setup.selectedQuestion;
   const currentQuestion = setup.currentQuestion;
@@ -104,43 +99,34 @@ export function SetupWorkspace({ sessionSlug, selectedQuestionId }: SetupWorkspa
         onSettingsSave={handleSettingsSave}
       />
 
-      <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="grid gap-5">
-          <CategoryTaxonomyEditor
-            sessionSlug={sessionSlug}
-            selectedQuestionId={selectedQuestionId}
-            categories={activeCategories.map((category) => ({
-              id: category.id,
-              name: category.name,
-              description: category.description,
-              color: category.color,
-            }))}
-          />
-          <FollowUpDraftEditor
-            sessionSlug={sessionSlug}
-            selectedQuestionId={selectedQuestionId}
-            categories={activeCategories.map((category) => ({
-              id: category.id,
-              name: category.name,
-            }))}
-            followUps={setup.followUpPrompts.map((prompt) => ({
-              id: prompt.id,
-              title: prompt.title,
-              prompt: prompt.prompt,
-              status: prompt.status,
-              targetMode: prompt.targetMode,
-              activatedAt: prompt.activatedAt ?? undefined,
-              closedAt: prompt.closedAt ?? undefined,
-              createdAt: prompt.createdAt,
-            }))}
-          />
-        </div>
-        <AccessAndSharingSection
-          sessionSlug={sessionSlug}
-          joinCode={session.joinCode}
-          joinUrl={joinUrl}
-        />
-      </section>
+      <CategoryTaxonomyEditor
+        sessionSlug={sessionSlug}
+        selectedQuestionId={selectedQuestionId}
+        categories={activeCategories.map((category) => ({
+          id: category.id,
+          name: category.name,
+          description: category.description,
+          color: category.color,
+        }))}
+      />
+      <FollowUpDraftEditor
+        sessionSlug={sessionSlug}
+        selectedQuestionId={selectedQuestionId}
+        categories={activeCategories.map((category) => ({
+          id: category.id,
+          name: category.name,
+        }))}
+        followUps={setup.followUpPrompts.map((prompt) => ({
+          id: prompt.id,
+          title: prompt.title,
+          prompt: prompt.prompt,
+          status: prompt.status,
+          targetMode: prompt.targetMode,
+          activatedAt: prompt.activatedAt ?? undefined,
+          closedAt: prompt.closedAt ?? undefined,
+          createdAt: prompt.createdAt,
+        }))}
+      />
 
       <AiReadinessSection
         sessionSlug={sessionSlug}

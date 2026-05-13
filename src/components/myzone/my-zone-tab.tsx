@@ -19,7 +19,6 @@ interface Submission {
 }
 
 interface FeedbackSummary {
-  submissionId: string;
   status: "queued" | "processing" | "success" | "error";
   tone: string;
   reasoningBand?: string | null;
@@ -33,15 +32,45 @@ interface FeedbackSummary {
 }
 
 interface Assignment {
-  submissionId: string;
   categoryName?: string | null;
   categoryId: string;
+  categoryColor?: string | null;
 }
 
 interface RecatRequest {
-  submissionId: string;
   status: string;
   suggestedCategoryName?: string | null;
+}
+
+interface ArchiveThreadMessage {
+  submission: Submission;
+}
+
+interface ArchiveThread {
+  root: ArchiveThreadMessage;
+  replies: ArchiveThreadMessage[];
+  assignment?: Assignment | null;
+  feedbackSummary?: FeedbackSummary | null;
+  recategorisationRequest?: RecatRequest | null;
+}
+
+interface ArchiveQuestion {
+  id: string;
+  title?: string | null;
+  prompt?: string | null;
+  isCurrent?: boolean;
+}
+
+interface ArchiveQuestionSection {
+  questionId: string | null;
+  question: ArchiveQuestion | null;
+  fallbackTitle: string | null;
+  fallbackPrompt: string | null;
+  isCurrent: boolean;
+  latestActivityAt: number;
+  contributionCount: number;
+  replyCount: number;
+  threads: ArchiveThread[];
 }
 
 interface PositionShift {
@@ -74,11 +103,7 @@ interface PersonalReportSummary {
 }
 
 interface MyZoneTabProps {
-  initialResponses?: Submission[];
-  followUpResponses?: (Submission & { followUpTitle?: string })[];
-  feedbackBySubmission?: FeedbackSummary[];
-  assignmentsBySubmission?: Assignment[];
-  recategorisationRequests?: RecatRequest[];
+  myArchiveByQuestion?: ArchiveQuestionSection[];
   fightThreads?: FightRecord[];
   positionShifts?: PositionShift[];
   personalReport?: PersonalReportSummary | null;
@@ -113,11 +138,7 @@ const BAND_LABELS: Record<string, string> = {
 };
 
 export function MyZoneTab({
-  initialResponses,
-  followUpResponses,
-  feedbackBySubmission,
-  assignmentsBySubmission,
-  recategorisationRequests,
+  myArchiveByQuestion,
   fightThreads,
   positionShifts,
   personalReport,
@@ -126,24 +147,17 @@ export function MyZoneTab({
   onViewFight,
   onViewReport,
 }: MyZoneTabProps) {
-  const feedbackMap = new Map(
-    (feedbackBySubmission ?? []).map((feedback) => [feedback.submissionId, feedback]),
-  );
-  const assignmentMap = new Map(
-    (assignmentsBySubmission ?? []).map((assignment) => [assignment.submissionId, assignment]),
-  );
-  const recatMap = new Map(
-    (recategorisationRequests ?? []).map((request) => [request.submissionId, request]),
-  );
-  const initials = initialResponses ?? [];
-  const followUps = followUpResponses ?? [];
+  const archiveSections = myArchiveByQuestion ?? [];
   const fights = fightThreads ?? [];
   const shifts = positionShifts ?? [];
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const contributionCount = initials.length;
-  const followUpCount = followUps.length;
+  const contributionCount = archiveSections.reduce(
+    (count, section) => count + section.contributionCount,
+    0,
+  );
+  const followUpCount = archiveSections.reduce((count, section) => count + section.replyCount, 0);
   const fightCount = fights.length;
   const shiftCount = shifts.length;
 
@@ -186,59 +200,44 @@ export function MyZoneTab({
 
       {loading ? <LoadingState label="Loading your activity..." /> : null}
 
-      {!loading && initials.length === 0 ? (
+      {!loading && archiveSections.length === 0 ? (
         <ParticipantStateSection kind="empty" title="Contributions">
           No contributions yet. Your submitted responses will appear here.
         </ParticipantStateSection>
       ) : null}
 
-      {initials.length > 0 ? (
-        <div className="space-y-1.5">
-          {initials.map((submission) => {
-            const assignment = assignmentMap.get(submission.id);
-            const feedback = feedbackMap.get(submission.id);
-            const recat = recatMap.get(submission.id);
-            const isExpanded = expandedId === submission.id;
+      {archiveSections.length > 0 ? (
+        <div className="space-y-2">
+          {archiveSections.map((section) => (
+            <Card
+              key={section.questionId ?? "session"}
+              title={section.question?.title ?? section.fallbackTitle ?? "Question"}
+              description={`${section.contributionCount} ${
+                section.contributionCount === 1 ? "contribution" : "contributions"
+              } / ${section.replyCount} ${section.replyCount === 1 ? "reply" : "replies"}`}
+            >
+              <div className="space-y-1.5">
+                {section.threads.map((thread) => {
+                  const submission = thread.root.submission;
+                  const isExpanded = expandedId === submission.id;
 
-            return (
-              <ContributionRow
-                key={submission.id}
-                submission={submission}
-                assignment={assignment}
-                feedback={feedback}
-                recat={recat}
-                expanded={isExpanded}
-                onToggle={() => setExpandedId(isExpanded ? null : submission.id)}
-              />
-            );
-          })}
-        </div>
-      ) : null}
-
-      {followUps.length > 0 ? (
-        <Card
-          title="Reply archive"
-          description="Thread replies are archived here; active thread work stays in Contribute."
-        >
-          <div className="flex flex-col gap-2">
-            {followUps.map((submission) => (
-              <div
-                key={submission.id}
-                className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
-              >
-                <p className="text-[10px] text-[var(--c-muted)]">
-                  {submission.followUpTitle
-                    ? `Follow-up: ${submission.followUpTitle}`
-                    : "Follow-up"}{" "}
-                  - {formatTime(submission.createdAt)}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-[var(--c-body)]">
-                  {submission.body}
-                </p>
+                  return (
+                    <ContributionRow
+                      key={submission.id}
+                      submission={submission}
+                      assignment={thread.assignment ?? undefined}
+                      feedback={thread.feedbackSummary ?? undefined}
+                      recat={thread.recategorisationRequest ?? undefined}
+                      replies={thread.replies}
+                      expanded={isExpanded}
+                      onToggle={() => setExpandedId(isExpanded ? null : submission.id)}
+                    />
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        </Card>
+            </Card>
+          ))}
+        </div>
       ) : null}
 
       {fights.length > 0 ? (
@@ -427,6 +426,7 @@ function ContributionRow({
   assignment,
   feedback,
   recat,
+  replies,
   expanded,
   onToggle,
 }: {
@@ -434,6 +434,7 @@ function ContributionRow({
   assignment?: Assignment;
   feedback?: FeedbackSummary;
   recat?: RecatRequest;
+  replies?: ArchiveThreadMessage[];
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -465,7 +466,14 @@ function ContributionRow({
               {formatTime(submission.createdAt)}
             </span>
             {assignment?.categoryName ? (
-              <Badge tone={categoryColorToTone(undefined, 0)}>{assignment.categoryName}</Badge>
+              <Badge tone={categoryColorToTone(assignment.categoryColor, 0)}>
+                {assignment.categoryName}
+              </Badge>
+            ) : null}
+            {replies && replies.length > 0 ? (
+              <Badge tone="neutral">
+                {replies.length} {replies.length === 1 ? "reply" : "replies"}
+              </Badge>
             ) : null}
             {feedbackBadge ? (
               <Badge tone={feedbackBadge as "sky" | "error" | "neutral"}>
@@ -520,6 +528,28 @@ function ContributionRow({
                   {feedback.error}
                 </p>
               ) : null}
+            </div>
+          ) : null}
+
+          {replies && replies.length > 0 ? (
+            <div className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-canvas)] p-3">
+              <p className="font-display text-xs font-medium text-[var(--c-ink)]">Replies</p>
+              <div className="mt-2 flex flex-col gap-2">
+                {replies.map((reply) => (
+                  <div
+                    key={reply.submission.id}
+                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-2"
+                  >
+                    <p className="text-[10px] text-[var(--c-muted)]">
+                      {reply.submission.kind === "reply" ? "Reply" : "Follow-up"} -{" "}
+                      {formatTime(reply.submission.createdAt)}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-[var(--c-body)]">
+                      {reply.submission.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
 

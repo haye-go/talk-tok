@@ -12,8 +12,8 @@ import { ParticipantStateSection } from "@/components/layout/participant-state-s
 import { MyZoneTab } from "@/components/myzone/my-zone-tab";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
-import { PresenceBar } from "@/components/stream/presence-bar";
 import { StreamTab } from "@/components/stream/stream-tab";
+import { InlineFollowUpComposer } from "@/components/submission/inline-follow-up-composer";
 import {
   ResponseComposer,
   type ResponseComposerSubmit,
@@ -142,7 +142,6 @@ export function ParticipantWorkspacePage({
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [feedbackQueueWarning, setFeedbackQueueWarning] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
-  const [showAdditionalComposer, setShowAdditionalComposer] = useState(false);
   const [expandedContributionId, setExpandedContributionId] = useState<Id<"submissions"> | null>(
     null,
   );
@@ -237,7 +236,6 @@ export function ParticipantWorkspacePage({
             "Your response was saved, but AI feedback could not be queued.",
         );
       }
-      setShowAdditionalComposer(false);
     } catch (cause) {
       setSubmissionError(cause instanceof Error ? cause.message : "Could not add another point.");
       throw cause;
@@ -372,32 +370,9 @@ export function ParticipantWorkspacePage({
   const releasedQuestions =
     ws?.releasedQuestionsOrdered ??
     (ws?.questions ?? []).filter((question) => question.status === "released");
-  const matchesSelectedQuestion = (questionId?: Id<"sessionQuestions"> | null) =>
-    !selectedQuestion?.id || questionId === selectedQuestion.id;
 
   const myThreads = ws?.myThreads ?? [];
-  const nonInitialResponses =
-    ws?.myZoneHistory.followUpResponses.filter((submission) =>
-      matchesSelectedQuestion(submission.questionId),
-    ) ?? [];
   const topLevelContributions = myThreads.map((thread) => thread.root.submission);
-  const followUpResponses = nonInitialResponses.filter(
-    (submission) => Boolean(submission.parentSubmissionId) || Boolean(submission.followUpPromptId),
-  );
-
-  const scopedSubmissionIds = new Set(
-    [...topLevelContributions, ...followUpResponses].map((submission) => submission.id),
-  );
-  const scopedFeedback =
-    ws?.feedbackBySubmission.filter((feedback) => scopedSubmissionIds.has(feedback.submissionId)) ??
-    [];
-  const scopedAssignments =
-    ws?.assignmentsBySubmission.filter((assignment) =>
-      matchesSelectedQuestion(assignment.questionId),
-    ) ?? [];
-  const scopedRecategorisationRequests =
-    ws?.recategorisationRequests.filter((request) => matchesSelectedQuestion(request.questionId)) ??
-    [];
 
   const primaryContribution = topLevelContributions[0] ?? null;
   const activeExpandedContributionId = topLevelContributions.some(
@@ -426,22 +401,10 @@ export function ParticipantWorkspacePage({
   const selectedPrompt = selectedQuestion?.prompt ?? session.openingPrompt;
 
   const followUpComposer = followUpParentId ? (
-    <Card
-      title="Add follow-up"
-      action={
-        <Button type="button" variant="ghost" size="sm" onClick={() => setFollowUpParentId(null)}>
-          Cancel
-        </Button>
-      }
-    >
-      {submissionError ? <InlineAlert tone="error">{submissionError}</InlineAlert> : null}
-      <ResponseComposer
-        softWordLimit={session.responseSoftLimitWords}
-        submitLabel="Add follow-up"
-        placeholder="Add a clarification or extra point..."
-        onSubmit={(_text, _tone, submission) => handleFollowUp(submission, followUpParentId)}
-      />
-    </Card>
+    <InlineFollowUpComposer
+      onSubmit={(submission) => handleFollowUp(submission, followUpParentId)}
+      onCancel={() => setFollowUpParentId(null)}
+    />
   ) : null;
 
   const promptLabel = selectedQuestion?.isCurrent ? "Current question" : "Released question";
@@ -472,6 +435,7 @@ export function ParticipantWorkspacePage({
       onSelectQuestion={(questionId) =>
         setSelectedQuestionOverrideId(questionId as typeof selectedQuestionOverrideId)
       }
+      presenceTyping={ws?.presenceAggregate.typing ?? 0}
       activeTab={activeTab}
       onActiveTabChange={handleTabChange}
       contribute={
@@ -490,41 +454,20 @@ export function ParticipantWorkspacePage({
             </ParticipantStateSection>
           ) : null}
 
-          <div className="flex flex-col gap-2 rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3 sm:flex-row sm:items-center sm:justify-between">
-            <PresenceBar
-              typing={ws?.presenceAggregate.typing ?? 0}
-              submitted={ws?.presenceAggregate.submitted ?? 0}
-              idle={ws?.presenceAggregate.idle ?? 0}
-              className="border-none bg-transparent p-0"
-            />
-            {contributionsOpen && topLevelContributions.length > 0 ? (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowAdditionalComposer((value) => !value)}
-              >
-                {showAdditionalComposer ? "Cancel" : "Add another point"}
-              </Button>
-            ) : !contributionsOpen ? (
-              <p className="text-xs text-[var(--c-muted)]">New contributions are paused.</p>
-            ) : (
-              <p className="text-xs text-[var(--c-muted)]">Add your first response below.</p>
-            )}
-          </div>
+          {!contributionsOpen ? (
+            <p className="text-xs text-[var(--c-muted)]">New contributions are paused.</p>
+          ) : null}
 
-          {topLevelContributions.length === 0 ? (
+          {contributionsOpen ? (
             <ResponseComposer
               softWordLimit={session.responseSoftLimitWords}
-              submitLabel="Submit response"
-              onSubmit={(_text, _tone, submission) => handleSubmit(submission)}
-            />
-          ) : showAdditionalComposer ? (
-            <ResponseComposer
-              softWordLimit={session.responseSoftLimitWords}
-              submitLabel="Add another point"
-              placeholder="Add another angle, example, or challenge..."
-              onSubmit={(_text, _tone, submission) => handleAddAnotherPoint(submission)}
+              submitLabel={topLevelContributions.length === 0 ? "Submit response" : "Add another point"}
+              placeholder={topLevelContributions.length === 0 ? "Share your perspective..." : "Add a response..."}
+              onSubmit={(_text, _tone, submission) =>
+                topLevelContributions.length === 0
+                  ? handleSubmit(submission)
+                  : handleAddAnotherPoint(submission)
+              }
             />
           ) : null}
 
@@ -621,11 +564,7 @@ export function ParticipantWorkspacePage({
           report={report ?? null}
           generatingReport={generatingReport}
           onGenerateReport={handleGenerateReport}
-          initialResponses={topLevelContributions}
-          followUpResponses={followUpResponses}
-          feedbackBySubmission={scopedFeedback}
-          assignmentsBySubmission={scopedAssignments}
-          recategorisationRequests={scopedRecategorisationRequests}
+          myArchiveByQuestion={ws?.myArchiveByQuestion}
           fightThreads={ws?.fightMe.mine}
           positionShifts={positionShifts ?? undefined}
           personalReport={ws?.personalReport}
@@ -737,21 +676,7 @@ interface MeTabContentProps {
   report: PersonalReportView | null;
   generatingReport: boolean;
   onGenerateReport: () => Promise<void>;
-  initialResponses: NonNullable<
-    ReturnType<typeof useParticipantWorkspace>
-  >["myZoneHistory"]["initialResponses"];
-  followUpResponses: NonNullable<
-    ReturnType<typeof useParticipantWorkspace>
-  >["myZoneHistory"]["followUpResponses"];
-  feedbackBySubmission: NonNullable<
-    ReturnType<typeof useParticipantWorkspace>
-  >["feedbackBySubmission"];
-  assignmentsBySubmission: NonNullable<
-    ReturnType<typeof useParticipantWorkspace>
-  >["assignmentsBySubmission"];
-  recategorisationRequests: NonNullable<
-    ReturnType<typeof useParticipantWorkspace>
-  >["recategorisationRequests"];
+  myArchiveByQuestion?: ComponentProps<typeof MyZoneTab>["myArchiveByQuestion"];
   fightThreads?: ComponentProps<typeof MyZoneTab>["fightThreads"];
   positionShifts?: ComponentProps<typeof MyZoneTab>["positionShifts"];
   personalReport?: ComponentProps<typeof MyZoneTab>["personalReport"];
@@ -770,11 +695,7 @@ function MeTabContent({
   report,
   generatingReport,
   onGenerateReport,
-  initialResponses,
-  followUpResponses,
-  feedbackBySubmission,
-  assignmentsBySubmission,
-  recategorisationRequests,
+  myArchiveByQuestion,
   fightThreads,
   positionShifts,
   personalReport,
@@ -796,11 +717,7 @@ function MeTabContent({
   return (
     <div className="grid gap-4">
       <MyZoneTab
-        initialResponses={initialResponses}
-        followUpResponses={followUpResponses}
-        feedbackBySubmission={feedbackBySubmission}
-        assignmentsBySubmission={assignmentsBySubmission}
-        recategorisationRequests={recategorisationRequests}
+        myArchiveByQuestion={myArchiveByQuestion}
         fightThreads={fightThreads}
         positionShifts={positionShifts}
         personalReport={personalReport}

@@ -243,7 +243,7 @@ export function StreamTab({
     }
   }
 
-  function renderThread(thread: PeerThread) {
+  function renderThread(thread: PeerThread, hideCategoryPill = false) {
     const submission = thread.root.submission;
     const replyOpen = replyParentId === submission.id;
     const creatingFight = creatingFightFor === submission.id;
@@ -253,10 +253,8 @@ export function StreamTab({
         <ParticipantThreadCard
           authorLabel={submission.nickname}
           body={submission.body}
-          createdAt={submission.createdAt}
-          categoryName={thread.assignment?.categoryName ?? undefined}
+          categoryName={hideCategoryPill ? undefined : (thread.assignment?.categoryName ?? undefined)}
           categoryTone={categoryColorToTone(thread.assignment?.categoryColor)}
-          stats={thread.root.stats}
           replies={thread.replies.map((reply) => ({
             id: reply.submission.id,
             authorLabel: reply.submission.nickname,
@@ -320,7 +318,7 @@ export function StreamTab({
       );
     }
 
-    return <div className="flex flex-col gap-3">{latestThreads.map(renderThread)}</div>;
+    return <div className="flex flex-col gap-3">{latestThreads.map((thread) => renderThread(thread))}</div>;
   }
 
   function renderByCategory() {
@@ -353,7 +351,9 @@ export function StreamTab({
                 {section.threadCount} {section.threadCount === 1 ? "message" : "messages"}
               </span>
             </div>
-            <div className="flex flex-col gap-3">{section.threads.map(renderThread)}</div>
+            <div className="flex flex-col gap-3">
+              {section.threads.map((t) => renderThread(t, true))}
+            </div>
           </section>
         ))}
       </div>

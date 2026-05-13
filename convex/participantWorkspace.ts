@@ -601,11 +601,12 @@ export const overview = query({
     const selectedQuestionSubmissions = sessionSubmissions.filter((submission) =>
       matchesSelectedQuestion(submission, selectedQuestionId),
     );
-    const selectedQuestionSubmissionIds = new Set(
-      selectedQuestionSubmissions.map((submission) => submission._id),
-    );
+    const threadSubmissionIds = new Set([
+      ...selectedQuestionSubmissions.map((submission) => submission._id),
+      ...mySubmissions.map((submission) => submission._id),
+    ]);
     const reactions =
-      selectedQuestionSubmissionIds.size > 0
+      threadSubmissionIds.size > 0
         ? await ctx.db
             .query("reactions")
             .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
@@ -621,7 +622,7 @@ export const overview = query({
     >();
 
     for (const reaction of reactions) {
-      if (!selectedQuestionSubmissionIds.has(reaction.submissionId)) {
+      if (!threadSubmissionIds.has(reaction.submissionId)) {
         continue;
       }
 
@@ -650,7 +651,22 @@ export const overview = query({
       repliesByParentId.set(submission.parentSubmissionId, existing);
     }
 
-    const toThreadMessage = (submission: Doc<"submissions">) => {
+    const archiveRepliesByParentId = new Map<Id<"submissions">, Doc<"submissions">[]>();
+
+    for (const submission of mySubmissions) {
+      if (!submission.parentSubmissionId) {
+        continue;
+      }
+
+      const existing = archiveRepliesByParentId.get(submission.parentSubmissionId) ?? [];
+      existing.push(submission);
+      archiveRepliesByParentId.set(submission.parentSubmissionId, existing);
+    }
+
+    const toThreadMessage = (
+      submission: Doc<"submissions">,
+      replySource = repliesByParentId,
+    ) => {
       const reactionState = reactionsBySubmission.get(submission._id);
 
       return {
@@ -660,7 +676,7 @@ export const overview = query({
           session,
         ),
         stats: {
-          replyCount: repliesByParentId.get(submission._id)?.length ?? 0,
+          replyCount: replySource.get(submission._id)?.length ?? 0,
           upvoteCount: reactionState?.counts.agree ?? 0,
           reactionCounts: reactionState?.counts ?? emptyReactionCounts(),
         },
@@ -672,16 +688,16 @@ export const overview = query({
       };
     };
 
-    const toThread = (root: Doc<"submissions">) => {
+    const toThread = (root: Doc<"submissions">, replySource = repliesByParentId) => {
       const assignment = assignmentBySubmission.get(root._id);
       const rootFeedback = feedbackMap.get(root._id);
       const recategorisationRequest = recategorisationMap.get(root._id);
 
       return {
-        root: toThreadMessage(root),
-        replies: (repliesByParentId.get(root._id) ?? [])
+        root: toThreadMessage(root, replySource),
+        replies: (replySource.get(root._id) ?? [])
           .sort((left, right) => left.createdAt - right.createdAt)
-          .map(toThreadMessage),
+          .map((reply) => toThreadMessage(reply, replySource)),
         assignment: assignment
           ? {
               categoryId: assignment.categoryId,
@@ -718,7 +734,80 @@ export const overview = query({
           submission.participantId === participant._id && isTopLevelMessage(submission),
       )
       .sort((left, right) => right.createdAt - left.createdAt)
-      .map(toThread);
+      .map((submission) => toThread(submission));
+    const questionsById = new Map(questions.map((question) => [question._id, question]));
+    const releasedQuestionRank = new Map(
+      releasedQuestionsOrdered.map((question, index) => [question._id, index]),
+    );
+    const archiveGroups = new Map<
+      Id<"sessionQuestions"> | "session",
+      {
+        question: Doc<"sessionQuestions"> | null;
+        roots: Doc<"submissions">[];
+      }
+    >();
+
+    for (const submission of mySubmissions) {
+      if (!isTopLevelMessage(submission)) {
+        continue;
+      }
+
+      const key = submission.questionId ?? "session";
+      const existing = archiveGroups.get(key) ?? {
+        question: submission.questionId ? (questionsById.get(submission.questionId) ?? null) : null,
+        roots: [],
+      };
+      existing.roots.push(submission);
+      archiveGroups.set(key, existing);
+    }
+
+    const myArchiveByQuestion = [...archiveGroups.entries()]
+      .map(([key, group]) => {
+        const threads = group.roots
+          .sort((left, right) => right.createdAt - left.createdAt)
+          .map((root) => toThread(root, archiveRepliesByParentId));
+        const latestActivityAt = threads.reduce((latest, thread) => {
+          const replyLatest = thread.replies.reduce(
+            (replyMax, reply) => Math.max(replyMax, reply.submission.createdAt),
+            thread.root.submission.createdAt,
+          );
+
+          return Math.max(latest, replyLatest);
+        }, 0);
+        const replyCount = threads.reduce((count, thread) => count + thread.replies.length, 0);
+
+        return {
+          questionId: key === "session" ? null : key,
+          question: group.question ? toPublicQuestion(group.question) : null,
+          fallbackTitle: group.question ? null : "Session prompt",
+          fallbackPrompt: group.question ? null : session.openingPrompt,
+          isCurrent: Boolean(group.question && group.question._id === currentQuestion?._id),
+          latestActivityAt,
+          contributionCount: threads.length,
+          replyCount,
+          threads,
+        };
+      })
+      .sort((left, right) => {
+        if (left.isCurrent !== right.isCurrent) {
+          return left.isCurrent ? -1 : 1;
+        }
+
+        const leftRank =
+          left.questionId === null
+            ? Number.MAX_SAFE_INTEGER
+            : (releasedQuestionRank.get(left.questionId) ?? Number.MAX_SAFE_INTEGER);
+        const rightRank =
+          right.questionId === null
+            ? Number.MAX_SAFE_INTEGER
+            : (releasedQuestionRank.get(right.questionId) ?? Number.MAX_SAFE_INTEGER);
+
+        if (leftRank !== rightRank) {
+          return leftRank - rightRank;
+        }
+
+        return right.latestActivityAt - left.latestActivityAt;
+      });
     const canSeeSelectedPeerThreads =
       selectedQuestion?.peerResponsesVisible ?? session.visibilityMode === "raw_responses_visible";
     const peerThreads = canSeeSelectedPeerThreads
@@ -729,7 +818,7 @@ export const overview = query({
           )
           .sort((left, right) => right.createdAt - left.createdAt)
           .slice(0, PEER_RESPONSE_LIMIT)
-          .map(toThread)
+          .map((submission) => toThread(submission))
       : [];
     const toCategorySummary = (category: Doc<"categories">) => ({
       id: category._id,
@@ -910,6 +999,7 @@ export const overview = query({
         toSubmission(submission, participant, session),
       ),
       myThreads,
+      myArchiveByQuestion,
       peerThreads,
       peerThreadsByCategory,
       activeFollowUps,

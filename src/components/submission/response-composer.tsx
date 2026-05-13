@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { PencilSimple } from "@phosphor-icons/react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { ToneSelector } from "@/components/submission/tone-selector";
 import { useInputTelemetry } from "@/hooks/use-input-telemetry";
@@ -40,7 +41,14 @@ export function ResponseComposer({
   const [text, setText] = useState("");
   const [tone, setTone] = useState(defaultTone);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const expanded = focused || text.length > 0;
+
+  useEffect(() => {
+    if (expanded) textareaRef.current?.focus();
+  }, [expanded]);
   const limit = softWordLimit ?? wordLimit ?? 200;
   const wordCount = countWords(text);
   const atLimit = wordCount >= limit;
@@ -72,46 +80,74 @@ export function ResponseComposer({
   return (
     <form
       onSubmit={handleSubmit}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+          setFocused(false);
+        }
+      }}
       className={cn(
-        "rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3",
+        "rounded-md border bg-[var(--c-surface-soft)] transition-all",
+        expanded
+          ? "border-[var(--c-border-strong)] p-3"
+          : "border-dashed border-[var(--c-border-strong)] px-3 py-2",
         className,
       )}
     >
-      <textarea
-        value={text}
-        onKeyDown={telemetry.onKeyDown}
-        onPaste={telemetry.onPaste}
-        onChange={(event) => {
-          setText(event.target.value);
-          telemetry.onChange(event.target.value);
-        }}
-        placeholder={placeholder}
-        disabled={disabled || isSubmitting}
-        className="w-full resize-y border-none bg-transparent text-sm text-[var(--c-body)] placeholder:text-[var(--c-muted)] focus:outline-none"
-        style={{ minHeight: 100, fontFamily: "var(--font-body)" }}
-      />
-      <div className="mt-2 flex items-center justify-between border-t border-[var(--c-hairline)] pt-2">
-        <span
-          className={cn(
-            "text-[10px]",
-            atLimit
-              ? "text-[var(--c-error)]"
-              : nearLimit
-                ? "text-[var(--c-sig-mustard)]"
-                : "text-[var(--c-muted)]",
-          )}
+      {expanded ? (
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onKeyDown={telemetry.onKeyDown}
+          onPaste={telemetry.onPaste}
+          onFocus={() => setFocused(true)}
+          onChange={(event) => {
+            setText(event.target.value);
+            telemetry.onChange(event.target.value);
+          }}
+          placeholder={placeholder}
+          disabled={disabled || isSubmitting}
+          className="w-full resize-y border-none bg-transparent text-sm text-[var(--c-body)] placeholder:text-[var(--c-muted)] focus:outline-none"
+          style={{ minHeight: 100, fontFamily: "var(--font-body)" }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setFocused(true)}
+          disabled={disabled}
+          className="flex w-full items-center gap-2 text-left"
         >
-          {wordCount}/{limit} words
-        </span>
-        <ToneSelector value={tone} onChange={setTone} />
-      </div>
-      <Button
-        className="mt-2 w-full"
-        type="submit"
-        disabled={disabled || isSubmitting || wordCount === 0}
-      >
-        {isSubmitting ? "Submitting..." : submitLabel}
-      </Button>
+          <PencilSimple size={14} className="shrink-0 text-[var(--c-muted)]" />
+          <span className="text-sm text-[var(--c-muted)]" style={{ fontFamily: "var(--font-body)" }}>
+            {placeholder}
+          </span>
+        </button>
+      )}
+      {expanded ? (
+        <>
+          <div className="mt-2 flex items-center justify-between pt-2">
+            <span
+              className={cn(
+                "text-[10px]",
+                atLimit
+                  ? "text-[var(--c-error)]"
+                  : nearLimit
+                    ? "text-[var(--c-sig-mustard)]"
+                    : "text-[var(--c-muted)]",
+              )}
+            >
+              {wordCount}/{limit} words
+            </span>
+            <ToneSelector value={tone} onChange={setTone} />
+          </div>
+          <Button
+            className="mt-2 w-full"
+            type="submit"
+            disabled={disabled || isSubmitting || wordCount === 0}
+          >
+            {isSubmitting ? "Submitting..." : submitLabel}
+          </Button>
+        </>
+      ) : null}
     </form>
   );
 }

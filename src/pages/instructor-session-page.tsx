@@ -120,6 +120,7 @@ export function InstructorSessionPage() {
         <InstructorLeftRail
           sessionSlug={sessionSlug}
           sessionTitle={session.title}
+          joinCode={session.joinCode}
           workspaceTab={workspaceTab}
           roomMode={roomMode}
           workspaceHref={workspaceHref}

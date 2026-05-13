@@ -11,3 +11,23 @@ Convex agent skills for common tasks can be installed by running
 `npx convex ai-files install`.
 
 <!-- convex-ai-end -->
+
+## Agent Workflow
+
+Always use these skills when working on frontend, UI, UX, navigation, interaction, layout, component, or visual design tasks:
+
+- `frontend-ui-component-generation`
+- `ui-ux-pro-max`
+- `shadcn` skill for component selection, composition, and shadcn/Base UI patterns
+
+Always use these skills when writing, reviewing, or refactoring code:
+
+- `karpathy-guidelines`
+- `vercel-react-best-practices` when writing, reviewing, or refactoring React code
+- `vercel-composition-patterns` when designing, reviewing, or refactoring React component architecture and reusable APIs
+
+Always use these skills when brainstorming, shaping product behavior, writing specs, or preparing implementation plans:
+
+- `brainstorming`
+
+Use the `imagegen` skill when the frontend task needs raster visual assets, generated imagery, UI mockups, or bitmap edits. Do not force `imagegen` for normal code-native UI work.
