@@ -203,7 +203,6 @@ export function InstructorSessionPage() {
   const instructorRoom = useInstructorRoom(sessionSlug, activeQuestionId);
   const questionScopedArgs = activeQuestionId ? { sessionSlug, questionId: activeQuestionId } : { sessionSlug };
   const triggerCategorisation = useMutation(api.categorisation.triggerForSession);
-  const updatePhase = useMutation(api.instructorControls.updatePhase);
   const updateVisibility = useMutation(api.instructorControls.updateVisibility);
   const updateSettings = useMutation(api.instructorControls.updateSettings);
   const generateCategorySummary = useMutation(api.synthesis.generateCategorySummary);
@@ -343,30 +342,6 @@ export function InstructorSessionPage() {
   const roomUncategorizedThreads = instructorRoom?.uncategorizedThreads ?? [];
   const roomNeedsAttention = instructorRoom?.needsAttention;
   const roomDataLoading = instructorRoom === undefined;
-
-  const PHASE_ORDER = ["lobby", "submit", "discover", "challenge", "synthesize", "closed"] as const;
-  type Phase = (typeof PHASE_ORDER)[number];
-  type Act = "submit" | "discover" | "challenge" | "synthesize";
-  const ACT_FOR_PHASE = {
-    lobby: "submit",
-    submit: "submit",
-    discover: "discover",
-    challenge: "challenge",
-    synthesize: "synthesize",
-    closed: "synthesize",
-  } satisfies Record<Phase, Act>;
-
-  function advancePhase() {
-    const idx = PHASE_ORDER.indexOf(session.phase as Phase);
-    const next = PHASE_ORDER[Math.min(idx + 1, PHASE_ORDER.length - 1)];
-    void updatePhase({ sessionSlug, phase: next, currentAct: ACT_FOR_PHASE[next] });
-  }
-
-  function retreatPhase() {
-    const idx = PHASE_ORDER.indexOf(session.phase as Phase);
-    const prev = PHASE_ORDER[Math.max(idx - 1, 0)];
-    void updatePhase({ sessionSlug, phase: prev, currentAct: ACT_FOR_PHASE[prev] });
-  }
 
   async function handleVisibilityChange(visibilityMode: VisibilityMode) {
     await updateVisibility({ sessionSlug, visibilityMode });
@@ -2028,9 +2003,6 @@ export function InstructorSessionPage() {
       sessionTitle={session.title}
       sessionCode={session.joinCode}
       participantCount={session.participantCount}
-      actIndex={PHASE_ORDER.indexOf(session.phase as Phase) - 1}
-      onPreviousAct={retreatPhase}
-      onNextAct={advancePhase}
       left={
         <div className="flex min-h-full flex-col gap-6 bg-gradient-to-b from-[#18324c] to-[#12263a] p-5 text-[#d9e7f3]">
           <section className="border-b border-white/10 pb-5">

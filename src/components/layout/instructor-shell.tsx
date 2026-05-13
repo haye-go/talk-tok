@@ -1,14 +1,10 @@
 import type { ReactNode } from "react";
 import { InstructorTopBar } from "@/components/layout/instructor-top-bar";
-import { useAct } from "@/hooks/use-act";
 
 export interface InstructorShellProps {
   sessionTitle?: string;
   sessionCode?: string;
   participantCount?: number;
-  actIndex?: number;
-  onPreviousAct?: () => void;
-  onNextAct?: () => void;
   left?: ReactNode;
   center?: ReactNode;
   right?: ReactNode;
@@ -21,9 +17,6 @@ export function InstructorShell({
   sessionTitle = "Session",
   sessionCode,
   participantCount = 0,
-  actIndex,
-  onPreviousAct,
-  onNextAct,
   left,
   center,
   right,
@@ -31,7 +24,6 @@ export function InstructorShell({
   main,
   rail,
 }: InstructorShellProps) {
-  const fallbackAct = useAct();
   const resolvedSidebar = sidebar ?? left;
   const resolvedMain = main ?? center;
   const resolvedRail = rail ?? right;
@@ -42,9 +34,6 @@ export function InstructorShell({
         sessionTitle={sessionTitle}
         sessionCode={sessionCode}
         participantCount={participantCount}
-        actIndex={actIndex ?? fallbackAct.actIndex}
-        onPreviousAct={onPreviousAct ?? fallbackAct.goBackAct}
-        onNextAct={onNextAct ?? fallbackAct.advanceAct}
       />
       <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[226px_minmax(0,1fr)_314px]">
         <aside className="min-h-0 overflow-y-auto border-b border-[#223a54] bg-[#12263a] text-[#d9e7f3] lg:border-b-0 lg:border-r">
