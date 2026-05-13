@@ -1,5 +1,3 @@
-import { Card } from "@/components/ui/card";
-
 interface CategoryCountCell {
   categoryId: string;
   categoryName?: string;
@@ -41,14 +39,18 @@ export function CategoryDriftSection({ drift }: CategoryDriftSectionProps) {
   );
 
   return (
-    <Card title="Category Drift">
-      <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
-        How category distribution has changed over time. Each bar shows the share of threads per
-        category across {drift.slices.length} slice{drift.slices.length === 1 ? "" : "s"}.
-      </p>
+    <section>
+      <header className="border-b border-[var(--c-hairline)] pb-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
+          Category Drift · {drift.slices.length} slice{drift.slices.length === 1 ? "" : "s"}
+        </p>
+        <p className="mt-1 text-xs text-[var(--c-muted)]">
+          Share of threads per category across the discussion. Bars total to 100%.
+        </p>
+      </header>
 
       {grandTotal > 0 ? (
-        <div className="mb-5 grid gap-3">
+        <div className="mt-4 grid gap-3">
           {Array.from(totalsByCategory.entries()).map(([id, entry]) => {
             const share = entry.total / grandTotal;
             const percent = Math.round(share * 100);
@@ -57,7 +59,7 @@ export function CategoryDriftSection({ drift }: CategoryDriftSectionProps) {
                 <div className="mb-1 flex items-center justify-between text-xs">
                   <span className="font-semibold text-[var(--c-ink)]">{entry.name}</span>
                   <span className="text-[var(--c-muted)]">
-                    {entry.total} threads · {percent}%
+                    {entry.total} thread{entry.total === 1 ? "" : "s"} · {percent}%
                   </span>
                 </div>
                 <div className="h-3 w-full overflow-hidden rounded-pill bg-[var(--c-surface-strong)]">
@@ -71,33 +73,6 @@ export function CategoryDriftSection({ drift }: CategoryDriftSectionProps) {
           })}
         </div>
       ) : null}
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-[11px]">
-          <thead>
-            <tr className="border-b border-[var(--c-hairline)] text-left text-[var(--c-muted)]">
-              <th className="py-1 pr-2 font-medium">Slice</th>
-              {drift.slices[0].categoryCounts.map((cell) => (
-                <th key={cell.categoryId} className="py-1 pr-2 font-medium">
-                  {cell.categoryName?.split(" ")[0]}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {drift.slices.map((slice) => (
-              <tr key={slice.key} className="border-b border-[var(--c-hairline)]">
-                <td className="py-1 pr-2 text-[var(--c-ink)]">{slice.label}</td>
-                {slice.categoryCounts.map((cell) => (
-                  <td key={cell.categoryId} className="py-1 pr-2 font-mono text-[var(--c-body)]">
-                    {cell.count}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+    </section>
   );
 }
