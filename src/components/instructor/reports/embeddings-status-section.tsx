@@ -3,6 +3,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export interface EmbeddingsStatusSectionProps {
   sessionSlug: string;
@@ -30,11 +31,15 @@ export function EmbeddingsStatusSection({
   }
 
   return (
-    <section className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--c-hairline)] py-3">
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-          Embeddings
-        </span>
+    <Card
+      title="Embeddings"
+      action={
+        <Button size="sm" variant="secondary" onClick={() => void handleQueue()} disabled={busy}>
+          {busy ? "Queued" : "Generate Embeddings"}
+        </Button>
+      }
+    >
+      <div className="-mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
         <span>
           <strong className="text-[var(--c-ink)]">{embeddingCount}</strong>{" "}
           <span className="text-[var(--c-muted)]">stored</span>
@@ -45,9 +50,6 @@ export function EmbeddingsStatusSection({
           <span className="text-[var(--c-muted)]">submissions</span>
         </span>
       </div>
-      <Button size="sm" variant="secondary" onClick={() => void handleQueue()} disabled={busy}>
-        {busy ? "Queued" : "Generate Embeddings"}
-      </Button>
-    </section>
+    </Card>
   );
 }
