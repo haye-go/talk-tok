@@ -8,13 +8,12 @@ import { SetupWorkspace } from "@/components/instructor/setup/setup-workspace";
 import { InstructorShell } from "@/components/layout/instructor-shell";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
-import { useInstructorOverview } from "@/hooks/use-instructor-overview";
+import { useInstructorShell } from "@/hooks/use-instructor-shell";
 import {
   routes,
   type InstructorRoomModeId,
   type InstructorWorkspaceTabId,
 } from "@/lib/routes";
-import { type InputPattern } from "@/lib/submission-telemetry";
 
 function isInstructorWorkspaceTab(value: string | null): value is InstructorWorkspaceTabId {
   return value === "room" || value === "setup" || value === "reports";
@@ -36,9 +35,9 @@ export function InstructorSessionPage() {
     : "latest";
   const selectedQuestionId =
     (searchParams.get("questionId") as Id<"sessionQuestions"> | null) ?? undefined;
-  const overview = useInstructorOverview(sessionSlug, selectedQuestionId);
+  const shell = useInstructorShell(sessionSlug, selectedQuestionId);
 
-  if (overview === undefined) {
+  if (shell === undefined) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[var(--c-canvas)] p-4">
         <LoadingState label="Loading instructor session..." className="w-full max-w-md" />
@@ -46,7 +45,7 @@ export function InstructorSessionPage() {
     );
   }
 
-  if (overview === null) {
+  if (shell === null) {
     return (
       <main className="grid min-h-dvh place-items-center bg-[var(--c-canvas)] p-4">
         <ErrorState
@@ -57,22 +56,7 @@ export function InstructorSessionPage() {
     );
   }
 
-  const {
-    session,
-    presence,
-    responses,
-    categories,
-    recategorisation,
-    followUps,
-    selectedQuestion,
-  } = overview;
-
-  const activeCategories = categories;
-  const patternCounts = responses.inputPatterns as Record<InputPattern, number>;
-  const joinPath = routes.join(session.joinCode);
-  const joinUrl =
-    typeof window === "undefined" ? joinPath : new URL(joinPath, window.location.origin).toString();
-
+  const { session, selectedQuestion } = shell;
   const synthesisReleasedForQuestion = selectedQuestion?.synthesisVisible ?? false;
   const reportsReleasedForQuestion = selectedQuestion?.personalReportsVisible ?? false;
   const sessionPrivateVisibility = session.visibilityMode === "private_until_released";
@@ -96,8 +80,6 @@ export function InstructorSessionPage() {
       questionId,
     });
 
-  const categoryRefs = activeCategories.map((category) => ({ id: category.id, name: category.name }));
-
   let center;
   if (workspaceTab === "room") {
     center = (
@@ -106,9 +88,9 @@ export function InstructorSessionPage() {
         selectedQuestionId={selectedQuestion?.id}
         roomMode={roomMode}
         roomModeHref={roomModeHref}
-        typingPresence={presence.typing}
-        patternCounts={patternCounts}
-        categories={categoryRefs}
+        typingPresence={shell.counters.typing}
+        patternCounts={shell.inputPatterns}
+        categories={shell.categories}
       />
     );
   } else if (workspaceTab === "reports") {
@@ -116,8 +98,8 @@ export function InstructorSessionPage() {
       <ReportsWorkspace
         sessionSlug={sessionSlug}
         selectedQuestionId={selectedQuestion?.id}
-        categories={categoryRefs}
-        currentQuestionTitle={overview.currentQuestion?.title ?? "the current question"}
+        categories={shell.categories}
+        currentQuestionTitle={shell.currentQuestion?.title ?? "the current question"}
         sessionPrivateVisibility={sessionPrivateVisibility}
         synthesisReleasedForQuestion={synthesisReleasedForQuestion}
         reportsReleasedForQuestion={reportsReleasedForQuestion}
@@ -125,37 +107,7 @@ export function InstructorSessionPage() {
     );
   } else {
     center = (
-      <SetupWorkspace
-        sessionSlug={sessionSlug}
-        selectedQuestionId={selectedQuestion?.id}
-        session={session}
-        currentQuestion={overview.currentQuestion}
-        selectedQuestion={selectedQuestion ?? null}
-        metrics={{
-          submitted: responses.total,
-          categories: activeCategories.length,
-          recategorisationRequests: recategorisation.pendingCount,
-          followUps: followUps.activeCount,
-        }}
-        joinUrl={joinUrl}
-        categories={activeCategories.map((category) => ({
-          id: category.id,
-          name: category.name,
-          description: category.description,
-          color: category.color,
-          assignmentCount: category.assignmentCount,
-        }))}
-        followUps={followUps.recent.map((prompt) => ({
-          id: prompt.id,
-          title: prompt.title,
-          prompt: prompt.prompt,
-          status: prompt.status,
-          targetMode: prompt.targetMode,
-          activatedAt: prompt.activatedAt ?? undefined,
-          closedAt: prompt.closedAt ?? undefined,
-          createdAt: prompt.createdAt,
-        }))}
-      />
+      <SetupWorkspace sessionSlug={sessionSlug} selectedQuestionId={selectedQuestion?.id} />
     );
   }
 

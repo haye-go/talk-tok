@@ -1,4 +1,4 @@
-import { ROOM_MODES } from "@/components/instructor/instructor-left-rail";
+import { ROOM_MODES } from "@/components/instructor/instructor-nav";
 import { PresenceBar } from "@/components/stream/presence-bar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";

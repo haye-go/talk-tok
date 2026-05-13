@@ -3,77 +3,29 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { QuestionManagerPanel } from "@/components/instructor/question-manager-panel";
 import {
-  type SessionControlSnapshot,
   type SessionSettingsUpdate,
   type VisibilityMode,
 } from "@/components/instructor/session-controls-card";
+import { useInstructorSetup } from "@/hooks/use-instructor-setup";
+import { useInstructorShell } from "@/hooks/use-instructor-shell";
+import { routes } from "@/lib/routes";
 import { AccessAndSharingSection } from "./access-and-sharing-section";
 import { AiReadinessSection } from "./ai-readiness-section";
 import { CategoryTaxonomyEditor } from "./category-taxonomy-editor";
 import { FollowUpDraftEditor } from "./follow-up-draft-editor";
 
-interface CategoryItem {
-  id: Id<"categories">;
-  name: string;
-  description?: string;
-  color?: string;
-  assignmentCount?: number;
-}
-
-interface FollowUpPrompt {
-  id: Id<"followUpPrompts">;
-  title: string;
-  prompt: string;
-  status: "draft" | "active" | "closed" | "archived";
-  targetMode: string;
-  activatedAt?: number;
-  closedAt?: number;
-  createdAt: number;
-}
-
-interface CurrentQuestionInfo {
-  title: string;
-  prompt: string;
-  status: string;
-  isCurrent: boolean;
-}
-
-interface SelectedQuestionStatus {
-  status?: string;
-}
-
 export interface SetupWorkspaceProps {
   sessionSlug: string;
   selectedQuestionId: Id<"sessionQuestions"> | undefined;
-  session: SessionControlSnapshot & { joinCode: string; id: Id<"sessions"> };
-  currentQuestion: CurrentQuestionInfo | null;
-  selectedQuestion: SelectedQuestionStatus | null;
-  metrics: {
-    submitted: number;
-    categories: number;
-    recategorisationRequests: number;
-    followUps: number;
-  };
-  joinUrl: string;
-  categories: CategoryItem[];
-  followUps: FollowUpPrompt[];
 }
 
 function isBusyStatus(status?: string) {
   return status === "queued" || status === "processing";
 }
 
-export function SetupWorkspace({
-  sessionSlug,
-  selectedQuestionId,
-  session,
-  currentQuestion,
-  selectedQuestion,
-  metrics,
-  joinUrl,
-  categories,
-  followUps,
-}: SetupWorkspaceProps) {
+export function SetupWorkspace({ sessionSlug, selectedQuestionId }: SetupWorkspaceProps) {
+  const setup = useInstructorSetup(sessionSlug, selectedQuestionId);
+  const shell = useInstructorShell(sessionSlug, selectedQuestionId);
   const updateVisibility = useMutation(api.instructorControls.updateVisibility);
   const updateSettings = useMutation(api.instructorControls.updateSettings);
   const questionScopedArgs = selectedQuestionId
@@ -81,6 +33,31 @@ export function SetupWorkspace({
     : { sessionSlug };
   const questionBaseline = useQuery(api.questionBaselines.getForQuestion, questionScopedArgs);
   const aiJobs = useQuery(api.jobs.listForSession, { ...questionScopedArgs, limit: 80 });
+
+  if (!setup || !shell) {
+    return (
+      <div className="mx-auto grid w-full max-w-6xl gap-5 p-5 lg:p-7">
+        <p className="text-sm text-[var(--c-muted)]">Loading setup data…</p>
+      </div>
+    );
+  }
+
+  const session = setup.session;
+  const joinPath = routes.join(session.joinCode);
+  const joinUrl =
+    typeof window === "undefined" ? joinPath : new URL(joinPath, window.location.origin).toString();
+
+  const selectedQuestion = setup.selectedQuestion;
+  const currentQuestion = setup.currentQuestion;
+  const activeCategories = setup.categories.filter((category) => category.status === "active");
+  const activeFollowUps = setup.followUpPrompts.filter((prompt) => prompt.status === "active");
+
+  const metrics = {
+    submitted: shell.counters.submitted,
+    categories: activeCategories.length,
+    recategorisationRequests: shell.counters.pendingRecategorisation,
+    followUps: activeFollowUps.length,
+  };
 
   const latestBaselineJob = aiJobs?.find((job) => job.type === "question_baseline") ?? null;
   const baselineBusy =
@@ -132,13 +109,30 @@ export function SetupWorkspace({
           <CategoryTaxonomyEditor
             sessionSlug={sessionSlug}
             selectedQuestionId={selectedQuestionId}
-            categories={categories}
+            categories={activeCategories.map((category) => ({
+              id: category.id,
+              name: category.name,
+              description: category.description,
+              color: category.color,
+            }))}
           />
           <FollowUpDraftEditor
             sessionSlug={sessionSlug}
             selectedQuestionId={selectedQuestionId}
-            categories={categories}
-            followUps={followUps}
+            categories={activeCategories.map((category) => ({
+              id: category.id,
+              name: category.name,
+            }))}
+            followUps={setup.followUpPrompts.map((prompt) => ({
+              id: prompt.id,
+              title: prompt.title,
+              prompt: prompt.prompt,
+              status: prompt.status,
+              targetMode: prompt.targetMode,
+              activatedAt: prompt.activatedAt ?? undefined,
+              closedAt: prompt.closedAt ?? undefined,
+              createdAt: prompt.createdAt,
+            }))}
           />
         </div>
         <AccessAndSharingSection
