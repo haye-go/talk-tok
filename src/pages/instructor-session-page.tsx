@@ -1,36 +1,28 @@
 import { useEffect, useState } from "react";
-import { WarningCircle } from "@phosphor-icons/react";
 import { useLocation, useParams } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { type AiJobStatusItem } from "@/components/instructor/ai-job-status-panel";
-import { InstructorLeftRail, ROOM_MODES } from "@/components/instructor/instructor-left-rail";
+import { InstructorLeftRail } from "@/components/instructor/instructor-left-rail";
 import { InstructorRightRail } from "@/components/instructor/instructor-right-rail";
 import { ReportsWorkspace } from "@/components/instructor/reports/reports-workspace";
+import { RoomWorkspace } from "@/components/instructor/room/room-workspace";
 import { SetupWorkspace } from "@/components/instructor/setup/setup-workspace";
 import { InstructorShell } from "@/components/layout/instructor-shell";
 import {
   type SessionSettingsUpdate,
   type VisibilityMode,
 } from "@/components/instructor/session-controls-card";
-import { PresenceBar } from "@/components/stream/presence-bar";
-import { SubmissionCard } from "@/components/submission/submission-card";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { MetricTile } from "@/components/ui/metric-tile";
 import { useInstructorOverview } from "@/hooks/use-instructor-overview";
-import { useInstructorRoom } from "@/hooks/use-instructor-room";
-import { categoryColorToTone } from "@/lib/category-colors";
 import {
   routes,
   type InstructorRoomModeId,
   type InstructorWorkspaceTabId,
 } from "@/lib/routes";
-import { cn } from "@/lib/utils";
+import { type InputPattern } from "@/lib/submission-telemetry";
 
 const AI_READINESS_FEATURES = [
   { feature: "feedback", label: "Feedback", promptKey: "feedback.private.v1" },
@@ -129,23 +121,10 @@ export function InstructorSessionPage() {
   const selectedQuestionId = (searchParams.get("questionId") as Id<"sessionQuestions"> | null) ?? undefined;
   const overview = useInstructorOverview(sessionSlug, selectedQuestionId);
   const activeQuestionId = overview?.selectedQuestion?.id ?? overview?.currentQuestion?.id;
-  const instructorRoom = useInstructorRoom(sessionSlug, activeQuestionId);
   const questionScopedArgs = activeQuestionId ? { sessionSlug, questionId: activeQuestionId } : { sessionSlug };
-  const triggerCategorisation = useMutation(api.categorisation.triggerForSession);
   const updateVisibility = useMutation(api.instructorControls.updateVisibility);
   const updateSettings = useMutation(api.instructorControls.updateSettings);
-  const generateCategorySummary = useMutation(api.synthesis.generateCategorySummary);
-  const createCategory = useMutation(api.categoryManagement.create);
-  const updateCategory = useMutation(api.categoryManagement.update);
-  const createFollowUp = useMutation(api.followUps.create);
-  const pendingRecatRequests = useQuery(api.recategorisation.listForSession, {
-    sessionSlug,
-    status: "pending",
-  });
-  const decideRecategorisation = useMutation(api.recategorisation.decide);
-
   const semanticStatus = useQuery(api.semantic.getSemanticStatus, questionScopedArgs);
-  const similarityMap = useQuery(api.semantic.getSimilarityMap, questionScopedArgs);
   const argumentGraph = useQuery(api.argumentMap.getVisualizationGraph, questionScopedArgs);
   const aiJobs = useQuery(api.jobs.listForSession, { ...questionScopedArgs, limit: 80 });
   const questionBaseline = useQuery(api.questionBaselines.getForQuestion, questionScopedArgs);
@@ -158,28 +137,11 @@ export function InstructorSessionPage() {
   const recentLlmCalls = useQuery(api.llmObservability.recentCalls, { sessionSlug, limit: 12 });
   const demoToggles = useQuery(api.demo.listToggles, {});
 
-  const queueEmbeddings = useMutation(api.semantic.queueEmbeddingsForSession);
   const checkOpenAiKey = useAction(api.modelSettings.checkOpenAiKey);
 
-  const [triggeringCategorisation, setTriggeringCategorisation] = useState(false);
-  const [generatingCategoryId, setGeneratingCategoryId] = useState<Id<"categories"> | null>(null);
-  const [embeddingQueued, setEmbeddingQueued] = useState(false);
   const [openAiKeyState, setOpenAiKeyState] = useState<"checking" | "ready" | "missing" | "error">(
     "checking",
   );
-  const [decidingRecatId, setDecidingRecatId] = useState<string | null>(null);
-  const [showAddCategory, setShowAddCategory] = useState(false);
-  const [addCategoryName, setAddCategoryName] = useState("");
-  const [addCategoryDescription, setAddCategoryDescription] = useState("");
-  const [savingCategory, setSavingCategory] = useState(false);
-  const [categoryError, setCategoryError] = useState<string | null>(null);
-  const [editingCategoryId, setEditingCategoryId] = useState<Id<"categories"> | null>(null);
-  const [editingCategoryName, setEditingCategoryName] = useState("");
-  const [editingCategoryDescription, setEditingCategoryDescription] = useState("");
-  const [followUpCategoryId, setFollowUpCategoryId] = useState<Id<"categories"> | null>(null);
-  const [followUpPrompt, setFollowUpPrompt] = useState("");
-  const [savingFollowUp, setSavingFollowUp] = useState(false);
-  const [followUpError, setFollowUpError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -237,13 +199,7 @@ export function InstructorSessionPage() {
     typeof window === "undefined" ? joinPath : new URL(joinPath, window.location.origin).toString();
 
   const activeCategories = categories;
-  const categoryById = new Map(activeCategories.map((category) => [category.id, category]));
-  const roomLatestThreads = instructorRoom?.latestThreads ?? [];
-  const roomCategoryGroups =
-    instructorRoom?.threadsByCategory.filter((group) => group.threads.length > 0) ?? [];
-  const roomUncategorizedThreads = instructorRoom?.uncategorizedThreads ?? [];
-  const roomNeedsAttention = instructorRoom?.needsAttention;
-  const roomDataLoading = instructorRoom === undefined;
+  const patternCounts = responses.inputPatterns as Record<InputPattern, number>;
 
   async function handleVisibilityChange(visibilityMode: VisibilityMode) {
     await updateVisibility({ sessionSlug, visibilityMode });
@@ -254,128 +210,6 @@ export function InstructorSessionPage() {
       sessionSlug,
       ...settings,
     });
-  }
-
-  async function handleRecategorisationDecision(args: {
-    requestId: Id<"recategorizationRequests">;
-    decision: "approved" | "rejected";
-    categoryId?: Id<"categories">;
-  }) {
-    setDecidingRecatId(args.requestId);
-    try {
-      await decideRecategorisation({
-        sessionSlug,
-        requestId: args.requestId,
-        decision: args.decision,
-        categoryId: args.categoryId,
-      });
-    } finally {
-      setDecidingRecatId(null);
-    }
-  }
-
-  async function handleGenerateCategorySummary(categoryId: Id<"categories">) {
-    setGeneratingCategoryId(categoryId);
-    try {
-      await generateCategorySummary({ sessionSlug, categoryId });
-    } finally {
-      setGeneratingCategoryId(null);
-    }
-  }
-
-  async function handleTriggerCategorisation() {
-    setTriggeringCategorisation(true);
-    try {
-      await triggerCategorisation({ sessionSlug, questionId: activeQuestionId });
-    } finally {
-      setTriggeringCategorisation(false);
-    }
-  }
-
-  async function handleCreateCategory() {
-    setCategoryError(null);
-    setSavingCategory(true);
-    try {
-      await createCategory({
-        sessionSlug,
-        questionId: activeQuestionId,
-        name: addCategoryName,
-        description: addCategoryDescription || undefined,
-      });
-      setAddCategoryName("");
-      setAddCategoryDescription("");
-      setShowAddCategory(false);
-    } catch (cause) {
-      setCategoryError(cause instanceof Error ? cause.message : "Could not create category.");
-    } finally {
-      setSavingCategory(false);
-    }
-  }
-
-  function startRenameCategory(category: (typeof activeCategories)[number]) {
-    setCategoryError(null);
-    setEditingCategoryId(category.id);
-    setEditingCategoryName(category.name);
-    setEditingCategoryDescription(category.description ?? "");
-  }
-
-  async function handleRenameCategory(categoryId: Id<"categories">) {
-    setCategoryError(null);
-    setSavingCategory(true);
-    try {
-      await updateCategory({
-        sessionSlug,
-        categoryId,
-        name: editingCategoryName,
-        description: editingCategoryDescription || undefined,
-      });
-      setEditingCategoryId(null);
-      setEditingCategoryName("");
-      setEditingCategoryDescription("");
-    } catch (cause) {
-      setCategoryError(cause instanceof Error ? cause.message : "Could not rename category.");
-    } finally {
-      setSavingCategory(false);
-    }
-  }
-
-  function startCategoryFollowUp(category: (typeof activeCategories)[number]) {
-    setFollowUpError(null);
-    setFollowUpCategoryId(category.id);
-    setFollowUpPrompt(
-      `What is one strong counterpoint or extension to the "${category.name}" view?`,
-    );
-  }
-
-  async function handleCreateCategoryFollowUp(categoryId: Id<"categories">) {
-    setFollowUpError(null);
-    setSavingFollowUp(true);
-    try {
-      await createFollowUp({
-        sessionSlug,
-        questionId: activeQuestionId,
-        title: `Follow-up: ${activeCategories.find((category) => category.id === categoryId)?.name ?? "Category"}`,
-        prompt: followUpPrompt,
-        targetMode: "categories",
-        categoryIds: [categoryId],
-        activateNow: true,
-      });
-      setFollowUpCategoryId(null);
-      setFollowUpPrompt("");
-    } catch (cause) {
-      setFollowUpError(cause instanceof Error ? cause.message : "Could not create follow-up.");
-    } finally {
-      setSavingFollowUp(false);
-    }
-  }
-
-  async function handleQueueEmbeddings() {
-    setEmbeddingQueued(true);
-    try {
-      await queueEmbeddings({ sessionSlug, questionId: activeQuestionId });
-    } finally {
-      setEmbeddingQueued(false);
-    }
   }
 
   const artifactCounts = synthesis?.artifactCounts;
@@ -394,17 +228,13 @@ export function InstructorSessionPage() {
     latestJobFor("argument_map");
   const latestEmbeddingJob =
     (semanticStatus?.latestJob as EmbeddingJobRecord | null | undefined) ?? null;
-  const categorisationBusy =
-    triggeringCategorisation || isBusyStatus(latestCategorisationJob?.status);
+  const categorisationBusy = isBusyStatus(latestCategorisationJob?.status);
   const reportBusy = isBusyStatus(latestReportJob?.status);
   const baselineBusy =
     isBusyStatus(latestBaselineJob?.status) || isBusyStatus(questionBaseline?.status);
   const baselineCanGenerate = selectedQuestion?.status === "released";
-  const embeddingBusy = embeddingQueued || isBusyStatus(latestEmbeddingJob?.status);
+  const embeddingBusy = isBusyStatus(latestEmbeddingJob?.status);
   const argMapBusy = isBusyStatus(latestArgumentMapJob?.status);
-  const embeddingCount = semanticStatus?.embeddingCount ?? 0;
-  const noveltyCount = semanticStatus?.noveltyCount ?? 0;
-  const hasEmbeddings = embeddingCount > 0;
   const enabledModelFeatures = new Set(
     (modelSettings ?? [])
       .filter((setting) => setting.enabled)
@@ -498,7 +328,7 @@ export function InstructorSessionPage() {
     },
     {
       label: "Embeddings and signals",
-      status: latestEmbeddingJob?.status ?? (embeddingQueued ? "queued" : "idle"),
+      status: latestEmbeddingJob?.status ?? "idle",
       detail:
         progressDetail(latestEmbeddingJob) ??
         (semanticStatus
@@ -547,555 +377,16 @@ export function InstructorSessionPage() {
       questionId,
     });
 
-  function renderRoomThread(thread: (typeof roomLatestThreads)[number]) {
-    const { root, replies, assignment } = thread;
-    const submission = root.submission;
-    return (
-      <div
-        key={submission.id}
-        className="rounded-[18px] border border-[#d7e0ea] bg-white"
-      >
-        <SubmissionCard submission={submission} />
-        <div className="border-t border-[#e7edf3] px-4 py-3 text-xs text-[var(--c-muted)]">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={assignment ? "neutral" : "warning"}>
-              {assignment?.categoryName ?? "Uncategorized"}
-            </Badge>
-            <span>{root.stats.upvoteCount} upvotes</span>
-            <span>{root.stats.replyCount} replies</span>
-            <span>
-              {new Date(submission.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
-          {replies.length > 0 ? (
-            <details className="mt-3">
-              <summary className="cursor-pointer font-medium text-[var(--c-ink)]">
-                Show replies
-              </summary>
-              <div className="mt-3 grid gap-2">
-                {replies.map((reply) => (
-                  <div
-                    key={reply.submission.id}
-                    className="ml-4 border-l-2 border-[#dbe5ee] pl-3"
-                  >
-                    <SubmissionCard submission={reply.submission} />
-                  </div>
-                ))}
-              </div>
-            </details>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
-  const needsAttentionCount =
-    (roomNeedsAttention?.pendingRecategorisationCount ?? recategorisation.pendingCount) +
-    (roomNeedsAttention?.uncategorizedCount ?? responses.uncategorized) +
-    (latestCategorisationJob?.status === "error" ? 1 : 0) +
-    (latestSynthesisJob?.status === "error" ? 1 : 0) +
-    (latestReportJob?.status === "error" ? 1 : 0);
-
   const roomWorkspace = (
-    <div className="mx-auto grid w-full max-w-5xl gap-5 p-5 lg:p-7">
-      <header className="border-b border-[var(--c-hairline)] pb-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-[var(--c-muted)]">
-              Room
-            </p>
-            <h1 className="font-display text-2xl font-semibold text-[var(--c-ink)]">
-              {selectedQuestion?.title ?? "Live discussion"}
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--c-body)]">
-              {selectedQuestion?.prompt ?? session.openingPrompt}
-            </p>
-          </div>
-          <Badge tone={selectedQuestion?.isCurrent ? "success" : "neutral"}>
-            {selectedQuestion?.isCurrent
-              ? "Current question"
-              : (selectedQuestion?.status ?? session.phase)}
-          </Badge>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {ROOM_MODES.map((mode) => {
-            const Icon = mode.icon;
-
-            return (
-              <a
-                key={mode.id}
-                href={roomModeHref(mode.id)}
-                className={cn(
-                  "inline-flex min-h-9 items-center gap-2 rounded-sm border px-3 text-sm font-medium transition",
-                  roomMode === mode.id
-                    ? "border-[var(--c-primary)] bg-[var(--c-surface-strong)] text-[var(--c-ink)]"
-                    : "border-[var(--c-hairline)] text-[var(--c-muted)] hover:bg-[var(--c-surface-soft)] hover:text-[var(--c-ink)]",
-                )}
-              >
-                <Icon size={15} />
-                {mode.label}
-              </a>
-            );
-          })}
-        </div>
-      </header>
-
-      <details
-        open
-        className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)]"
-      >
-        <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3">
-          <span className="inline-flex items-center gap-2 font-display text-sm font-medium text-[var(--c-ink)]">
-            <WarningCircle size={16} />
-            Needs attention
-          </span>
-          <Badge tone={needsAttentionCount > 0 ? "warning" : "success"}>
-            {needsAttentionCount}
-          </Badge>
-        </summary>
-        <div className="grid gap-2 border-t border-[var(--c-hairline)] px-4 py-3 text-sm">
-          {recategorisation.pendingCount > 0 ? (
-            <p className="text-[var(--c-body)]">
-              {recategorisation.pendingCount} recategorisation request
-              {recategorisation.pendingCount === 1 ? "" : "s"} pending review.
-            </p>
-          ) : null}
-          {(roomNeedsAttention?.uncategorizedCount ?? responses.uncategorized) > 0 ? (
-            <p className="text-[var(--c-body)]">
-              {roomNeedsAttention?.uncategorizedCount ?? responses.uncategorized} root thread
-              {(roomNeedsAttention?.uncategorizedCount ?? responses.uncategorized) === 1
-                ? ""
-                : "s"}{" "}
-              need categorisation.
-            </p>
-          ) : null}
-          {latestCategorisationJob?.status === "error" ||
-          latestSynthesisJob?.status === "error" ||
-          latestReportJob?.status === "error" ? (
-            <p className="text-[var(--c-error)]">One or more live AI jobs need review.</p>
-          ) : null}
-          {needsAttentionCount === 0 ? (
-            <p className="text-[var(--c-muted)]">No live issues for the selected question.</p>
-          ) : null}
-        </div>
-      </details>
-
-      {pendingRecatRequests && pendingRecatRequests.length > 0 ? (
-        <Card title="Recategorisation Requests">
-          <div className="grid gap-2">
-            {pendingRecatRequests.slice(0, 6).map((request) => {
-              const requestedCategory = request.requestedCategoryId
-                ? categoryById.get(request.requestedCategoryId)
-                : null;
-              const canApprove = Boolean(request.requestedCategoryId);
-              const busy = decidingRecatId === request.id;
-
-              return (
-                <div
-                  key={request.id}
-                  className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-surface-strong)] p-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--c-ink)]">
-                        {requestedCategory
-                          ? `Move to ${requestedCategory.name}`
-                          : `Suggested: ${request.suggestedCategoryName ?? "New category"}`}
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-[var(--c-body)]">
-                        {request.reason}
-                      </p>
-                    </div>
-                    <Badge tone="warning">{request.status}</Badge>
-                  </div>
-                  <div className="mt-3 flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() =>
-                        void handleRecategorisationDecision({
-                          requestId: request.id,
-                          decision: "rejected",
-                        })
-                      }
-                    >
-                      Reject
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={busy || !canApprove}
-                      onClick={() =>
-                        void handleRecategorisationDecision({
-                          requestId: request.id,
-                          decision: "approved",
-                          categoryId: request.requestedCategoryId ?? undefined,
-                        })
-                      }
-                    >
-                      {busy ? "Saving..." : "Approve"}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      ) : null}
-
-      <PresenceBar typing={presence.typing} />
-
-      {roomMode === "latest" ? (
-        <section className="grid gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-medium text-[var(--c-ink)]">Latest threads</h2>
-            <Badge tone="neutral">{roomLatestThreads.length}</Badge>
-          </div>
-          {roomDataLoading ? (
-            <Card>
-              <p className="text-sm text-[var(--c-muted)]">Loading room threads...</p>
-            </Card>
-          ) : roomLatestThreads.length === 0 ? (
-            <Card>
-              <p className="text-sm text-[var(--c-muted)]">No submissions yet.</p>
-            </Card>
-          ) : (
-            roomLatestThreads.map(renderRoomThread)
-          )}
-        </section>
-      ) : null}
-
-      {roomMode === "categories" ? (
-        <section className="grid gap-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-medium text-[var(--c-ink)]">By category</h2>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                setCategoryError(null);
-                setShowAddCategory((value) => !value);
-              }}
-            >
-              + Add category
-            </Button>
-          </div>
-
-          {showAddCategory ? (
-            <form
-              className="grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void handleCreateCategory();
-              }}
-            >
-              <input
-                value={addCategoryName}
-                onChange={(event) => setAddCategoryName(event.target.value)}
-                placeholder="Category name"
-                className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
-              />
-              <textarea
-                value={addCategoryDescription}
-                onChange={(event) => setAddCategoryDescription(event.target.value)}
-                placeholder="Short description"
-                rows={2}
-                className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
-              />
-              {categoryError ? (
-                <p className="text-xs text-[var(--c-error)]">{categoryError}</p>
-              ) : null}
-              <div className="flex gap-2">
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={savingCategory || addCategoryName.trim().length < 2}
-                >
-                  {savingCategory ? "Saving..." : "Create"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setShowAddCategory(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          ) : null}
-
-          {roomCategoryGroups.map(({ category, threads }, index) => (
-            <section
-              key={category.id}
-              className="grid gap-3 border-l-4 pl-4"
-              style={{ borderColor: `var(--c-sig-${categoryColorToTone(category.color, index)})` }}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-display text-base font-medium text-[var(--c-ink)]">
-                    {category.name}
-                  </h3>
-                  {category.description ? (
-                    <p className="text-xs text-[var(--c-muted)]">{category.description}</p>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => startRenameCategory(category)}
-                  >
-                    Rename
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => startCategoryFollowUp(category)}
-                  >
-                    Follow-up
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => handleGenerateCategorySummary(category.id)}
-                    disabled={generatingCategoryId === category.id}
-                  >
-                    {generatingCategoryId === category.id ? "Summarizing..." : "Summarize"}
-                  </Button>
-                </div>
-              </div>
-
-              {editingCategoryId === category.id ? (
-                <form
-                  className="grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void handleRenameCategory(category.id);
-                  }}
-                >
-                  <input
-                    value={editingCategoryName}
-                    onChange={(event) => setEditingCategoryName(event.target.value)}
-                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
-                  />
-                  <textarea
-                    value={editingCategoryDescription}
-                    onChange={(event) => setEditingCategoryDescription(event.target.value)}
-                    rows={2}
-                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      type="submit"
-                      size="sm"
-                      disabled={savingCategory || editingCategoryName.trim().length < 2}
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditingCategoryId(null)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              ) : null}
-
-              {followUpCategoryId === category.id ? (
-                <form
-                  className="grid gap-2 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void handleCreateCategoryFollowUp(category.id);
-                  }}
-                >
-                  <textarea
-                    value={followUpPrompt}
-                    onChange={(event) => setFollowUpPrompt(event.target.value)}
-                    rows={3}
-                    placeholder="Follow-up question for this category"
-                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
-                  />
-                  {followUpError ? (
-                    <p className="text-xs text-[var(--c-error)]">{followUpError}</p>
-                  ) : null}
-                  <div className="flex gap-2">
-                    <Button
-                      type="submit"
-                      size="sm"
-                      disabled={savingFollowUp || followUpPrompt.trim().length < 5}
-                    >
-                      {savingFollowUp ? "Sending..." : "Send"}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setFollowUpCategoryId(null)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              ) : null}
-
-              {threads.map(renderRoomThread)}
-            </section>
-          ))}
-
-          {roomUncategorizedThreads.length > 0 ? (
-            <section className="grid gap-3 border-l-4 border-[var(--c-muted)] pl-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="font-display text-base font-medium text-[var(--c-ink)]">
-                  Uncategorized
-                </h3>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void handleTriggerCategorisation()}
-                  disabled={categorisationBusy}
-                >
-                  {categorisationBusy ? "Categorising..." : "Run categorisation"}
-                </Button>
-              </div>
-              {roomUncategorizedThreads.map(renderRoomThread)}
-            </section>
-          ) : null}
-        </section>
-      ) : null}
-
-      {roomMode === "similarity" ? (
-        <section className="grid gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-display text-lg font-medium text-[var(--c-ink)]">
-                Similarity map
-              </h2>
-              <p className="text-xs text-[var(--c-muted)]">
-                Machine-generated idea proximity. Categories remain separate.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleQueueEmbeddings}
-              disabled={embeddingBusy}
-            >
-              {embeddingBusy ? "Queued" : "Generate embeddings"}
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            <MetricTile label="Embeddings" value={String(embeddingCount)} />
-            <MetricTile label="Signals" value={String(noveltyCount)} />
-            <MetricTile label="Clusters" value={String(similarityMap?.clusters.length ?? 0)} />
-            <MetricTile
-              label="Status"
-              value={
-                similarityMap === undefined
-                  ? "loading"
-                  : similarityMap?.clusters.length
-                    ? "ready"
-                    : hasEmbeddings
-                      ? "unclustered"
-                      : "pending"
-              }
-            />
-          </div>
-
-          {similarityMap === undefined ? (
-            <Card>
-              <p className="text-sm text-[var(--c-muted)]">Loading similarity clusters...</p>
-            </Card>
-          ) : null}
-
-          {similarityMap && similarityMap.clusters.length === 0 ? (
-            <Card>
-              <p className="text-sm text-[var(--c-muted)]">
-                No semantic clusters yet. New submissions are embedded asynchronously; existing
-                messages can be processed with Generate embeddings.
-              </p>
-            </Card>
-          ) : null}
-
-          {similarityMap?.clusters.map((cluster, index) => (
-            <section
-              key={cluster.id}
-              className="grid gap-3 border-l-4 pl-4"
-              style={{
-                borderColor: `var(--c-sig-${["sky", "peach", "mustard", "coral"][index % 4]})`,
-              }}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-display text-base font-medium text-[var(--c-ink)]">
-                    {cluster.label}
-                  </h3>
-                  <p className="text-xs text-[var(--c-muted)]">
-                    {cluster.rootSubmissionCount} roots / {cluster.messageCount} messages
-                  </p>
-                </div>
-                <Badge tone={cluster.clusterKind === "promoted" ? "success" : "neutral"}>
-                  {cluster.clusterKind}
-                </Badge>
-              </div>
-
-              {cluster.threads.map((thread) => (
-                <div
-                  key={thread.root.id}
-                  className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="font-display text-sm font-medium text-[var(--c-ink)]">
-                      {thread.root.nickname}
-                    </p>
-                    <Badge tone="neutral">{thread.membership.score.toFixed(2)}</Badge>
-                  </div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--c-body)]">
-                    {thread.root.body}
-                  </p>
-                  {thread.replies.length > 0 ? (
-                    <details className="mt-3 border-t border-[var(--c-hairline)] pt-3">
-                      <summary className="cursor-pointer text-xs font-medium text-[var(--c-ink)]">
-                        {thread.replies.length} replies
-                      </summary>
-                      <div className="mt-3 grid gap-2">
-                        {thread.replies.map((reply) => (
-                          <div
-                            key={reply.id}
-                            className="border-l-2 border-[var(--c-hairline)] pl-3 text-sm"
-                          >
-                            <p className="font-medium text-[var(--c-ink)]">{reply.nickname}</p>
-                            <p className="mt-1 whitespace-pre-wrap leading-6 text-[var(--c-body)]">
-                              {reply.body}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  ) : null}
-                </div>
-              ))}
-            </section>
-          ))}
-        </section>
-      ) : null}
-    </div>
+    <RoomWorkspace
+      sessionSlug={sessionSlug}
+      selectedQuestionId={selectedQuestion?.id}
+      roomMode={roomMode}
+      roomModeHref={roomModeHref}
+      typingPresence={presence.typing}
+      patternCounts={patternCounts}
+      categories={activeCategories.map((category) => ({ id: category.id, name: category.name }))}
+    />
   );
 
   const reportsWorkspace = (
