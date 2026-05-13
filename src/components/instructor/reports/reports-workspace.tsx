@@ -195,21 +195,19 @@ export function ReportsWorkspace({
 
       <CategoryDriftSection drift={categoryDrift ?? null} />
 
-      <section className="grid gap-5 lg:grid-cols-2">
-        <EmbeddingsStatusSection
-          sessionSlug={sessionSlug}
-          selectedQuestionId={selectedQuestionId}
-          embeddingCount={embeddingCount}
-          submissionCount={semanticStatus?.submissionCount ?? 0}
-        />
-        <NoveltySignalsSection
-          sessionSlug={sessionSlug}
-          selectedQuestionId={selectedQuestionId}
-          signalCount={signalCount}
-          ready={hasNoveltySignals}
-          hasEmbeddings={hasEmbeddings}
-        />
-      </section>
+      <EmbeddingsStatusSection
+        sessionSlug={sessionSlug}
+        selectedQuestionId={selectedQuestionId}
+        embeddingCount={embeddingCount}
+        submissionCount={semanticStatus?.submissionCount ?? 0}
+      />
+      <NoveltySignalsSection
+        sessionSlug={sessionSlug}
+        selectedQuestionId={selectedQuestionId}
+        signalCount={signalCount}
+        ready={hasNoveltySignals}
+        hasEmbeddings={hasEmbeddings}
+      />
     </div>
   );
 }

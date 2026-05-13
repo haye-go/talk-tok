@@ -2,8 +2,6 @@ import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { MetricTile } from "@/components/ui/metric-tile";
 
 export interface NoveltySignalsSectionProps {
   sessionSlug: string;
@@ -23,14 +21,22 @@ export function NoveltySignalsSection({
   const refreshSignals = useMutation(api.semantic.refreshSignalsForSession);
 
   return (
-    <Card title="Novelty Signals">
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <MetricTile label="Signals" value={String(signalCount)} />
-        <MetricTile label="Ready" value={ready ? "Yes" : "No"} />
+    <section className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--c-hairline)] py-3">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
+          Novelty Signals
+        </span>
+        <span>
+          <strong className="text-[var(--c-ink)]">{signalCount}</strong>{" "}
+          <span className="text-[var(--c-muted)]">signals</span>
+        </span>
+        <span aria-hidden className="text-[var(--c-muted)]">·</span>
+        <span
+          className={ready ? "text-[var(--c-success)]" : "text-[var(--c-muted)]"}
+        >
+          {ready ? "ready" : "not ready"}
+        </span>
       </div>
-      <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
-        Refresh recomputes novelty from existing embeddings. It does not create missing embeddings.
-      </p>
       <Button
         size="sm"
         variant="secondary"
@@ -39,6 +45,6 @@ export function NoveltySignalsSection({
       >
         Refresh Signals
       </Button>
-    </Card>
+    </section>
   );
 }

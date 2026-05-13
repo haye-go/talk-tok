@@ -3,8 +3,6 @@ import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { MetricTile } from "@/components/ui/metric-tile";
 
 export interface EmbeddingsStatusSectionProps {
   sessionSlug: string;
@@ -32,14 +30,24 @@ export function EmbeddingsStatusSection({
   }
 
   return (
-    <Card title="Embeddings">
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <MetricTile label="Stored" value={String(embeddingCount)} />
-        <MetricTile label="Submissions" value={String(submissionCount)} />
+    <section className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--c-hairline)] py-3">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
+          Embeddings
+        </span>
+        <span>
+          <strong className="text-[var(--c-ink)]">{embeddingCount}</strong>{" "}
+          <span className="text-[var(--c-muted)]">stored</span>
+        </span>
+        <span aria-hidden className="text-[var(--c-muted)]">·</span>
+        <span>
+          <strong className="text-[var(--c-ink)]">{submissionCount}</strong>{" "}
+          <span className="text-[var(--c-muted)]">submissions</span>
+        </span>
       </div>
       <Button size="sm" variant="secondary" onClick={() => void handleQueue()} disabled={busy}>
         {busy ? "Queued" : "Generate Embeddings"}
       </Button>
-    </Card>
+    </section>
   );
 }
