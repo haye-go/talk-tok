@@ -4,7 +4,6 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 
 interface CategoryItem {
   id: Id<"categories">;
@@ -44,7 +43,9 @@ export function FollowUpDraftEditor({
 
   function startNew(category: CategoryItem) {
     setOpenCategoryId(category.id);
-    setFollowUpPrompt(`What is one strong counterpoint or extension to the "${category.name}" view?`);
+    setFollowUpPrompt(
+      `What is one strong counterpoint or extension to the "${category.name}" view?`,
+    );
     setFollowUpError(null);
   }
 
@@ -72,99 +73,112 @@ export function FollowUpDraftEditor({
   }
 
   return (
-    <Card title="Follow-up Prompts" eyebrow={`${followUps.length} total`}>
-      <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
-        Draft follow-up prompts per category. Launch them from Room or the right rail during live
-        facilitation.
-      </p>
+    <section>
+      <header className="border-b border-[var(--c-hairline)] pb-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
+          Follow-up Prompts · {followUps.length} total
+        </p>
+        <p className="mt-1 text-xs text-[var(--c-muted)]">
+          Draft per category. Launch them from Room or the right rail during live facilitation.
+        </p>
+      </header>
 
       {followUps.length > 0 ? (
-        <div className="mb-4 grid gap-2">
-          {followUps.slice(0, 8).map((prompt) => (
-            <div
-              key={prompt.id}
-              className="flex items-start justify-between gap-3 rounded-md bg-[var(--c-surface-strong)] px-3 py-2"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-display text-sm font-medium text-[var(--c-ink)]">
-                  {prompt.title}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-[var(--c-muted)]">{prompt.prompt}</p>
-              </div>
-              <Badge
-                tone={
-                  prompt.status === "active"
-                    ? "success"
-                    : prompt.status === "draft"
-                      ? "neutral"
-                      : "warning"
-                }
+        <div className="mt-4">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--c-muted)]">
+            Existing drafts
+          </p>
+          <ul className="grid gap-0 border-t border-[var(--c-hairline)]">
+            {followUps.slice(0, 8).map((prompt) => (
+              <li
+                key={prompt.id}
+                className="flex items-start justify-between gap-3 border-b border-[var(--c-hairline)] py-2 text-sm last:border-b-0"
               >
-                {prompt.status}
-              </Badge>
-            </div>
-          ))}
+                <div className="min-w-0">
+                  <p className="truncate font-display font-medium text-[var(--c-ink)]">
+                    {prompt.title}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-[var(--c-muted)]">{prompt.prompt}</p>
+                </div>
+                <Badge
+                  tone={
+                    prompt.status === "active"
+                      ? "success"
+                      : prompt.status === "draft"
+                        ? "neutral"
+                        : "warning"
+                  }
+                >
+                  {prompt.status}
+                </Badge>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
-      <div className="grid gap-2">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--c-muted)]">
-          Create a category-targeted follow-up
+      <div className="mt-4">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--c-muted)]">
+          Create per-category follow-up
         </p>
-        {categories.map((category) => (
-          <div
-            key={category.id}
-            className="rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-display text-sm font-medium text-[var(--c-ink)]">{category.name}</p>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() =>
-                  openCategoryId === category.id ? setOpenCategoryId(null) : startNew(category)
-                }
-              >
-                {openCategoryId === category.id ? "Cancel" : "Draft follow-up"}
-              </Button>
-            </div>
-
-            {openCategoryId === category.id ? (
-              <form
-                className="mt-3 grid gap-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void handleSubmit(category.id);
-                }}
-              >
-                <textarea
-                  value={followUpPrompt}
-                  onChange={(event) => setFollowUpPrompt(event.target.value)}
-                  rows={3}
-                  placeholder="Follow-up question for this category"
-                  className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
-                />
-                {followUpError ? (
-                  <p className="text-xs text-[var(--c-error)]">{followUpError}</p>
-                ) : null}
+        <ul className="grid gap-0 border-t border-[var(--c-hairline)]">
+          {categories.map((category) => (
+            <li
+              key={category.id}
+              className="border-b border-[var(--c-hairline)] py-2 last:border-b-0"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-display text-sm font-medium text-[var(--c-ink)]">
+                  {category.name}
+                </p>
                 <Button
-                  type="submit"
+                  type="button"
                   size="sm"
-                  disabled={savingFollowUp || followUpPrompt.trim().length < 5}
+                  variant="ghost"
+                  onClick={() =>
+                    openCategoryId === category.id ? setOpenCategoryId(null) : startNew(category)
+                  }
                 >
-                  {savingFollowUp ? "Sending..." : "Send"}
+                  {openCategoryId === category.id ? "Cancel" : "Draft follow-up"}
                 </Button>
-              </form>
-            ) : null}
-          </div>
-        ))}
-        {categories.length === 0 ? (
-          <p className="rounded-sm bg-[var(--c-surface-strong)] px-3 py-2 text-xs text-[var(--c-muted)]">
-            Add a category first to draft a category-targeted follow-up.
-          </p>
-        ) : null}
+              </div>
+
+              {openCategoryId === category.id ? (
+                <form
+                  className="mt-2 grid gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleSubmit(category.id);
+                  }}
+                >
+                  <textarea
+                    value={followUpPrompt}
+                    onChange={(event) => setFollowUpPrompt(event.target.value)}
+                    rows={3}
+                    placeholder="Follow-up question for this category"
+                    className="rounded-sm border border-[var(--c-hairline)] bg-[var(--c-canvas)] px-3 py-2 text-sm text-[var(--c-ink)]"
+                  />
+                  {followUpError ? (
+                    <p className="text-xs text-[var(--c-error)]">{followUpError}</p>
+                  ) : null}
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={savingFollowUp || followUpPrompt.trim().length < 5}
+                  >
+                    {savingFollowUp ? "Sending..." : "Send"}
+                  </Button>
+                </form>
+              ) : null}
+            </li>
+          ))}
+          {categories.length === 0 ? (
+            <li className="py-2 text-xs text-[var(--c-muted)]">
+              Add a category first to draft a category-targeted follow-up.
+            </li>
+          ) : null}
+        </ul>
       </div>
-    </Card>
+    </section>
   );
 }
