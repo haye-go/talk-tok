@@ -4,8 +4,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { MetricTile } from "@/components/ui/metric-tile";
+import { cn } from "@/lib/utils";
 
 const AI_READINESS_FEATURES = [
   { feature: "feedback", label: "Feedback", promptKey: "feedback.private.v1" },
@@ -16,6 +15,8 @@ const AI_READINESS_FEATURES = [
   { feature: "argument_map", label: "Argument map", promptKey: "argument_map.session.v1" },
   { feature: "embedding", label: "Embeddings", promptKey: null },
 ] as const;
+
+type ReadinessTone = "success" | "warning" | "error" | "neutral";
 
 interface BaselineSnapshot {
   status?: string;
@@ -31,6 +32,55 @@ export interface AiReadinessSectionProps {
   baseline: BaselineSnapshot | null;
   baselineBusy: boolean;
   baselineCanGenerate: boolean;
+}
+
+function toneDotClass(tone: ReadinessTone) {
+  switch (tone) {
+    case "success":
+      return "bg-[var(--c-success)]";
+    case "warning":
+      return "bg-[var(--c-warning)]";
+    case "error":
+      return "bg-[var(--c-error)]";
+    default:
+      return "bg-[var(--c-hairline)]";
+  }
+}
+
+interface ReadinessRowProps {
+  tone: ReadinessTone;
+  label: string;
+  badge: string;
+  detail?: string;
+}
+
+function ReadinessRow({ tone, label, badge, detail }: ReadinessRowProps) {
+  return (
+    <li className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 px-4 py-2.5">
+      <span aria-hidden className={cn("h-2 w-2 shrink-0 rounded-full", toneDotClass(tone))} />
+      <span className="text-sm font-medium text-[var(--c-ink)]">{label}</span>
+      <Badge tone={tone}>{badge}</Badge>
+      {detail ? (
+        <p className="col-start-2 col-span-2 text-[11px] leading-4 text-[var(--c-muted)]">
+          {detail}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
+interface StatPairProps {
+  label: string;
+  value: string;
+}
+
+function StatPair({ label, value }: StatPairProps) {
+  return (
+    <span>
+      <span className="text-[var(--c-muted)]">{label}:</span>{" "}
+      <strong className="font-mono text-[var(--c-ink)]">{value}</strong>
+    </span>
+  );
 }
 
 export function AiReadinessSection({
@@ -90,8 +140,7 @@ export function AiReadinessSection({
   ).length;
   const recentLlmFailures = (recentLlmCalls ?? [])
     .filter((call) => call.status === "error")
-    .slice(0, 3)
-    .map((call) => ({ id: call.id, feature: call.feature, error: call.error ?? undefined }));
+    .slice(0, 3);
   const budgetUsagePercent =
     sessionBudget && sessionBudget.perSessionEstimatedCostUsd > 0
       ? Math.round(
@@ -118,18 +167,42 @@ export function AiReadinessSection({
     }
   }
 
+  const openAiKeyTone: ReadinessTone =
+    openAiKeyState === "ready"
+      ? "success"
+      : openAiKeyState === "missing"
+        ? "warning"
+        : openAiKeyState === "error"
+          ? "error"
+          : "neutral";
+
   return (
-    <section className="grid gap-5 lg:grid-cols-2">
-      <Card title="Hidden Baseline Diagnostics">
-        <p className="text-xs leading-5 text-[var(--c-muted)]">
-          The baseline is the instructor-side reference answer used by private feedback and personal
-          reports. Learners never see the baseline text.
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-          <MetricTile label="Status" value={baseline?.status ?? "missing"} />
-          <MetricTile label="Provider" value={baseline?.provider ?? "none"} />
-          <MetricTile label="Model" value={baseline?.model ?? "none"} />
-          <MetricTile
+    <div className="grid gap-6">
+      <section>
+        <header className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[var(--c-hairline)] pb-2">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
+              Hidden Baseline Diagnostics
+            </p>
+            <p className="mt-1 text-xs text-[var(--c-muted)]">
+              Instructor-side reference answer used by private feedback and personal reports. Never
+              shown to learners.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void handleGenerateBaseline(Boolean(baseline))}
+            disabled={baselineBusy || !baselineCanGenerate}
+          >
+            {baselineBusy ? "Queued" : baseline ? "Regenerate Baseline" : "Generate Baseline"}
+          </Button>
+        </header>
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs">
+          <StatPair label="Status" value={baseline?.status ?? "missing"} />
+          <StatPair label="Provider" value={baseline?.provider ?? "none"} />
+          <StatPair label="Model" value={baseline?.model ?? "none"} />
+          <StatPair
             label="Generated"
             value={
               baseline?.generatedAt
@@ -141,95 +214,79 @@ export function AiReadinessSection({
             }
           />
         </div>
-        <Button
-          className="mt-3 w-full"
-          size="sm"
-          variant="secondary"
-          onClick={() => void handleGenerateBaseline(Boolean(baseline))}
-          disabled={baselineBusy || !baselineCanGenerate}
-        >
-          {baselineBusy ? "Queued" : baseline ? "Regenerate Baseline" : "Generate Baseline"}
-        </Button>
         {error ? <p className="mt-2 text-xs text-[var(--c-error)]">{error}</p> : null}
-      </Card>
+      </section>
 
-      <Card title="AI Readiness">
-        <p className="text-xs leading-5 text-[var(--c-muted)]">
-          Operational prerequisites that commonly block AI work: API key, enabled models, prompt
-          templates, budget stops, demo failure toggles, and recent LLM errors.
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-          <MetricTile label="OpenAI key" value={openAiKeyState} />
-          <MetricTile label="Models" value={String(modelsCount)} />
-          <MetricTile label="Prompts" value={String(promptsCount)} />
-          <MetricTile label="Budget" value={`${budgetUsagePercent}%`} />
-        </div>
-        <div className="mt-3 grid gap-2 text-xs">
-          <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-medium text-[var(--c-ink)]">Model coverage</span>
-              <Badge tone={missingModelFeatureLabels.length === 0 ? "success" : "warning"}>
-                {missingModelFeatureLabels.length === 0 ? "ready" : "missing"}
-              </Badge>
-            </div>
-            <p className="mt-1 text-[11px] text-[var(--c-muted)]">
-              {missingModelFeatureLabels.length === 0
+      <section>
+        <header className="border-b border-[var(--c-hairline)] pb-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
+            AI Readiness
+          </p>
+          <p className="mt-1 text-xs text-[var(--c-muted)]">
+            Operational prerequisites that commonly block AI work.
+          </p>
+        </header>
+        <ul className="mt-3 divide-y divide-[var(--c-hairline)] rounded-2xl border border-[var(--c-hairline)] bg-[var(--c-surface-soft)]">
+          <ReadinessRow tone={openAiKeyTone} label="OpenAI key" badge={openAiKeyState} />
+          <ReadinessRow
+            tone={modelsCount > 0 ? "success" : "warning"}
+            label="Models"
+            badge={`${modelsCount} enabled`}
+          />
+          <ReadinessRow
+            tone={promptsCount > 0 ? "success" : "warning"}
+            label="Prompts"
+            badge={`${promptsCount} templates`}
+          />
+          <ReadinessRow
+            tone={missingModelFeatureLabels.length === 0 ? "success" : "warning"}
+            label="Model coverage"
+            badge={missingModelFeatureLabels.length === 0 ? "ready" : "missing"}
+            detail={
+              missingModelFeatureLabels.length === 0
                 ? "Enabled models cover all AI workflow features."
-                : `Missing enabled model features: ${missingModelFeatureLabels.join(", ")}.`}
-            </p>
-          </div>
-
-          <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-medium text-[var(--c-ink)]">Prompt templates</span>
-              <Badge tone={missingPromptKeys.length === 0 ? "success" : "warning"}>
-                {missingPromptKeys.length === 0 ? "ready" : "missing"}
-              </Badge>
-            </div>
-            <p className="mt-1 text-[11px] text-[var(--c-muted)]">
-              {missingPromptKeys.length === 0
+                : `Missing: ${missingModelFeatureLabels.join(", ")}.`
+            }
+          />
+          <ReadinessRow
+            tone={missingPromptKeys.length === 0 ? "success" : "warning"}
+            label="Prompt templates"
+            badge={missingPromptKeys.length === 0 ? "ready" : "missing"}
+            detail={
+              missingPromptKeys.length === 0
                 ? "Required prompt templates are present."
-                : `Missing prompts: ${missingPromptKeys.join(", ")}.`}
-            </p>
-          </div>
-
-          <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-medium text-[var(--c-ink)]">Budget and demo controls</span>
-              <Badge tone={budgetHardStopActive || activeDemoToggleCount > 0 ? "warning" : "success"}>
-                {budgetHardStopActive || activeDemoToggleCount > 0 ? "attention" : "clear"}
-              </Badge>
-            </div>
-            <p className="mt-1 text-[11px] text-[var(--c-muted)]">
-              {budgetHardStopActive
+                : `Missing: ${missingPromptKeys.join(", ")}.`
+            }
+          />
+          <ReadinessRow
+            tone={budgetHardStopActive ? "warning" : "success"}
+            label="Budget"
+            badge={`${budgetUsagePercent}%`}
+            detail={
+              budgetHardStopActive
                 ? "Budget hard stop is active for this session."
-                : "No budget hard stop is currently blocking this session."}
-            </p>
-          </div>
-
-          <div className="rounded-sm bg-[var(--c-surface-strong)] p-2.5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-medium text-[var(--c-ink)]">Recent LLM failures</span>
-              <Badge tone={recentLlmFailures.length === 0 ? "success" : "error"}>
-                {recentLlmFailures.length}
-              </Badge>
-            </div>
-            {recentLlmFailures.length === 0 ? (
-              <p className="mt-1 text-[11px] text-[var(--c-muted)]">
-                No recent LLM errors found for this session.
-              </p>
-            ) : (
-              <div className="mt-1 grid gap-1">
-                {recentLlmFailures.map((call) => (
-                  <p key={call.id} className="text-[11px] leading-4 text-[var(--c-error)]">
-                    {call.feature}: {call.error ?? "Unknown error"}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </Card>
-    </section>
+                : "No budget hard stop blocking this session."
+            }
+          />
+          <ReadinessRow
+            tone={activeDemoToggleCount > 0 ? "warning" : "success"}
+            label="Demo failure toggles"
+            badge={activeDemoToggleCount > 0 ? "attention" : "clear"}
+          />
+          <ReadinessRow
+            tone={recentLlmFailures.length === 0 ? "success" : "error"}
+            label="Recent LLM failures"
+            badge={String(recentLlmFailures.length)}
+            detail={
+              recentLlmFailures.length === 0
+                ? "No recent errors found for this session."
+                : recentLlmFailures
+                    .map((call) => `${call.feature}: ${call.error ?? "Unknown error"}`)
+                    .join(" / ")
+            }
+          />
+        </ul>
+      </section>
+    </div>
   );
 }
