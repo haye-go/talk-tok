@@ -1,24 +1,23 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { FloppyDisk, Sparkle, WarningCircle } from "@phosphor-icons/react";
+import { FloppyDisk, WarningCircle } from "@phosphor-icons/react";
 import { useLocation, useParams } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { AiJobStatusPanel, type AiJobStatusItem } from "@/components/instructor/ai-job-status-panel";
+import { type AiJobStatusItem } from "@/components/instructor/ai-job-status-panel";
 import { InstructorLeftRail, ROOM_MODES } from "@/components/instructor/instructor-left-rail";
 import { InstructorRightRail } from "@/components/instructor/instructor-right-rail";
+import { ReportsWorkspace } from "@/components/instructor/reports/reports-workspace";
 import { InstructorShell } from "@/components/layout/instructor-shell";
 import { QuestionManagerPanel } from "@/components/instructor/question-manager-panel";
 import {
   type SessionSettingsUpdate,
   type VisibilityMode,
 } from "@/components/instructor/session-controls-card";
-import { SynthesisArtifactCard } from "@/components/synthesis/synthesis-artifact-card";
 import { PresenceBar } from "@/components/stream/presence-bar";
 import { SubmissionCard } from "@/components/submission/submission-card";
 import { ErrorState } from "@/components/state/error-state";
-import { ArgumentMapGraph } from "@/components/instructor/argument-map-graph";
 import { LoadingState } from "@/components/state/loading-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,6 @@ import { MetricTile } from "@/components/ui/metric-tile";
 import { useInstructorOverview } from "@/hooks/use-instructor-overview";
 import { useInstructorRoom } from "@/hooks/use-instructor-room";
 import { categoryColorToTone } from "@/lib/category-colors";
-import { inputPatternLabel, type InputPattern } from "@/lib/submission-telemetry";
 import {
   routes,
   type InstructorRoomModeId,
@@ -52,27 +50,6 @@ function isInstructorWorkspaceTab(value: string | null): value is InstructorWork
 
 function isInstructorRoomMode(value: string | null): value is InstructorRoomModeId {
   return value === "latest" || value === "categories" || value === "similarity";
-}
-
-function previewText(value?: string | null, maxLength = 150) {
-  const text = value?.trim();
-
-  if (!text) {
-    return null;
-  }
-
-  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
-}
-
-function formatReportTime(value?: number | null) {
-  if (!value) {
-    return "Not generated yet";
-  }
-
-  return new Date(value).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 type JobStatus = "queued" | "processing" | "success" | "error";
@@ -138,27 +115,6 @@ interface PersonalReportsSummary {
   error?: number;
 }
 
-interface NoveltyRadarItem {
-  signalId: string;
-  participantLabel: string;
-  categoryName?: string;
-  categoryColor?: string;
-  band: string;
-  bodyPreview?: string;
-}
-
-interface CategoryCountCell {
-  categoryId: string;
-  categoryName?: string;
-  count: number;
-}
-
-interface CategoryDriftSlice {
-  key: string;
-  label: string;
-  categoryCounts: CategoryCountCell[];
-}
-
 export function InstructorSessionPage() {
   const { sessionSlug } = useParams({ from: "/instructor/session/$sessionSlug" });
   const location = useLocation();
@@ -180,8 +136,6 @@ export function InstructorSessionPage() {
   const updateVisibility = useMutation(api.instructorControls.updateVisibility);
   const updateSettings = useMutation(api.instructorControls.updateSettings);
   const generateCategorySummary = useMutation(api.synthesis.generateCategorySummary);
-  const generateClassSynthesis = useMutation(api.synthesis.generateClassSynthesis);
-  const generateReports = useMutation(api.personalReports.generateForSession);
   const saveAsTemplate = useMutation(api.sessionTemplates.createFromSession);
   const createCategory = useMutation(api.categoryManagement.create);
   const updateCategory = useMutation(api.categoryManagement.update);
@@ -194,8 +148,6 @@ export function InstructorSessionPage() {
 
   const semanticStatus = useQuery(api.semantic.getSemanticStatus, questionScopedArgs);
   const similarityMap = useQuery(api.semantic.getSimilarityMap, questionScopedArgs);
-  const noveltyRadar = useQuery(api.semantic.getNoveltyRadar, questionScopedArgs);
-  const categoryDrift = useQuery(api.semantic.getCategoryDrift, questionScopedArgs);
   const argumentGraph = useQuery(api.argumentMap.getVisualizationGraph, questionScopedArgs);
   const aiJobs = useQuery(api.jobs.listForSession, { ...questionScopedArgs, limit: 80 });
   const questionBaseline = useQuery(api.questionBaselines.getForQuestion, questionScopedArgs);
@@ -209,21 +161,14 @@ export function InstructorSessionPage() {
   const demoToggles = useQuery(api.demo.listToggles, {});
 
   const queueEmbeddings = useMutation(api.semantic.queueEmbeddingsForSession);
-  const refreshSignals = useMutation(api.semantic.refreshSignalsForSession);
-  const generateArgMap = useMutation(api.argumentMap.generateForSession);
   const generateBaseline = useMutation(api.questionBaselines.generateForQuestion);
   const checkOpenAiKey = useAction(api.modelSettings.checkOpenAiKey);
 
-  const [generatingClass, setGeneratingClass] = useState(false);
-  const [generatingOpposing, setGeneratingOpposing] = useState(false);
-  const [generatingReports, setGeneratingReports] = useState(false);
-  const [reportGenerationError, setReportGenerationError] = useState<string | null>(null);
   const [triggeringCategorisation, setTriggeringCategorisation] = useState(false);
   const [generatingCategoryId, setGeneratingCategoryId] = useState<Id<"categories"> | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
   const [embeddingQueued, setEmbeddingQueued] = useState(false);
-  const [argMapQueued, setArgMapQueued] = useState(false);
   const [baselineGenerating, setBaselineGenerating] = useState(false);
   const [baselineError, setBaselineError] = useState<string | null>(null);
   const [openAiKeyState, setOpenAiKeyState] = useState<"checking" | "ready" | "missing" | "error">(
@@ -288,7 +233,6 @@ export function InstructorSessionPage() {
     responses,
     categories,
     recategorisation,
-    recentSubmissions,
     followUps,
     synthesis,
     reports,
@@ -299,7 +243,6 @@ export function InstructorSessionPage() {
   const joinUrl =
     typeof window === "undefined" ? joinPath : new URL(joinPath, window.location.origin).toString();
 
-  const patternCounts = responses.inputPatterns as Record<InputPattern, number>;
   const activeCategories = categories;
   const categoryById = new Map(activeCategories.map((category) => [category.id, category]));
   const roomLatestThreads = instructorRoom?.latestThreads ?? [];
@@ -347,28 +290,6 @@ export function InstructorSessionPage() {
     }
   }
 
-  async function handleGenerateClassSynthesis(kind?: "class_synthesis" | "opposing_views") {
-    if (kind === "opposing_views") {
-      setGeneratingOpposing(true);
-      try {
-        await generateClassSynthesis({
-          sessionSlug,
-          kind: "opposing_views",
-          questionId: activeQuestionId,
-        });
-      } finally {
-        setGeneratingOpposing(false);
-      }
-    } else {
-      setGeneratingClass(true);
-      try {
-        await generateClassSynthesis({ sessionSlug, questionId: activeQuestionId });
-      } finally {
-        setGeneratingClass(false);
-      }
-    }
-  }
-
   async function handleGenerateBaseline(forceRegenerate = false) {
     setBaselineError(null);
     setBaselineGenerating(true);
@@ -382,20 +303,6 @@ export function InstructorSessionPage() {
       setBaselineError(cause instanceof Error ? cause.message : "Could not generate baseline.");
     } finally {
       setBaselineGenerating(false);
-    }
-  }
-
-  async function handleGenerateReports() {
-    setReportGenerationError(null);
-    setGeneratingReports(true);
-    try {
-      await generateReports({ sessionSlug, questionId: activeQuestionId });
-    } catch (cause) {
-      setReportGenerationError(
-        cause instanceof Error ? cause.message : "Could not generate reports.",
-      );
-    } finally {
-      setGeneratingReports(false);
     }
   }
 
@@ -505,20 +412,8 @@ export function InstructorSessionPage() {
     }
   }
 
-  async function handleGenerateArgMap() {
-    setArgMapQueued(true);
-    try {
-      await generateArgMap({ sessionSlug, questionId: activeQuestionId });
-    } finally {
-      setArgMapQueued(false);
-    }
-  }
-
   const artifactCounts = synthesis?.artifactCounts;
-  const recentArtifacts = synthesis?.recentArtifacts ?? [];
-  const latestClassSynthesis = synthesis?.latestClassSynthesis;
   const reportsSummary = reports?.summary as PersonalReportsSummary | undefined;
-  const recentReports = reports?.recent ?? [];
   const synthesisReleasedForQuestion = selectedQuestion?.synthesisVisible ?? false;
   const reportsReleasedForQuestion = selectedQuestion?.personalReportsVisible ?? false;
   const sessionPrivateVisibility = session.visibilityMode === "private_until_released";
@@ -535,20 +430,17 @@ export function InstructorSessionPage() {
     (semanticStatus?.latestJob as EmbeddingJobRecord | null | undefined) ?? null;
   const categorisationBusy =
     triggeringCategorisation || isBusyStatus(latestCategorisationJob?.status);
-  const reportBusy = generatingReports || isBusyStatus(latestReportJob?.status);
+  const reportBusy = isBusyStatus(latestReportJob?.status);
   const baselineBusy =
     baselineGenerating ||
     isBusyStatus(latestBaselineJob?.status) ||
     isBusyStatus(questionBaseline?.status);
   const baselineCanGenerate = selectedQuestion?.status === "released";
   const embeddingBusy = embeddingQueued || isBusyStatus(latestEmbeddingJob?.status);
-  const argMapBusy = argMapQueued || isBusyStatus(latestArgumentMapJob?.status);
+  const argMapBusy = isBusyStatus(latestArgumentMapJob?.status);
   const embeddingCount = semanticStatus?.embeddingCount ?? 0;
   const noveltyCount = semanticStatus?.noveltyCount ?? 0;
-  const argumentLinkCount = semanticStatus?.argumentLinkCount ?? 0;
   const hasEmbeddings = embeddingCount > 0;
-  const hasNoveltySignals = noveltyCount > 0;
-  const hasArgumentLinks = argumentLinkCount > 0;
   const enabledModelFeatures = new Set(
     (modelSettings ?? [])
       .filter((setting) => setting.enabled)
@@ -618,16 +510,14 @@ export function InstructorSessionPage() {
     },
     {
       label: "Personal reports",
-      status: latestReportJob?.status ?? (generatingReports ? "processing" : "idle"),
+      status: latestReportJob?.status ?? "idle",
       detail:
         progressDetail(latestReportJob) ??
         (reportsSummary
           ? `${reportsSummary.success ?? 0} ready, ${(reportsSummary.queued ?? 0) + (reportsSummary.processing ?? 0)} in flight`
           : "No reports generated yet"),
-      tone: reportGenerationError
-        ? "error"
-        : jobTone(latestReportJob, reportBusy ? "warning" : "sky"),
-      error: latestReportJob?.error ?? reportGenerationError,
+      tone: jobTone(latestReportJob, reportBusy ? "warning" : "sky"),
+      error: latestReportJob?.error,
       updatedAt: latestReportJob?.updatedAt,
     },
     {
@@ -661,7 +551,7 @@ export function InstructorSessionPage() {
     },
     {
       label: "Argument map",
-      status: latestArgumentMapJob?.status ?? (argMapQueued ? "queued" : "idle"),
+      status: latestArgumentMapJob?.status ?? "idle",
       detail:
         progressDetail(latestArgumentMapJob) ??
         (argumentGraph
@@ -1247,361 +1137,18 @@ export function InstructorSessionPage() {
   );
 
   const reportsWorkspace = (
-    <div className="mx-auto grid w-full max-w-6xl gap-5 p-5 lg:p-7">
-      <header className="border-b border-[#d7e0ea] pb-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
-          Reports / Review
-        </p>
-        <h1 className="mt-2 font-display text-2xl font-semibold text-[var(--c-ink)]">
-          Review generated evidence and analysis
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--c-body)]">
-          Reports owns synthesis, personal reports, semantic review, novelty, category drift, and
-          the argument map. Live controls stay in the rail.
-        </p>
-      </header>
-
-      <AiJobStatusPanel
-        items={aiJobStatusItems}
-        contextLabel={overview.currentQuestion?.title ?? "the current question"}
-      />
-
-      <section className="grid gap-5 lg:grid-cols-2">
-        <Card>
-          <p className="mb-1.5 text-[10px] uppercase tracking-[0.14em] text-[var(--c-muted)]">
-            Consensus Pulse
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-[var(--c-sig-coral)]">Against</span>
-            <div className="flex h-2.5 flex-1 overflow-hidden rounded-pill bg-[var(--c-hairline)]">
-              <div className="bg-[var(--c-sig-coral)]" style={{ width: "30%" }} />
-              <div className="bg-[var(--c-sig-mustard)]" style={{ width: "25%" }} />
-              <div className="bg-[var(--c-sig-sky)]" style={{ width: "45%" }} />
-            </div>
-            <span className="text-[10px] text-[var(--c-sig-sky)]">For</span>
-          </div>
-        </Card>
-
-        <Card title="Input Patterns">
-          <div className="grid gap-1.5 text-sm">
-            {(Object.keys(patternCounts) as InputPattern[]).map((pattern) => (
-              <div key={pattern} className="flex items-center justify-between gap-3">
-                <span className="text-xs text-[var(--c-body)]">{inputPatternLabel(pattern)}</span>
-                <span className="font-mono text-xs text-[var(--c-ink)]">
-                  {patternCounts[pattern]}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
-        <Card title="Synthesis">
-          <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
-            Draft artifacts are instructor-only. Published and final artifacts are learner-facing
-            only when synthesis is released for the current question
-            {sessionPrivateVisibility ? " and session visibility is no longer private." : "."}
-          </p>
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            <Badge tone={synthesisReleasedForQuestion ? "success" : "warning"}>
-              {synthesisReleasedForQuestion ? "Synthesis released" : "Synthesis hidden"}
-            </Badge>
-            {sessionPrivateVisibility ? <Badge tone="warning">Session visibility private</Badge> : null}
-          </div>
-          {artifactCounts ? (
-            <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-              <MetricTile label="Draft" value={String(artifactCounts.draft ?? 0)} />
-              <MetricTile label="Published" value={String(artifactCounts.published ?? 0)} />
-              <MetricTile label="Final" value={String(artifactCounts.final ?? 0)} />
-              <MetricTile label="Error" value={String(artifactCounts.error ?? 0)} />
-            </div>
-          ) : null}
-
-          {latestClassSynthesis ? (
-            <div className="mb-3 rounded-md bg-[var(--c-surface-strong)] p-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-display text-sm font-semibold text-[var(--c-ink)]">
-                  <Sparkle size={13} className="mr-1 inline" />
-                  {latestClassSynthesis.title}
-                </span>
-                <Badge
-                  tone={
-                    latestClassSynthesis.status === "final"
-                      ? "success"
-                      : latestClassSynthesis.status === "published"
-                        ? "sky"
-                        : "neutral"
-                  }
-                >
-                  {latestClassSynthesis.status}
-                </Badge>
-              </div>
-              {latestClassSynthesis.summary ? (
-                <p className="mt-2 text-sm leading-6 text-[var(--c-body)]">
-                  {previewText(String(latestClassSynthesis.summary), 320)}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => handleGenerateClassSynthesis()}
-              disabled={generatingClass}
-            >
-              {generatingClass ? "Generating..." : "Class Synthesis"}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => handleGenerateClassSynthesis("opposing_views")}
-              disabled={generatingOpposing}
-            >
-              {generatingOpposing ? "Generating..." : "Opposing Views"}
-            </Button>
-          </div>
-        </Card>
-
-        <Card title="Synthesis Artifacts">
-          <div className="grid gap-3">
-            {recentArtifacts.length === 0 ? (
-              <p className="text-sm text-[var(--c-muted)]">No synthesis artifacts yet.</p>
-            ) : (
-              recentArtifacts.map((artifact) => (
-                <SynthesisArtifactCard
-                  key={artifact.id}
-                  artifact={artifact}
-                  sessionSlug={sessionSlug}
-                  isInstructor
-                />
-              ))
-            )}
-          </div>
-        </Card>
-      </section>
-
-      <Card title="Personal Reports">
-        <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
-          Reports can be generated before they are released. Learners may use their private report
-          page, while this view shows generation and preview state for instructors.
-        </p>
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          <Badge tone={reportsReleasedForQuestion ? "success" : "warning"}>
-            {reportsReleasedForQuestion ? "Reports released" : "Reports hidden in Me"}
-          </Badge>
-        </div>
-        {reportsSummary ? (
-          <div className="mb-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-            <MetricTile label="Total" value={String(reportsSummary.total ?? 0)} />
-            <MetricTile label="Success" value={String(reportsSummary.success ?? 0)} />
-            <MetricTile
-              label="Processing"
-              value={String((reportsSummary.queued ?? 0) + (reportsSummary.processing ?? 0))}
-            />
-            <MetricTile label="Error" value={String(reportsSummary.error ?? 0)} />
-          </div>
-        ) : null}
-
-        <Button size="sm" variant="coral" onClick={handleGenerateReports} disabled={reportBusy}>
-          {reportBusy ? "Generating..." : "Generate All Reports"}
-        </Button>
-        {reportGenerationError ? (
-          <p className="mt-2 text-xs text-[var(--c-error)]">{reportGenerationError}</p>
-        ) : null}
-
-        <div className="mt-4 grid gap-2">
-          <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--c-muted)]">
-            Recent reports
-          </p>
-          {recentReports.length === 0 ? (
-            <p className="rounded-sm bg-[var(--c-surface-strong)] px-3 py-2 text-xs text-[var(--c-muted)]">
-              No personal reports generated yet.
-            </p>
-          ) : (
-            recentReports.slice(0, 6).map((report) => (
-              <div key={report.id} className="rounded-sm bg-[var(--c-surface-strong)] px-3 py-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-display text-sm font-medium text-[var(--c-ink)]">
-                      {report.nickname ?? "Unknown participant"}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-[var(--c-muted)]">
-                      {report.submissionCount ?? 0} responses · {report.followUpCount ?? 0}{" "}
-                      follow-ups · {report.fightCount ?? 0} fights ·{" "}
-                      {formatReportTime(report.generatedAt ?? report.updatedAt)}
-                    </p>
-                  </div>
-                  <Badge
-                    tone={
-                      report.status === "success"
-                        ? "success"
-                        : report.status === "error"
-                          ? "error"
-                          : "warning"
-                    }
-                  >
-                    {report.status}
-                  </Badge>
-                </div>
-                {previewText(report.summary) ? (
-                  <p className="mt-2 text-xs leading-relaxed text-[var(--c-body)]">
-                    {previewText(report.summary)}
-                  </p>
-                ) : null}
-                {report.status === "error" && report.error ? (
-                  <p className="mt-1 text-[10px] leading-relaxed text-[var(--c-error)]">
-                    Error: {report.error}
-                  </p>
-                ) : null}
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
-
-      <section className="grid gap-5 lg:grid-cols-2">
-        <Card title="Embeddings">
-          {semanticStatus ? (
-            <div className="mb-3 grid grid-cols-2 gap-2">
-              <MetricTile label="Stored" value={String(embeddingCount)} />
-              <MetricTile label="Submissions" value={String(semanticStatus.submissionCount)} />
-            </div>
-          ) : null}
-          <Button size="sm" variant="secondary" onClick={handleQueueEmbeddings} disabled={embeddingBusy}>
-            {embeddingBusy ? "Queued" : "Generate Embeddings"}
-          </Button>
-        </Card>
-
-        <Card title="Novelty Signals">
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            <MetricTile label="Signals" value={String(noveltyCount)} />
-            <MetricTile label="Ready" value={hasNoveltySignals ? "Yes" : "No"} />
-          </div>
-          <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
-            Refresh recomputes novelty from existing embeddings. It does not create missing
-            embeddings.
-          </p>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => void refreshSignals({ sessionSlug, questionId: activeQuestionId })}
-            disabled={!hasEmbeddings}
-          >
-            Refresh Signals
-          </Button>
-        </Card>
-
-        <Card title="Argument Map Readiness">
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            <MetricTile label="Links" value={String(argumentLinkCount)} />
-            <MetricTile label="Ready" value={hasArgumentLinks ? "Yes" : "No"} />
-          </div>
-          <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
-            Argument links are generated from responses, categories, and synthesis artifacts for
-            the current question.
-          </p>
-          {latestArgumentMapJob?.error ? (
-            <p className="text-xs text-[var(--c-error)]">{latestArgumentMapJob.error}</p>
-          ) : null}
-          <Button size="sm" variant="secondary" onClick={handleGenerateArgMap} disabled={argMapBusy}>
-            {argMapBusy ? "Queued" : "Generate Argument Map"}
-          </Button>
-        </Card>
-
-        <Card title="Category Drift Readiness">
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            <MetricTile label="Slices" value={String(categoryDrift?.slices.length ?? 0)} />
-            <MetricTile label="Transitions" value={String(categoryDrift?.transitions.length ?? 0)} />
-          </div>
-          <p className="text-xs leading-5 text-[var(--c-muted)]">
-            Drift is deterministic analysis over categorised initial and follow-up responses. It
-            becomes useful after categorisation and follow-up rounds exist.
-          </p>
-        </Card>
-      </section>
-
-      {semanticStatus?.readiness.canShowNoveltyRadar && noveltyRadar ? (
-        <Card title="Novelty Radar">
-          <div className="mb-3 grid grid-cols-3 gap-2">
-            <MetricTile label="Low" value={String(noveltyRadar.distribution.low)} />
-            <MetricTile label="Medium" value={String(noveltyRadar.distribution.medium)} />
-            <MetricTile label="High" value={String(noveltyRadar.distribution.high)} />
-          </div>
-          <div className="grid gap-2">
-            {noveltyRadar.topDistinctive.slice(0, 5).map((item: NoveltyRadarItem) => (
-              <div key={item.signalId} className="rounded-sm bg-[var(--c-surface-strong)] p-2">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-[var(--c-ink)]">{item.participantLabel}</span>
-                  <Badge tone="mustard">{item.band}</Badge>
-                </div>
-                {item.bodyPreview ? (
-                  <p className="mt-1 text-xs text-[var(--c-body)]">
-                    {previewText(item.bodyPreview, 140)}
-                  </p>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : null}
-
-      {categoryDrift && categoryDrift.slices.length > 0 ? (
-        <Card title="Category Drift">
-          <div className="overflow-x-auto">
-            <table className="w-full text-[10px]">
-              <thead>
-                <tr className="border-b border-[var(--c-hairline)] text-left text-[var(--c-muted)]">
-                  <th className="py-1 pr-2 font-medium">Slice</th>
-                  {categoryDrift.slices[0].categoryCounts.map((cell: CategoryCountCell) => (
-                    <th key={cell.categoryId} className="py-1 pr-2 font-medium">
-                      {cell.categoryName?.split(" ")[0]}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {categoryDrift.slices.map((slice: CategoryDriftSlice) => (
-                  <tr key={slice.key} className="border-b border-[var(--c-hairline)]">
-                    <td className="py-1 pr-2 text-[var(--c-ink)]">{slice.label}</td>
-                    {slice.categoryCounts.map((cell: CategoryCountCell) => (
-                      <td key={cell.categoryId} className="py-1 pr-2 font-mono text-[var(--c-body)]">
-                        {cell.count}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      ) : null}
-
-      {semanticStatus?.readiness.canShowArgumentMap && argumentGraph ? (
-        <Card title="Argument Map">
-          <ArgumentMapGraph
-            nodes={argumentGraph.nodes}
-            edges={argumentGraph.edges}
-            rendererLabel={argumentGraph.layout?.suggestedRenderer}
-          />
-        </Card>
-      ) : null}
-
-      <Card title="Recent Submissions">
-        <div className="grid gap-3">
-          {recentSubmissions.length === 0 ? (
-            <p className="text-sm text-[var(--c-muted)]">No submissions yet.</p>
-          ) : (
-            recentSubmissions.slice(0, 8).map((submission) => (
-              <SubmissionCard key={submission.id} submission={submission} />
-            ))
-          )}
-        </div>
-      </Card>
-    </div>
+    <ReportsWorkspace
+      sessionSlug={sessionSlug}
+      selectedQuestionId={selectedQuestion?.id}
+      categories={activeCategories.map((category) => ({ id: category.id, name: category.name }))}
+      aiJobStatusItems={aiJobStatusItems}
+      currentQuestionTitle={overview.currentQuestion?.title ?? "the current question"}
+      sessionPrivateVisibility={sessionPrivateVisibility}
+      synthesisReleasedForQuestion={synthesisReleasedForQuestion}
+      reportsReleasedForQuestion={reportsReleasedForQuestion}
+    />
   );
+
 
   const setupWorkspace = (
     <div className="mx-auto grid w-full max-w-6xl gap-5 p-5 lg:p-7">
