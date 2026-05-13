@@ -76,6 +76,7 @@ export function SynthesisArtifactCard({
   const Icon = KIND_ICON[artifact.kind] ?? Sparkle;
   const tone = STATUS_TONE[artifact.status] ?? "neutral";
   const isGenerating = artifact.status === "queued" || artifact.status === "processing";
+  const showStatusBadge = Boolean(isInstructor) || isGenerating || artifact.status === "error";
   const helperText = statusDescription(artifact.status, isInstructor);
 
   const publish = useMutation(api.synthesis.publishArtifact);
@@ -102,10 +103,12 @@ export function SynthesisArtifactCard({
           <Icon size={12} className="mr-1 inline" />
           {artifact.title}
         </span>
-        <Badge tone={tone} className="text-[9px]">
-          {isGenerating && <CircleNotch size={10} className="mr-0.5 inline animate-spin" />}
-          {artifact.status.replace(/_/g, " ")}
-        </Badge>
+        {showStatusBadge ? (
+          <Badge tone={tone} className="text-[9px]">
+            {isGenerating && <CircleNotch size={10} className="mr-0.5 inline animate-spin" />}
+            {artifact.status.replace(/_/g, " ")}
+          </Badge>
+        ) : null}
       </div>
 
       {helperText ? (

@@ -409,6 +409,44 @@ export const publishArtifact = mutation({
   },
 });
 
+export const unpublishArtifact = mutation({
+  args: {
+    sessionSlug: v.string(),
+    artifactId: v.id("synthesisArtifacts"),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+    const artifact = await ctx.db.get(args.artifactId);
+
+    if (!session || !artifact || artifact.sessionId !== session._id) {
+      throw new Error("Synthesis artifact not found in this session.");
+    }
+
+    if (artifact.status !== "published" && artifact.status !== "final") {
+      throw new Error("Only published or final synthesis artifacts can be unpublished.");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(artifact._id, {
+      status: "draft",
+      publishedAt: undefined,
+      finalizedAt: undefined,
+      updatedAt: now,
+    });
+    await ctx.runMutation(internal.audit.record, {
+      sessionId: session._id,
+      questionId: artifact.questionId,
+      actorType: "instructor",
+      action: "synthesis.unpublished",
+      targetType: "synthesisArtifact",
+      targetId: artifact._id,
+      metadataJson: { kind: artifact.kind },
+    });
+
+    return toArtifact((await ctx.db.get(artifact._id))!);
+  },
+});
+
 export const finalizeArtifact = mutation({
   args: {
     sessionSlug: v.string(),

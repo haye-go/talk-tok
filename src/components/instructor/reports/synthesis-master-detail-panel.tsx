@@ -75,6 +75,10 @@ function statusDot(status: string) {
   }
 }
 
+function isInstructorVisibleArtifactStatus(status: string) {
+  return status !== "archived";
+}
+
 export function SynthesisMasterDetailPanel({
   sessionSlug,
   selectedQuestionId,
@@ -86,19 +90,21 @@ export function SynthesisMasterDetailPanel({
 }: SynthesisMasterDetailPanelProps) {
   const generateClassSynthesis = useMutation(api.synthesis.generateClassSynthesis);
   const generateCategorySummary = useMutation(api.synthesis.generateCategorySummary);
+  const publishArtifact = useMutation(api.synthesis.publishArtifact);
+  const unpublishArtifact = useMutation(api.synthesis.unpublishArtifact);
 
   const [generatingClass, setGeneratingClass] = useState(false);
   const [generatingOpposing, setGeneratingOpposing] = useState(false);
   const [generatingCategoryId, setGeneratingCategoryId] = useState<Id<"categories"> | null>(null);
+  const [updatingArtifactId, setUpdatingArtifactId] = useState<Id<"synthesisArtifacts"> | null>(
+    null,
+  );
 
   const classArtifact = useMemo(
     () =>
       artifacts.find(
         (artifact) =>
-          artifact.kind === "class_synthesis" &&
-          (artifact.status === "draft" ||
-            artifact.status === "published" ||
-            artifact.status === "final"),
+          artifact.kind === "class_synthesis" && isInstructorVisibleArtifactStatus(artifact.status),
       ) ?? null,
     [artifacts],
   );
@@ -107,10 +113,7 @@ export function SynthesisMasterDetailPanel({
     () =>
       artifacts.find(
         (artifact) =>
-          artifact.kind === "opposing_views" &&
-          (artifact.status === "draft" ||
-            artifact.status === "published" ||
-            artifact.status === "final"),
+          artifact.kind === "opposing_views" && isInstructorVisibleArtifactStatus(artifact.status),
       ) ?? null,
     [artifacts],
   );
@@ -120,7 +123,10 @@ export function SynthesisMasterDetailPanel({
     for (const artifact of artifacts) {
       if (artifact.kind === "category_summary" && artifact.categoryId) {
         const existing = byCategory.get(artifact.categoryId);
-        if (!existing || artifact.updatedAt > existing.updatedAt) {
+        if (
+          isInstructorVisibleArtifactStatus(artifact.status) &&
+          (!existing || artifact.updatedAt > existing.updatedAt)
+        ) {
           byCategory.set(artifact.categoryId, artifact);
         }
       }
@@ -139,7 +145,7 @@ export function SynthesisMasterDetailPanel({
     return selectionKey(item) === selectionKey(selection);
   }
 
-  async function handleGenerateClass(kind?: "opposing_views") {
+  async function handleGenerateClass(kind?: "opposing_views", forceRegenerate = false) {
     if (!selectedQuestionId) return;
     const setBusy = kind === "opposing_views" ? setGeneratingOpposing : setGeneratingClass;
     setBusy(true);
@@ -148,18 +154,41 @@ export function SynthesisMasterDetailPanel({
         sessionSlug,
         questionId: selectedQuestionId,
         ...(kind ? { kind } : {}),
+        ...(forceRegenerate ? { forceRegenerate: true } : {}),
       });
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleGenerateCategory(categoryId: Id<"categories">) {
+  async function handleGenerateCategory(categoryId: Id<"categories">, forceRegenerate = false) {
     setGeneratingCategoryId(categoryId);
     try {
-      await generateCategorySummary({ sessionSlug, categoryId });
+      await generateCategorySummary({
+        sessionSlug,
+        categoryId,
+        ...(forceRegenerate ? { forceRegenerate: true } : {}),
+      });
     } finally {
       setGeneratingCategoryId(null);
+    }
+  }
+
+  async function handlePublish(artifactId: Id<"synthesisArtifacts">) {
+    setUpdatingArtifactId(artifactId);
+    try {
+      await publishArtifact({ sessionSlug, artifactId });
+    } finally {
+      setUpdatingArtifactId(null);
+    }
+  }
+
+  async function handleUnpublish(artifactId: Id<"synthesisArtifacts">) {
+    setUpdatingArtifactId(artifactId);
+    try {
+      await unpublishArtifact({ sessionSlug, artifactId });
+    } finally {
+      setUpdatingArtifactId(null);
     }
   }
 
@@ -174,9 +203,7 @@ export function SynthesisMasterDetailPanel({
         <Badge tone={synthesisReleasedForQuestion ? "success" : "warning"}>
           {synthesisReleasedForQuestion ? "Synthesis released" : "Synthesis hidden"}
         </Badge>
-        {sessionPrivateVisibility ? (
-          <Badge tone="warning">Session visibility private</Badge>
-        ) : null}
+        {sessionPrivateVisibility ? <Badge tone="warning">Session visibility private</Badge> : null}
         <span className="ml-auto flex flex-wrap gap-1.5 text-[10px] text-[var(--c-muted)]">
           <span>Draft {counts.draft ?? 0}</span>
           <span>· Published {counts.published ?? 0}</span>
@@ -251,8 +278,12 @@ export function SynthesisMasterDetailPanel({
               artifact={classArtifact}
               emptyLabel="No class synthesis generated yet."
               emptyHint="Use the Generate Class Synthesis button to create one."
-              onRegenerate={() => void handleGenerateClass()}
+              onGenerate={() => void handleGenerateClass()}
+              onRegenerate={() => void handleGenerateClass(undefined, true)}
+              onPublish={classArtifact ? () => void handlePublish(classArtifact.id) : undefined}
+              onUnpublish={classArtifact ? () => void handleUnpublish(classArtifact.id) : undefined}
               regenerating={generatingClass}
+              updatingLifecycle={classArtifact ? updatingArtifactId === classArtifact.id : false}
             />
           ) : null}
           {selection.type === "opposing" ? (
@@ -260,8 +291,18 @@ export function SynthesisMasterDetailPanel({
               artifact={opposingArtifact}
               emptyLabel="No opposing views artifact yet."
               emptyHint="Requires at least 2 categories with 3+ threads each."
-              onRegenerate={() => void handleGenerateClass("opposing_views")}
+              onGenerate={() => void handleGenerateClass("opposing_views")}
+              onRegenerate={() => void handleGenerateClass("opposing_views", true)}
+              onPublish={
+                opposingArtifact ? () => void handlePublish(opposingArtifact.id) : undefined
+              }
+              onUnpublish={
+                opposingArtifact ? () => void handleUnpublish(opposingArtifact.id) : undefined
+              }
               regenerating={generatingOpposing}
+              updatingLifecycle={
+                opposingArtifact ? updatingArtifactId === opposingArtifact.id : false
+              }
             />
           ) : null}
           {selection.type === "category" ? (
@@ -269,7 +310,21 @@ export function SynthesisMasterDetailPanel({
               artifact={categorySummaries.get(selection.categoryId) ?? null}
               category={categories.find((c) => c.id === selection.categoryId) ?? null}
               regenerating={generatingCategoryId === selection.categoryId}
-              onRegenerate={() => void handleGenerateCategory(selection.categoryId)}
+              onGenerate={() => void handleGenerateCategory(selection.categoryId)}
+              onRegenerate={() => void handleGenerateCategory(selection.categoryId, true)}
+              onPublish={() => {
+                const artifact = categorySummaries.get(selection.categoryId);
+                if (artifact) void handlePublish(artifact.id);
+              }}
+              onUnpublish={() => {
+                const artifact = categorySummaries.get(selection.categoryId);
+                if (artifact) void handleUnpublish(artifact.id);
+              }}
+              updatingLifecycle={
+                categorySummaries.get(selection.categoryId)
+                  ? updatingArtifactId === categorySummaries.get(selection.categoryId)?.id
+                  : false
+              }
             />
           ) : null}
         </div>
@@ -300,7 +355,9 @@ function SynthesisListItem({
         onClick={onClick}
         className={cn(
           "flex w-full items-center gap-2 border-t border-[var(--c-hairline)] px-3 py-2 text-left text-xs transition",
-          active ? "bg-white font-semibold text-[var(--c-ink)]" : "text-[var(--c-body)] hover:bg-white/70",
+          active
+            ? "bg-white font-semibold text-[var(--c-ink)]"
+            : "text-[var(--c-body)] hover:bg-white/70",
         )}
       >
         <span className={cn("h-2 w-2 shrink-0 rounded-full", statusClass)} />
@@ -315,16 +372,24 @@ interface ArtifactDetailProps {
   artifact: SynthesisArtifact | null;
   emptyLabel: string;
   emptyHint: string;
+  onGenerate: () => void;
   onRegenerate: () => void;
+  onPublish?: () => void;
+  onUnpublish?: () => void;
   regenerating: boolean;
+  updatingLifecycle: boolean;
 }
 
 function ArtifactDetail({
   artifact,
   emptyLabel,
   emptyHint,
+  onGenerate,
   onRegenerate,
+  onPublish,
+  onUnpublish,
   regenerating,
+  updatingLifecycle,
 }: ArtifactDetailProps) {
   if (!artifact) {
     return (
@@ -335,7 +400,7 @@ function ArtifactDetail({
           variant="secondary"
           size="sm"
           className="mt-3"
-          onClick={onRegenerate}
+          onClick={onGenerate}
           disabled={regenerating}
         >
           {regenerating ? "Generating..." : "Generate"}
@@ -343,6 +408,13 @@ function ArtifactDetail({
       </div>
     );
   }
+
+  const canPublish = artifact.status === "draft" && onPublish;
+  const canUnpublish =
+    (artifact.status === "published" || artifact.status === "final") && onUnpublish;
+  const artifactGenerationPending =
+    artifact.status === "queued" || artifact.status === "processing";
+  const generationBusy = regenerating || artifactGenerationPending;
 
   return (
     <div>
@@ -357,13 +429,33 @@ function ArtifactDetail({
         </div>
         <div className="flex items-center gap-2">
           <Badge tone={statusTone(artifact.status)}>{artifact.status}</Badge>
+          {canPublish ? (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={onPublish}
+              disabled={generationBusy || updatingLifecycle}
+            >
+              {updatingLifecycle ? "Publishing..." : "Publish"}
+            </Button>
+          ) : null}
+          {canUnpublish ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onUnpublish}
+              disabled={generationBusy || updatingLifecycle}
+            >
+              {updatingLifecycle ? "Unpublishing..." : "Unpublish"}
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="sm"
             onClick={onRegenerate}
-            disabled={regenerating}
+            disabled={generationBusy || updatingLifecycle}
           >
-            {regenerating ? "..." : "Regenerate"}
+            {generationBusy ? "..." : "Regenerate"}
           </Button>
         </div>
       </div>
@@ -422,22 +514,34 @@ interface CategoryArtifactDetailProps {
   artifact: SynthesisArtifact | null;
   category: CategoryRef | null;
   regenerating: boolean;
+  updatingLifecycle: boolean;
+  onGenerate: () => void;
   onRegenerate: () => void;
+  onPublish: () => void;
+  onUnpublish: () => void;
 }
 
 function CategoryArtifactDetail({
   artifact,
   category,
   regenerating,
+  updatingLifecycle,
+  onGenerate,
   onRegenerate,
+  onPublish,
+  onUnpublish,
 }: CategoryArtifactDetailProps) {
   return (
     <ArtifactDetail
       artifact={artifact}
       emptyLabel={`No summary generated yet for ${category?.name ?? "this category"}.`}
       emptyHint="Click Generate to summarise this category from the current threads."
+      onGenerate={onGenerate}
       onRegenerate={onRegenerate}
+      onPublish={onPublish}
+      onUnpublish={onUnpublish}
       regenerating={regenerating}
+      updatingLifecycle={updatingLifecycle}
     />
   );
 }
