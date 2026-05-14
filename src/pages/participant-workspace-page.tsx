@@ -113,15 +113,19 @@ export function ParticipantWorkspacePage({
 
   const [selectedQuestionOverrideId, setSelectedQuestionOverrideId] =
     useState<Id<"sessionQuestions"> | null>(null);
-  const workspace = useParticipantWorkspace(sessionSlug, clientKey, selectedQuestionOverrideId);
+  const routeDrivenTab: TabId | null = fightSlug ? "fight" : showReviewDetail ? "me" : null;
+  const [localActiveTab, setLocalActiveTab] = useState<TabId>(requestedTab ?? initialTab);
+  const activeTab = routeDrivenTab ?? localActiveTab;
+  const workspace = useParticipantWorkspace(
+    sessionSlug,
+    clientKey,
+    selectedQuestionOverrideId,
+    activeTab,
+  );
 
-  const session = useQuery(api.sessions.getBySlug, { sessionSlug });
+  const session = useQuery(api.sessions.getBySlugSnapshot, { sessionSlug });
   const participant = useQuery(
     api.participants.restore,
-    clientKey ? { sessionSlug, clientKey } : "skip",
-  );
-  const positionShifts = useQuery(
-    api.positionShifts.listMine,
     clientKey ? { sessionSlug, clientKey } : "skip",
   );
   const report = useQuery(
@@ -147,9 +151,6 @@ export function ParticipantWorkspacePage({
   );
   const [retryingFeedbackSubmissionId, setRetryingFeedbackSubmissionId] =
     useState<Id<"submissions"> | null>(null);
-  const routeDrivenTab: TabId | null = fightSlug ? "fight" : showReviewDetail ? "me" : null;
-  const [localActiveTab, setLocalActiveTab] = useState<TabId>(requestedTab ?? initialTab);
-  const activeTab = routeDrivenTab ?? localActiveTab;
   const [generatingReport, setGeneratingReport] = useState(false);
   const touchedPresenceKey = useRef<string | null>(null);
 
@@ -573,7 +574,7 @@ export function ParticipantWorkspacePage({
           onGenerateReport={handleGenerateReport}
           myArchiveByQuestion={ws?.myArchiveByQuestion}
           fightThreads={ws?.fightMe.mine}
-          positionShifts={positionShifts ?? undefined}
+          positionShifts={ws?.positionShifts}
           personalReport={ws?.personalReport}
           personalReportsVisible={selectedQuestion?.personalReportsVisible ?? false}
           loading={ws === undefined}

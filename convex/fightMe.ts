@@ -12,7 +12,7 @@ import {
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
 import { assertCanUseFightMe, canUseFightMe } from "./questionCapabilities";
-import { createDefaultQuestionForSession } from "./sessionQuestions";
+import { createDefaultQuestionForSession, listQuestionsForSession } from "./sessionQuestions";
 
 const ACCEPTANCE_TIMEOUT_MS = 20_000;
 const TURN_TIMEOUT_MS = 60_000;
@@ -1112,19 +1112,48 @@ export const findAvailableTargets = query({
       return null;
     }
 
-    if (await hasActiveRealFight(ctx, participant._id)) {
-      return [];
-    }
-
     if (session.phase === "closed" || !session.fightMeEnabled) {
       return [];
     }
 
-    const submissions = await ctx.db
-      .query("submissions")
-      .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-      .order("desc")
-      .take(120);
+    const activeThreads = (
+      await Promise.all(
+        ACTIVE_REAL_STATUSES.map((status) =>
+          ctx.db
+            .query("fightThreads")
+            .withIndex("by_session_and_status", (q) =>
+              q.eq("sessionId", session._id).eq("status", status),
+            )
+            .take(THREAD_LIMIT),
+        ),
+      )
+    ).flat();
+    const activeRealFightParticipantIds = new Set<Id<"participants">>();
+
+    for (const thread of activeThreads) {
+      if (thread.mode !== "real_1v1") {
+        continue;
+      }
+
+      activeRealFightParticipantIds.add(thread.attackerParticipantId);
+      if (thread.defenderParticipantId) {
+        activeRealFightParticipantIds.add(thread.defenderParticipantId);
+      }
+    }
+
+    if (activeRealFightParticipantIds.has(participant._id)) {
+      return [];
+    }
+
+    const [submissions, questions] = await Promise.all([
+      ctx.db
+        .query("submissions")
+        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+        .order("desc")
+        .take(120),
+      listQuestionsForSession(ctx, session._id),
+    ]);
+    const questionsById = new Map(questions.map((question) => [question._id, question]));
     const targets = [];
 
     for (const submission of submissions) {
@@ -1133,7 +1162,7 @@ export const findAvailableTargets = query({
       }
 
       if (submission.questionId) {
-        const question = await ctx.db.get(submission.questionId);
+        const question = questionsById.get(submission.questionId);
 
         if (!question || !canUseFightMe(session, question)) {
           continue;
@@ -1142,7 +1171,7 @@ export const findAvailableTargets = query({
 
       const defender = await ctx.db.get(submission.participantId);
 
-      if (!defender || (await hasActiveRealFight(ctx, defender._id))) {
+      if (!defender || activeRealFightParticipantIds.has(defender._id)) {
         continue;
       }
 

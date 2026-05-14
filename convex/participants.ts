@@ -7,6 +7,7 @@ import { canJoinSession } from "./questionCapabilities";
 const OFFLINE_AFTER_MS = 60_000;
 const MAX_NICKNAME_LENGTH = 40;
 const RECENT_PARTICIPANT_LIMIT = 8;
+const PRESENCE_TOUCH_MIN_INTERVAL_MS = 15_000;
 
 function normalizeSessionSlug(value: string) {
   return value
@@ -308,9 +309,18 @@ export const touchPresence = mutation({
       throw new Error("Participant not found.");
     }
 
+    const now = Date.now();
+
+    if (
+      participant.presenceState === args.presenceState &&
+      now - participant.lastSeenAt < PRESENCE_TOUCH_MIN_INTERVAL_MS
+    ) {
+      return true;
+    }
+
     await ctx.db.patch(participant._id, {
       presenceState: args.presenceState,
-      lastSeenAt: Date.now(),
+      lastSeenAt: now,
     });
 
     return true;

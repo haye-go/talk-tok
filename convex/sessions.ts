@@ -243,6 +243,21 @@ export const getBySlug = query({
   },
 });
 
+export const getBySlugSnapshot = query({
+  args: {
+    sessionSlug: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await getSessionBySlug(ctx, slugify(args.sessionSlug));
+
+    if (!session) {
+      return null;
+    }
+
+    return toPublicSession(session);
+  },
+});
+
 export const getByJoinCode = query({
   args: {
     sessionCode: v.string(),

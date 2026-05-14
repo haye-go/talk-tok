@@ -17,8 +17,10 @@ const FIGHT_THREAD_LIMIT = 40;
 const SYNTHESIS_ARTIFACT_LIMIT = 40;
 const PARTICIPANT_PRESENCE_LIMIT = 500;
 const THREAD_REACTION_LIMIT = 1_000;
+const REACTIONS_PER_SUBMISSION_LIMIT = 200;
 const SYNTHESIS_QUOTE_LIMIT = 120;
 const SYNTHESIS_SUPPORTING_SNIPPET_LIMIT = 2;
+const POSITION_SHIFT_LIMIT = 120;
 const OFFLINE_AFTER_MS = 45_000;
 
 const toneValidator = v.union(
@@ -27,6 +29,16 @@ const toneValidator = v.union(
   v.literal("spicy"),
   v.literal("roast"),
 );
+
+const tabScopeValidator = v.union(
+  v.literal("contribute"),
+  v.literal("explore"),
+  v.literal("fight"),
+  v.literal("me"),
+  v.literal("all"),
+);
+
+type TabScope = "contribute" | "explore" | "fight" | "me" | "all";
 
 type PublicSubmissionResult = {
   id: Id<"submissions">;
@@ -284,6 +296,19 @@ function toFightThread(thread: Doc<"fightThreads">) {
   };
 }
 
+function toPositionShift(shift: Doc<"positionShiftEvents">) {
+  return {
+    id: shift._id,
+    sessionId: shift.sessionId,
+    participantId: shift.participantId,
+    submissionId: shift.submissionId,
+    categoryId: shift.categoryId,
+    reason: shift.reason,
+    influencedBy: shift.influencedBy,
+    createdAt: shift.createdAt,
+  };
+}
+
 function emptyReactionCounts() {
   return {
     agree: 0,
@@ -316,8 +341,18 @@ export const overview = query({
     sessionSlug: v.string(),
     clientKey: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
+    activeTab: v.optional(tabScopeValidator),
   },
   handler: async (ctx, args) => {
+    const activeTab: TabScope = args.activeTab ?? "all";
+    const needsContribute = activeTab === "all" || activeTab === "contribute";
+    const needsExplore = activeTab === "all" || activeTab === "explore";
+    const needsFight = activeTab === "all" || activeTab === "fight";
+    const needsMe = activeTab === "all" || activeTab === "me";
+    const needsRoomThreads = needsContribute || needsExplore;
+    const needsAssignments = needsContribute || needsExplore || needsMe;
+    const needsPresence = needsContribute;
+    const needsSynthesis = needsExplore;
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -346,6 +381,7 @@ export const overview = query({
       finalArtifacts,
       personalReports,
       presenceParticipants,
+      positionShifts,
     ] = await Promise.all([
       listQuestionsForSession(ctx, session._id),
       getCurrentQuestionForSession(ctx, session),
@@ -354,70 +390,101 @@ export const overview = query({
         .withIndex("by_participant_and_created_at", (q) => q.eq("participantId", participant._id))
         .order("desc")
         .take(MY_SUBMISSION_LIMIT),
-      ctx.db
-        .query("submissions")
-        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-        .order("desc")
-        .take(SESSION_SUBMISSION_LIMIT),
-      ctx.db
-        .query("categories")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(CATEGORY_LIMIT),
-      ctx.db
-        .query("submissionFeedback")
-        .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
-        .order("desc")
-        .take(MY_SUBMISSION_LIMIT),
-      ctx.db
-        .query("recategorizationRequests")
-        .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
-        .order("desc")
-        .take(MY_SUBMISSION_LIMIT),
-      ctx.db
-        .query("aiJobs")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .order("desc")
-        .take(JOB_LIMIT),
-      ctx.db
-        .query("followUpPrompts")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .order("desc")
-        .take(80),
-      ctx.db
-        .query("fightThreads")
-        .withIndex("by_attacker", (q) => q.eq("attackerParticipantId", participant._id))
-        .order("desc")
-        .take(FIGHT_THREAD_LIMIT),
-      ctx.db
-        .query("fightThreads")
-        .withIndex("by_defender", (q) => q.eq("defenderParticipantId", participant._id))
-        .order("desc")
-        .take(FIGHT_THREAD_LIMIT),
-      ctx.db
-        .query("synthesisArtifacts")
-        .withIndex("by_session_and_status", (q) =>
-          q.eq("sessionId", session._id).eq("status", "published"),
-        )
-        .order("desc")
-        .take(SYNTHESIS_ARTIFACT_LIMIT),
-      ctx.db
-        .query("synthesisArtifacts")
-        .withIndex("by_session_and_status", (q) =>
-          q.eq("sessionId", session._id).eq("status", "final"),
-        )
-        .order("desc")
-        .take(SYNTHESIS_ARTIFACT_LIMIT),
-      ctx.db
-        .query("personalReports")
-        .withIndex("by_session_and_participant", (q) =>
-          q.eq("sessionId", session._id).eq("participantId", participant._id),
-        )
-        .order("desc")
-        .take(1),
-      ctx.db
-        .query("participants")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(PARTICIPANT_PRESENCE_LIMIT),
+      needsRoomThreads
+        ? ctx.db
+            .query("submissions")
+            .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(SESSION_SUBMISSION_LIMIT)
+        : Promise.resolve([]),
+      needsAssignments
+        ? ctx.db
+            .query("categories")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(CATEGORY_LIMIT)
+        : Promise.resolve([]),
+      needsContribute || needsMe
+        ? ctx.db
+            .query("submissionFeedback")
+            .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
+            .order("desc")
+            .take(MY_SUBMISSION_LIMIT)
+        : Promise.resolve([]),
+      needsContribute || needsMe
+        ? ctx.db
+            .query("recategorizationRequests")
+            .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
+            .order("desc")
+            .take(MY_SUBMISSION_LIMIT)
+        : Promise.resolve([]),
+      activeTab === "all"
+        ? ctx.db
+            .query("aiJobs")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(JOB_LIMIT)
+        : Promise.resolve([]),
+      needsContribute
+        ? ctx.db
+            .query("followUpPrompts")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .order("desc")
+            .take(80)
+        : Promise.resolve([]),
+      needsFight || needsMe
+        ? ctx.db
+            .query("fightThreads")
+            .withIndex("by_attacker", (q) => q.eq("attackerParticipantId", participant._id))
+            .order("desc")
+            .take(FIGHT_THREAD_LIMIT)
+        : Promise.resolve([]),
+      needsFight || needsMe
+        ? ctx.db
+            .query("fightThreads")
+            .withIndex("by_defender", (q) => q.eq("defenderParticipantId", participant._id))
+            .order("desc")
+            .take(FIGHT_THREAD_LIMIT)
+        : Promise.resolve([]),
+      needsSynthesis
+        ? ctx.db
+            .query("synthesisArtifacts")
+            .withIndex("by_session_and_status", (q) =>
+              q.eq("sessionId", session._id).eq("status", "published"),
+            )
+            .order("desc")
+            .take(SYNTHESIS_ARTIFACT_LIMIT)
+        : Promise.resolve([]),
+      needsSynthesis
+        ? ctx.db
+            .query("synthesisArtifacts")
+            .withIndex("by_session_and_status", (q) =>
+              q.eq("sessionId", session._id).eq("status", "final"),
+            )
+            .order("desc")
+            .take(SYNTHESIS_ARTIFACT_LIMIT)
+        : Promise.resolve([]),
+      needsMe
+        ? ctx.db
+            .query("personalReports")
+            .withIndex("by_session_and_participant", (q) =>
+              q.eq("sessionId", session._id).eq("participantId", participant._id),
+            )
+            .order("desc")
+            .take(1)
+        : Promise.resolve([]),
+      needsPresence
+        ? ctx.db
+            .query("participants")
+            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+            .take(PARTICIPANT_PRESENCE_LIMIT)
+        : Promise.resolve([]),
+      needsMe
+        ? ctx.db
+            .query("positionShiftEvents")
+            .withIndex("by_participant", (q) => q.eq("participantId", participant._id))
+            .order("desc")
+            .take(POSITION_SHIFT_LIMIT)
+        : Promise.resolve([]),
     ]);
     const requestedQuestion = args.questionId ? await ctx.db.get(args.questionId) : null;
     const releasedQuestionsOrdered = orderReleasedQuestions(questions, currentQuestion?._id);
@@ -433,6 +500,7 @@ export const overview = query({
     const selectedQuestionId = selectedQuestion?._id;
     const presenceAggregate = presenceAggregateFor(presenceParticipants, Date.now());
     const synthesisVisible =
+      needsSynthesis &&
       Boolean(selectedQuestion?.synthesisVisible) &&
       session.visibilityMode !== "private_until_released";
     const synthesisPublishedArtifacts = synthesisVisible
@@ -496,24 +564,42 @@ export const overview = query({
       }
     }
 
-    for (const submission of sessionSubmissions) {
-      const assignment = await ctx.db
-        .query("submissionCategories")
-        .withIndex("by_submission", (q) => q.eq("submissionId", submission._id))
-        .order("desc")
-        .take(1)
-        .then((rows) => rows[0]);
+    const relevantAssignmentSubmissionIds = new Set([
+      ...sessionSubmissions.map((submission) => submission._id),
+      ...mySubmissions.map((submission) => submission._id),
+    ]);
+    const sessionSubmissionIds = new Set(sessionSubmissions.map((submission) => submission._id));
+    const assignmentCandidates =
+      needsAssignments && selectedQuestionId
+        ? await ctx.db
+            .query("submissionCategories")
+            .withIndex("by_questionId", (q) => q.eq("questionId", selectedQuestionId))
+            .order("desc")
+            .take(SESSION_SUBMISSION_LIMIT + MY_SUBMISSION_LIMIT)
+        : needsAssignments
+          ? await ctx.db
+              .query("submissionCategories")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .order("desc")
+              .take(SESSION_SUBMISSION_LIMIT + MY_SUBMISSION_LIMIT)
+          : [];
 
-      if (!assignment) {
+    for (const assignment of assignmentCandidates) {
+      if (
+        !relevantAssignmentSubmissionIds.has(assignment.submissionId) ||
+        assignmentBySubmission.has(assignment.submissionId)
+      ) {
         continue;
       }
 
       const category = categoriesById.get(assignment.categoryId);
-      categoryCounts.set(
-        assignment.categoryId,
-        (categoryCounts.get(assignment.categoryId) ?? 0) + 1,
-      );
-      assignmentBySubmission.set(submission._id, {
+      if (sessionSubmissionIds.has(assignment.submissionId)) {
+        categoryCounts.set(
+          assignment.categoryId,
+          (categoryCounts.get(assignment.categoryId) ?? 0) + 1,
+        );
+      }
+      assignmentBySubmission.set(assignment.submissionId, {
         id: assignment._id,
         questionId: assignment.questionId,
         categoryId: assignment.categoryId,
@@ -606,12 +692,17 @@ export const overview = query({
       ...mySubmissions.map((submission) => submission._id),
     ]);
     const reactions =
-      threadSubmissionIds.size > 0
-        ? await ctx.db
-            .query("reactions")
-            .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-            .order("desc")
-            .take(THREAD_REACTION_LIMIT)
+      needsRoomThreads && threadSubmissionIds.size > 0
+        ? (
+            await Promise.all(
+              [...threadSubmissionIds].slice(0, THREAD_REACTION_LIMIT).map((submissionId) =>
+                ctx.db
+                  .query("reactions")
+                  .withIndex("by_submission", (q) => q.eq("submissionId", submissionId))
+                  .take(REACTIONS_PER_SUBMISSION_LIMIT),
+              ),
+            )
+          ).flat()
         : [];
     const reactionsBySubmission = new Map<
       Id<"submissions">,
@@ -663,10 +754,7 @@ export const overview = query({
       archiveRepliesByParentId.set(submission.parentSubmissionId, existing);
     }
 
-    const toThreadMessage = (
-      submission: Doc<"submissions">,
-      replySource = repliesByParentId,
-    ) => {
+    const toThreadMessage = (submission: Doc<"submissions">, replySource = repliesByParentId) => {
       const reactionState = reactionsBySubmission.get(submission._id);
 
       return {
@@ -728,7 +816,12 @@ export const overview = query({
       };
     };
 
-    const myThreads = selectedQuestionSubmissions
+    const mySelectedQuestionSubmissions = needsRoomThreads
+      ? selectedQuestionSubmissions
+      : mySubmissions.filter((submission) =>
+          matchesSelectedQuestion(submission, selectedQuestionId),
+        );
+    const myThreads = mySelectedQuestionSubmissions
       .filter(
         (submission) =>
           submission.participantId === participant._id && isTopLevelMessage(submission),
@@ -810,16 +903,17 @@ export const overview = query({
       });
     const canSeeSelectedPeerThreads =
       selectedQuestion?.peerResponsesVisible ?? session.visibilityMode === "raw_responses_visible";
-    const peerThreads = canSeeSelectedPeerThreads
-      ? selectedQuestionSubmissions
-          .filter(
-            (submission) =>
-              submission.participantId !== participant._id && isTopLevelMessage(submission),
-          )
-          .sort((left, right) => right.createdAt - left.createdAt)
-          .slice(0, PEER_RESPONSE_LIMIT)
-          .map((submission) => toThread(submission))
-      : [];
+    const peerThreads =
+      needsExplore && canSeeSelectedPeerThreads
+        ? selectedQuestionSubmissions
+            .filter(
+              (submission) =>
+                submission.participantId !== participant._id && isTopLevelMessage(submission),
+            )
+            .sort((left, right) => right.createdAt - left.createdAt)
+            .slice(0, PEER_RESPONSE_LIMIT)
+            .map((submission) => toThread(submission))
+        : [];
     const toCategorySummary = (category: Doc<"categories">) => ({
       id: category._id,
       questionId: category.questionId,
@@ -951,7 +1045,7 @@ export const overview = query({
         .filter((section) => section.artifactCount > 0),
     };
     const peerResponses =
-      session.visibilityMode === "raw_responses_visible"
+      needsExplore && session.visibilityMode === "raw_responses_visible"
         ? sessionSubmissions
             .filter((submission) => submission.participantId !== participant._id)
             .slice(0, PEER_RESPONSE_LIMIT)
@@ -1105,6 +1199,9 @@ export const overview = query({
             updatedAt: personalReports[0].updatedAt,
           }
         : null,
+      positionShifts: positionShifts
+        .filter((shift) => shift.sessionId === session._id)
+        .map(toPositionShift),
       myZoneHistory: {
         initialResponses: mySubmissions
           .filter((submission) => submission.kind === "initial")
