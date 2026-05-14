@@ -128,6 +128,8 @@ export default defineSchema({
     body: v.string(),
     parentSubmissionId: v.optional(v.id("submissions")),
     followUpPromptId: v.optional(v.id("followUpPrompts")),
+    classifiedType: v.optional(v.union(v.literal("question"), v.literal("comment"))),
+    classifiedTypeSource: v.optional(v.union(v.literal("llm"), v.literal("instructor"))),
     kind: v.union(
       v.literal("initial"),
       v.literal("additional_point"),
@@ -442,6 +444,22 @@ export default defineSchema({
     .index("by_questionId", ["questionId"])
     .index("by_submissionId_and_questionId", ["submissionId", "questionId"])
     .index("by_category", ["categoryId"]),
+
+  categoryAssignmentReviews: defineTable({
+    sessionId: v.id("sessions"),
+    questionId: v.optional(v.id("sessionQuestions")),
+    submissionId: v.id("submissions"),
+    suggestedCategoryId: v.optional(v.id("categories")),
+    decision: v.union(v.literal("review"), v.literal("none")),
+    rationale: v.optional(v.string()),
+    status: v.union(v.literal("pending"), v.literal("resolved"), v.literal("dismissed")),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_questionId_and_status", ["questionId", "status"])
+    .index("by_submission", ["submissionId"])
+    .index("by_status", ["status"]),
 
   recategorizationRequests: defineTable({
     sessionId: v.id("sessions"),

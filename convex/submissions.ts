@@ -118,6 +118,8 @@ function toPublicSubmission(
     body: submission.body,
     parentSubmissionId: submission.parentSubmissionId,
     followUpPromptId: submission.followUpPromptId,
+    classifiedType: submission.classifiedType,
+    classifiedTypeSource: submission.classifiedTypeSource,
     kind: submission.kind,
     wordCount: submission.wordCount,
     typingStartedAt: submission.typingStartedAt,
