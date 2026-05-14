@@ -39,10 +39,7 @@ export interface SynthesisMasterDetailPanelProps {
   counts: Record<string, number>;
 }
 
-type ItemKey =
-  | { type: "class" }
-  | { type: "opposing" }
-  | { type: "category"; categoryId: Id<"categories"> };
+type ItemKey = { type: "class" } | { type: "category"; categoryId: Id<"categories"> };
 
 function statusTone(status: string) {
   switch (status) {
@@ -84,7 +81,6 @@ export function SynthesisMasterDetailPanel({
   selectedQuestionId,
   artifacts,
   categories,
-  synthesisReleasedForQuestion,
   sessionPrivateVisibility,
   counts,
 }: SynthesisMasterDetailPanelProps) {
@@ -94,7 +90,6 @@ export function SynthesisMasterDetailPanel({
   const unpublishArtifact = useMutation(api.synthesis.unpublishArtifact);
 
   const [generatingClass, setGeneratingClass] = useState(false);
-  const [generatingOpposing, setGeneratingOpposing] = useState(false);
   const [generatingCategoryId, setGeneratingCategoryId] = useState<Id<"categories"> | null>(null);
   const [updatingArtifactId, setUpdatingArtifactId] = useState<Id<"synthesisArtifacts"> | null>(
     null,
@@ -105,15 +100,6 @@ export function SynthesisMasterDetailPanel({
       artifacts.find(
         (artifact) =>
           artifact.kind === "class_synthesis" && isInstructorVisibleArtifactStatus(artifact.status),
-      ) ?? null,
-    [artifacts],
-  );
-
-  const opposingArtifact = useMemo(
-    () =>
-      artifacts.find(
-        (artifact) =>
-          artifact.kind === "opposing_views" && isInstructorVisibleArtifactStatus(artifact.status),
       ) ?? null,
     [artifacts],
   );
@@ -145,19 +131,17 @@ export function SynthesisMasterDetailPanel({
     return selectionKey(item) === selectionKey(selection);
   }
 
-  async function handleGenerateClass(kind?: "opposing_views", forceRegenerate = false) {
+  async function handleGenerateClass(forceRegenerate = false) {
     if (!selectedQuestionId) return;
-    const setBusy = kind === "opposing_views" ? setGeneratingOpposing : setGeneratingClass;
-    setBusy(true);
+    setGeneratingClass(true);
     try {
       await generateClassSynthesis({
         sessionSlug,
         questionId: selectedQuestionId,
-        ...(kind ? { kind } : {}),
         ...(forceRegenerate ? { forceRegenerate: true } : {}),
       });
     } finally {
-      setBusy(false);
+      setGeneratingClass(false);
     }
   }
 
@@ -200,9 +184,6 @@ export function SynthesisMasterDetailPanel({
         {sessionPrivateVisibility ? " and session visibility is no longer private." : "."}
       </p>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Badge tone={synthesisReleasedForQuestion ? "success" : "warning"}>
-          {synthesisReleasedForQuestion ? "Synthesis released" : "Synthesis hidden"}
-        </Badge>
         {sessionPrivateVisibility ? <Badge tone="warning">Session visibility private</Badge> : null}
         <span className="ml-auto flex flex-wrap gap-1.5 text-[10px] text-[var(--c-muted)]">
           <span>Draft {counts.draft ?? 0}</span>
@@ -210,25 +191,6 @@ export function SynthesisMasterDetailPanel({
           <span>· Final {counts.final ?? 0}</span>
           <span>· Error {counts.error ?? 0}</span>
         </span>
-      </div>
-
-      <div className="mb-3 flex flex-wrap gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => void handleGenerateClass()}
-          disabled={generatingClass || !selectedQuestionId}
-        >
-          {generatingClass ? "Generating..." : "Generate Class Synthesis"}
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => void handleGenerateClass("opposing_views")}
-          disabled={generatingOpposing || !selectedQuestionId}
-        >
-          {generatingOpposing ? "Generating..." : "Generate Opposing Views"}
-        </Button>
       </div>
 
       <div className="grid grid-cols-1 overflow-hidden rounded-lg border border-[var(--c-hairline)] md:grid-cols-[220px_minmax(0,1fr)] md:min-h-[340px]">
@@ -243,13 +205,6 @@ export function SynthesisMasterDetailPanel({
             statusClass={statusDot(classArtifact?.status ?? "idle")}
             active={isActive({ type: "class" })}
             onClick={() => setSelection({ type: "class" })}
-          />
-          <SynthesisListItem
-            label="Opposing Views"
-            statusLabel={opposingArtifact?.status ?? "Not generated"}
-            statusClass={statusDot(opposingArtifact?.status ?? "idle")}
-            active={isActive({ type: "opposing" })}
-            onClick={() => setSelection({ type: "opposing" })}
           />
           {categories.length > 0 ? (
             <li className="border-t border-[var(--c-hairline)] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[var(--c-muted)]">
@@ -277,32 +232,13 @@ export function SynthesisMasterDetailPanel({
             <ArtifactDetail
               artifact={classArtifact}
               emptyLabel="No class synthesis generated yet."
-              emptyHint="Use the Generate Class Synthesis button to create one."
+              emptyHint="Generate a class-level synthesis from the current responses."
               onGenerate={() => void handleGenerateClass()}
-              onRegenerate={() => void handleGenerateClass(undefined, true)}
+              onRegenerate={() => void handleGenerateClass(true)}
               onPublish={classArtifact ? () => void handlePublish(classArtifact.id) : undefined}
               onUnpublish={classArtifact ? () => void handleUnpublish(classArtifact.id) : undefined}
               regenerating={generatingClass}
               updatingLifecycle={classArtifact ? updatingArtifactId === classArtifact.id : false}
-            />
-          ) : null}
-          {selection.type === "opposing" ? (
-            <ArtifactDetail
-              artifact={opposingArtifact}
-              emptyLabel="No opposing views artifact yet."
-              emptyHint="Requires at least 2 categories with 3+ threads each."
-              onGenerate={() => void handleGenerateClass("opposing_views")}
-              onRegenerate={() => void handleGenerateClass("opposing_views", true)}
-              onPublish={
-                opposingArtifact ? () => void handlePublish(opposingArtifact.id) : undefined
-              }
-              onUnpublish={
-                opposingArtifact ? () => void handleUnpublish(opposingArtifact.id) : undefined
-              }
-              regenerating={generatingOpposing}
-              updatingLifecycle={
-                opposingArtifact ? updatingArtifactId === opposingArtifact.id : false
-              }
             />
           ) : null}
           {selection.type === "category" ? (
@@ -475,18 +411,6 @@ function ArtifactDetail({
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--c-accent,#0f766e)]" />
                 <span>{point}</span>
               </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {artifact.opposingViews && artifact.opposingViews.length > 0 ? (
-        <div className="mt-3 rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--c-muted)]">
-            Opposing Views
-          </p>
-          <ul className="space-y-1.5 text-xs text-[var(--c-body)]">
-            {artifact.opposingViews.map((point, index) => (
-              <li key={index}>{point}</li>
             ))}
           </ul>
         </div>
