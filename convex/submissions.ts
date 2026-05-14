@@ -428,6 +428,15 @@ export const create = mutation({
       submissionId,
     });
 
+    if (!args.parentSubmissionId && args.kind !== "reply") {
+      await ctx.scheduler.runAfter(0, internal.categorisation.autoAssignSubmission, {
+        submissionId,
+      });
+      await ctx.scheduler.runAfter(0, internal.categorisation.classifySubmissionType, {
+        submissionId,
+      });
+    }
+
     const submission = await ctx.db.get(submissionId);
 
     if (!submission) {

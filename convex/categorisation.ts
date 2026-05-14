@@ -81,6 +81,10 @@ function assignmentDecisionFrom(value: unknown, confidence: number): AssignmentD
   return confidence >= AUTO_ASSIGNMENT_CONFIDENCE ? "auto" : "review";
 }
 
+function classifiedTypeFrom(value: unknown): "question" | "comment" {
+  return value === "question" ? "question" : "comment";
+}
+
 async function getSessionBySlug(ctx: QueryCtx | MutationCtx, sessionSlug: string) {
   return await ctx.db
     .query("sessions")
@@ -782,6 +786,54 @@ export const loadAssignmentContext = internalQuery({
   },
 });
 
+export const loadSubmissionAutomationContext = internalQuery({
+  args: {
+    submissionId: v.id("submissions"),
+  },
+  handler: async (ctx, args) => {
+    const submission = await ctx.db.get(args.submissionId);
+
+    if (!submission) {
+      throw new Error("Submission not found.");
+    }
+
+    const session = await ctx.db.get(submission.sessionId);
+
+    if (!session) {
+      throw new Error("Session not found.");
+    }
+
+    const questionId = submission.questionId ?? session.currentQuestionId;
+    const question = questionId ? await ctx.db.get(questionId) : null;
+
+    if (questionId && (!question || question.sessionId !== session._id)) {
+      throw new Error("Question not found in this session.");
+    }
+
+    const categories = questionId
+      ? (await loadCategoriesForQuestion(ctx, session._id, questionId)).filter(
+          (category) => category.status === "active",
+        )
+      : [];
+    const existingAssignments = await ctx.db
+      .query("submissionCategories")
+      .withIndex("by_submission", (q) => q.eq("submissionId", submission._id))
+      .take(8);
+    const hasAssignment = existingAssignments.some(
+      (assignment) => !questionId || !assignment.questionId || assignment.questionId === questionId,
+    );
+
+    return {
+      session,
+      question,
+      questionId,
+      submission,
+      categories,
+      hasAssignment,
+    };
+  },
+});
+
 export const applyGeneratedCategories = internalMutation({
   args: {
     sessionId: v.id("sessions"),
@@ -1229,6 +1281,135 @@ export const runAssignCategories = internalAction({
       });
       throw error;
     }
+  },
+});
+
+export const autoAssignSubmission = internalAction({
+  args: {
+    submissionId: v.id("submissions"),
+  },
+  handler: async (ctx, args) => {
+    const { session, question, questionId, submission, categories, hasAssignment } =
+      await ctx.runQuery(internal.categorisation.loadSubmissionAutomationContext, {
+        submissionId: args.submissionId,
+      });
+
+    if (!questionId || hasAssignment || categories.length === 0) {
+      return { skipped: true };
+    }
+
+    if (submission.kind === "reply" || submission.kind === "fight_me_turn") {
+      return { skipped: true };
+    }
+
+    const budget = await ctx.runQuery(internal.budget.checkSessionBudget, {
+      sessionId: session._id,
+      feature: "categorisation_auto_assign",
+    });
+
+    if (!budget.allowed) {
+      return { skipped: true, reason: "budget" };
+    }
+
+    const result = await ctx.runAction(internal.llm.runJson, {
+      sessionId: session._id,
+      questionId,
+      feature: "categorisation_auto_assign",
+      promptKey: "category.assign.single.v1",
+      variables: {
+        sessionTitle: session.title,
+        openingPrompt: question?.prompt ?? session.openingPrompt,
+        categoriesJson: JSON.stringify(
+          categories.map((category) => ({
+            slug: category.slug,
+            name: category.name,
+            description: category.description,
+          })),
+        ),
+        submissionJson: JSON.stringify({
+          id: submission._id,
+          body: submission.body,
+          kind: submission.kind,
+          wordCount: submission.wordCount,
+        }),
+      },
+    });
+    const data = asRecord(result.data);
+    const confidence = clampConfidence(data.confidence);
+    const categorySlug = stringOrFallback(data.categorySlug ?? data.categoryName, "");
+
+    await ctx.runMutation(internal.categorisation.applyAssignments, {
+      sessionId: session._id,
+      questionId,
+      assignments: [
+        {
+          submissionId: submission._id,
+          categorySlug: categorySlug ? slugify(categorySlug) : undefined,
+          decision: assignmentDecisionFrom(data.decision, confidence),
+          confidence,
+          rationale: typeof data.rationale === "string" ? data.rationale : undefined,
+        },
+      ],
+    });
+
+    return { skipped: false };
+  },
+});
+
+export const classifySubmissionType = internalAction({
+  args: {
+    submissionId: v.id("submissions"),
+  },
+  handler: async (ctx, args) => {
+    const { session, question, questionId, submission } = await ctx.runQuery(
+      internal.categorisation.loadSubmissionAutomationContext,
+      {
+        submissionId: args.submissionId,
+      },
+    );
+
+    if (!questionId || submission.classifiedTypeSource === "instructor" || submission.classifiedType) {
+      return { skipped: true };
+    }
+
+    if (submission.kind === "reply" || submission.kind === "fight_me_turn") {
+      return { skipped: true };
+    }
+
+    const budget = await ctx.runQuery(internal.budget.checkSessionBudget, {
+      sessionId: session._id,
+      feature: "submission_type_classification",
+    });
+
+    if (!budget.allowed) {
+      return { skipped: true, reason: "budget" };
+    }
+
+    const result = await ctx.runAction(internal.llm.runJson, {
+      sessionId: session._id,
+      questionId,
+      feature: "submission_type_classification",
+      promptKey: "submission.type.classify.v1",
+      variables: {
+        sessionTitle: session.title,
+        openingPrompt: question?.prompt ?? session.openingPrompt,
+        submissionJson: JSON.stringify({
+          id: submission._id,
+          body: submission.body,
+          kind: submission.kind,
+          wordCount: submission.wordCount,
+        }),
+      },
+    });
+    const data = asRecord(result.data);
+
+    await ctx.runMutation(internal.categorisation.applySubmissionType, {
+      submissionId: submission._id,
+      classifiedType: classifiedTypeFrom(data.type),
+      source: "llm",
+    });
+
+    return { skipped: false };
   },
 });
 
