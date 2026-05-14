@@ -10,6 +10,8 @@ export interface SubmissionCardData {
   id: Id<"submissions">;
   nickname: string;
   body: string;
+  classifiedType?: "question" | "comment";
+  classifiedTypeSource?: "llm" | "instructor";
   kind: "initial" | "additional_point" | "reply" | "fight_me_turn";
   wordCount: number;
   inputPattern: InputPattern;
@@ -64,6 +66,11 @@ export function SubmissionCard({
       <PretextDisplay text={submission.body} />
       <ReactionCounts counts={reactionCounts} />
       <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--c-muted)]">
+        {submission.classifiedType ? (
+          <Badge tone={submission.classifiedType === "question" ? "sky" : "cream"}>
+            {submission.classifiedType}
+          </Badge>
+        ) : null}
         <Badge tone={submission.inputPattern === "likely_pasted" ? "warning" : "neutral"}>
           {inputPatternLabel(submission.inputPattern)}
         </Badge>

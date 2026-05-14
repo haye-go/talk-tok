@@ -96,7 +96,9 @@ export function NeedsAttentionPanel({
         sessionSlug,
         submissionId,
         categoryId,
-        rationale: categoryId ? "Instructor accepted suggested category." : "Instructor cleared category.",
+        rationale: categoryId
+          ? "Instructor accepted suggested category."
+          : "Instructor cleared category.",
       });
     } finally {
       setReviewingId(null);
@@ -120,10 +122,11 @@ export function NeedsAttentionPanel({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="font-medium text-[var(--c-ink)]">
-                {uncategorizedCount} root thread{uncategorizedCount === 1 ? "" : "s"} still uncategorized
+                {uncategorizedCount} root thread{uncategorizedCount === 1 ? "" : "s"} still
+                uncategorized
               </p>
               <p className="text-xs text-[var(--c-muted)]">
-                Quick triage — run categorisation now or assign manually.
+                Quick triage - assign categories now or handle manually.
               </p>
             </div>
             <Button
@@ -179,9 +182,7 @@ export function NeedsAttentionPanel({
                       size="sm"
                       variant="ghost"
                       disabled={busy}
-                      onClick={() =>
-                        void handleAssignmentReview(review.id, review.submissionId)
-                      }
+                      onClick={() => void handleAssignmentReview(review.id, review.submissionId)}
                     >
                       No category
                     </Button>
@@ -209,7 +210,8 @@ export function NeedsAttentionPanel({
         {pendingRequests && pendingRequests.length > 0 ? (
           <div className="grid gap-2">
             <p className="font-medium text-[var(--c-ink)]">
-              {pendingRequests.length} thread{pendingRequests.length === 1 ? "" : "s"} pending recategorisation
+              {pendingRequests.length} thread{pendingRequests.length === 1 ? "" : "s"} pending
+              recategorisation
             </p>
             {pendingRequests.slice(0, 4).map((request) => {
               const requestedCategory = request.requestedCategoryId

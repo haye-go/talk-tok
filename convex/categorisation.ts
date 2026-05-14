@@ -350,7 +350,9 @@ export const listAssignmentReviews = query({
   args: {
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
-    status: v.optional(v.union(v.literal("pending"), v.literal("resolved"), v.literal("dismissed"))),
+    status: v.optional(
+      v.union(v.literal("pending"), v.literal("resolved"), v.literal("dismissed")),
+    ),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -865,7 +867,9 @@ export const applyGeneratedCategories = internalMutation({
       returnedSlugs.add(slug);
       const existingForQuestion = await ctx.db
         .query("categories")
-        .withIndex("by_questionId_and_slug", (q) => q.eq("questionId", args.questionId).eq("slug", slug))
+        .withIndex("by_questionId_and_slug", (q) =>
+          q.eq("questionId", args.questionId).eq("slug", slug),
+        )
         .unique();
       const existingForSession = existingForQuestion
         ? null
@@ -953,9 +957,9 @@ export const applyAssignments = internalMutation({
       throw new Error("Session not found.");
     }
 
-    const categories = (await loadCategoriesForQuestion(ctx, args.sessionId, args.questionId)).filter(
-      (category) => category.status === "active",
-    );
+    const categories = (
+      await loadCategoriesForQuestion(ctx, args.sessionId, args.questionId)
+    ).filter((category) => category.status === "active");
     const categoriesBySlug = new Map(categories.map((category) => [category.slug, category]));
     const now = Date.now();
     let assigned = 0;
@@ -1015,7 +1019,8 @@ export const applyAssignments = internalMutation({
         .withIndex("by_submission", (q) => q.eq("submissionId", submission._id))
         .take(20);
       const existingPending = existingReviews.find(
-        (row) => row.status === "pending" && (!row.questionId || row.questionId === args.questionId),
+        (row) =>
+          row.status === "pending" && (!row.questionId || row.questionId === args.questionId),
       );
       const reviewPatch = {
         questionId: args.questionId,
@@ -1368,7 +1373,11 @@ export const classifySubmissionType = internalAction({
       },
     );
 
-    if (!questionId || submission.classifiedTypeSource === "instructor" || submission.classifiedType) {
+    if (
+      !questionId ||
+      submission.classifiedTypeSource === "instructor" ||
+      submission.classifiedType
+    ) {
       return { skipped: true };
     }
 
@@ -1460,7 +1469,9 @@ export const applyCategorisation = internalMutation({
             .take(10);
       const existing =
         existingForQuestion ??
-        existingForSession?.find((category) => !category.questionId || category.questionId === questionId);
+        existingForSession?.find(
+          (category) => !category.questionId || category.questionId === questionId,
+        );
 
       if (existing) {
         await ctx.db.patch(existing._id, {

@@ -44,7 +44,9 @@ export function QuickActionsRailCard({
           : "Full category regeneration queued.",
       );
     } catch (error) {
-      setCategoryError(error instanceof Error ? error.message : "Failed to queue category generation.");
+      setCategoryError(
+        error instanceof Error ? error.message : "Failed to queue category generation.",
+      );
     } finally {
       setCategoryBusy(null);
     }
@@ -66,7 +68,9 @@ export function QuickActionsRailCard({
           : "All-post reassignment queued.",
       );
     } catch (error) {
-      setCategoryError(error instanceof Error ? error.message : "Failed to queue category assignment.");
+      setCategoryError(
+        error instanceof Error ? error.message : "Failed to queue category assignment.",
+      );
     } finally {
       setCategoryBusy(null);
     }
@@ -159,9 +163,7 @@ export function QuickActionsRailCard({
         {categoryMessage ? (
           <p className="text-xs text-[var(--c-success)]">{categoryMessage}</p>
         ) : null}
-        {categoryError ? (
-          <p className="text-xs text-[var(--c-error)]">{categoryError}</p>
-        ) : null}
+        {categoryError ? <p className="text-xs text-[var(--c-error)]">{categoryError}</p> : null}
         <Button
           type="button"
           size="sm"

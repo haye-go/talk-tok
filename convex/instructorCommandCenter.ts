@@ -154,6 +154,8 @@ function toSubmission(
     body: submission.body,
     parentSubmissionId: submission.parentSubmissionId,
     followUpPromptId: submission.followUpPromptId,
+    classifiedType: submission.classifiedType,
+    classifiedTypeSource: submission.classifiedTypeSource,
     kind: submission.kind,
     wordCount: submission.wordCount,
     compositionMs: submission.compositionMs,
@@ -199,70 +201,62 @@ export const room = query({
         : currentQuestion;
     const selectedQuestionId = selectedQuestion?._id;
 
-    const [
-      participants,
-      submissions,
-      categories,
-      assignments,
-      reactions,
-      pendingRequests,
-    ] = await Promise.all([
-      ctx.db
-        .query("participants")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(PARTICIPANT_LIMIT),
-      selectedQuestionId
-        ? ctx.db
-            .query("submissions")
-            .withIndex("by_questionId_and_createdAt", (q) =>
-              q.eq("questionId", selectedQuestionId),
-            )
-            .order("desc")
-            .take(ROOM_SUBMISSION_LIMIT)
-        : ctx.db
-            .query("submissions")
-            .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-            .order("desc")
-            .take(ROOM_SUBMISSION_LIMIT),
-      ctx.db
-        .query("categories")
-        .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-        .take(CATEGORY_LIMIT),
-      selectedQuestionId
-        ? ctx.db
-            .query("submissionCategories")
-            .withIndex("by_questionId", (q) => q.eq("questionId", selectedQuestionId))
-            .take(ROOM_SUBMISSION_LIMIT)
-        : ctx.db
-            .query("submissionCategories")
-            .withIndex("by_session", (q) => q.eq("sessionId", session._id))
-            .take(ROOM_SUBMISSION_LIMIT),
-      ctx.db
-        .query("reactions")
-        .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
-        .order("desc")
-        .take(ROOM_REACTION_LIMIT),
-      selectedQuestionId
-        ? ctx.db
-            .query("recategorizationRequests")
-            .withIndex("by_questionId_and_status", (q) =>
-              q.eq("questionId", selectedQuestionId).eq("status", "pending"),
-            )
-            .take(50)
-        : ctx.db
-            .query("recategorizationRequests")
-            .withIndex("by_session_and_status", (q) =>
-              q.eq("sessionId", session._id).eq("status", "pending"),
-            )
-            .take(50),
-    ]);
+    const [participants, submissions, categories, assignments, reactions, pendingRequests] =
+      await Promise.all([
+        ctx.db
+          .query("participants")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .take(PARTICIPANT_LIMIT),
+        selectedQuestionId
+          ? ctx.db
+              .query("submissions")
+              .withIndex("by_questionId_and_createdAt", (q) =>
+                q.eq("questionId", selectedQuestionId),
+              )
+              .order("desc")
+              .take(ROOM_SUBMISSION_LIMIT)
+          : ctx.db
+              .query("submissions")
+              .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+              .order("desc")
+              .take(ROOM_SUBMISSION_LIMIT),
+        ctx.db
+          .query("categories")
+          .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+          .take(CATEGORY_LIMIT),
+        selectedQuestionId
+          ? ctx.db
+              .query("submissionCategories")
+              .withIndex("by_questionId", (q) => q.eq("questionId", selectedQuestionId))
+              .take(ROOM_SUBMISSION_LIMIT)
+          : ctx.db
+              .query("submissionCategories")
+              .withIndex("by_session", (q) => q.eq("sessionId", session._id))
+              .take(ROOM_SUBMISSION_LIMIT),
+        ctx.db
+          .query("reactions")
+          .withIndex("by_session_and_created_at", (q) => q.eq("sessionId", session._id))
+          .order("desc")
+          .take(ROOM_REACTION_LIMIT),
+        selectedQuestionId
+          ? ctx.db
+              .query("recategorizationRequests")
+              .withIndex("by_questionId_and_status", (q) =>
+                q.eq("questionId", selectedQuestionId).eq("status", "pending"),
+              )
+              .take(50)
+          : ctx.db
+              .query("recategorizationRequests")
+              .withIndex("by_session_and_status", (q) =>
+                q.eq("sessionId", session._id).eq("status", "pending"),
+              )
+              .take(50),
+      ]);
 
     const activeCategories = categories.filter(
       (category) =>
         category.status === "active" &&
-        (!selectedQuestionId ||
-          !category.questionId ||
-          category.questionId === selectedQuestionId),
+        (!selectedQuestionId || !category.questionId || category.questionId === selectedQuestionId),
     );
     const categoriesById = new Map(categories.map((category) => [category._id, category]));
     const participantsById = new Map(
@@ -826,8 +820,7 @@ export const reports = query({
           id: report._id,
           participantId: report.participantId,
           nickname: participantsById.get(report.participantId)?.nickname ?? "Unknown",
-          participantSlug:
-            participantsById.get(report.participantId)?.participantSlug ?? "unknown",
+          participantSlug: participantsById.get(report.participantId)?.participantSlug ?? "unknown",
           status: report.status,
           participationBand: report.participationBand,
           reasoningBand: report.reasoningBand,
