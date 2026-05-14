@@ -163,12 +163,15 @@ function toPublicAssignment(
 function toPublicReview(
   review: Doc<"categoryAssignmentReviews">,
   category: Doc<"categories"> | null,
+  submission: Doc<"submissions"> | null,
 ) {
   return {
     id: review._id,
     sessionId: review.sessionId,
     questionId: review.questionId,
     submissionId: review.submissionId,
+    submissionBody: submission?.body,
+    submissionKind: submission?.kind,
     suggestedCategoryId: review.suggestedCategoryId,
     suggestedCategorySlug: category?.slug,
     suggestedCategoryName: category?.name,
@@ -381,6 +384,7 @@ export const listAssignmentReviews = query({
         toPublicReview(
           review,
           review.suggestedCategoryId ? await ctx.db.get(review.suggestedCategoryId) : null,
+          await ctx.db.get(review.submissionId),
         ),
       ),
     );

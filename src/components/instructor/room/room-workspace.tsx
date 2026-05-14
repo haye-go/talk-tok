@@ -99,6 +99,7 @@ export function RoomWorkspace({
 
       <NeedsAttentionPanel
         sessionSlug={sessionSlug}
+        selectedQuestionId={selectedQuestionId}
         uncategorizedCount={needsAttention?.uncategorizedCount ?? 0}
         pendingRecategorisationCount={needsAttention?.pendingRecategorisationCount ?? 0}
         failedLiveJobCount={needsAttention?.failedLiveJobCount ?? 0}

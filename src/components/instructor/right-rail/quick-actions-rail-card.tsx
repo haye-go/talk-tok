@@ -4,6 +4,9 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 
+type CategoryGenerationMode = "append" | "full_regeneration";
+type CategoryAssignmentScope = "uncategorised_posts" | "all_posts";
+
 export interface QuickActionsRailCardProps {
   sessionSlug: string;
   selectedQuestionId: Id<"sessionQuestions"> | undefined;
@@ -13,29 +16,59 @@ export function QuickActionsRailCard({
   sessionSlug,
   selectedQuestionId,
 }: QuickActionsRailCardProps) {
-  const triggerCategorisation = useMutation(api.categorisation.triggerForSession);
+  const generateCategories = useMutation(api.categorisation.generateCategories);
+  const assignCategories = useMutation(api.categorisation.assignCategories);
   const generateClassSynthesis = useMutation(api.synthesis.generateClassSynthesis);
 
-  const [categorisationBusy, setCategorisationBusy] = useState(false);
-  const [categorisationMessage, setCategorisationMessage] = useState<string | null>(null);
-  const [categorisationError, setCategorisationError] = useState<string | null>(null);
+  const [generationMode, setGenerationMode] = useState<CategoryGenerationMode>("append");
+  const [assignmentScope, setAssignmentScope] =
+    useState<CategoryAssignmentScope>("uncategorised_posts");
+  const [categoryBusy, setCategoryBusy] = useState<"generate" | "assign" | null>(null);
+  const [categoryMessage, setCategoryMessage] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const [synthBusy, setSynthBusy] = useState(false);
 
-  async function handleTriggerCategorisation() {
-    setCategorisationBusy(true);
-    setCategorisationMessage(null);
-    setCategorisationError(null);
+  async function handleGenerateCategories() {
+    setCategoryBusy("generate");
+    setCategoryMessage(null);
+    setCategoryError(null);
     try {
-      const result = await triggerCategorisation({ sessionSlug, questionId: selectedQuestionId });
-      setCategorisationMessage(
-        typeof result === "string" ? result : "Categorisation queued.",
+      await generateCategories({
+        sessionSlug,
+        questionId: selectedQuestionId,
+        mode: generationMode,
+      });
+      setCategoryMessage(
+        generationMode === "append"
+          ? "Category append queued."
+          : "Full category regeneration queued.",
       );
     } catch (error) {
-      setCategorisationError(
-        error instanceof Error ? error.message : "Failed to queue categorisation.",
-      );
+      setCategoryError(error instanceof Error ? error.message : "Failed to queue category generation.");
     } finally {
-      setCategorisationBusy(false);
+      setCategoryBusy(null);
+    }
+  }
+
+  async function handleAssignCategories() {
+    setCategoryBusy("assign");
+    setCategoryMessage(null);
+    setCategoryError(null);
+    try {
+      await assignCategories({
+        sessionSlug,
+        questionId: selectedQuestionId,
+        scope: assignmentScope,
+      });
+      setCategoryMessage(
+        assignmentScope === "uncategorised_posts"
+          ? "Uncategorised post assignment queued."
+          : "All-post reassignment queued.",
+      );
+    } catch (error) {
+      setCategoryError(error instanceof Error ? error.message : "Failed to queue category assignment.");
+    } finally {
+      setCategoryBusy(null);
     }
   }
 
@@ -55,20 +88,79 @@ export function QuickActionsRailCard({
         Quick Live Actions
       </p>
       <div className="grid gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          onClick={() => void handleTriggerCategorisation()}
-          disabled={categorisationBusy}
-        >
-          {categorisationBusy ? "Categorising..." : "Run categorisation"}
-        </Button>
-        {categorisationMessage ? (
-          <p className="text-xs text-[var(--c-success)]">{categorisationMessage}</p>
+        <div className="rounded-xl border border-[#eadfcb] bg-white/60 p-3">
+          <p className="text-xs font-semibold text-[var(--c-ink)]">Generate Categories</p>
+          <div className="mt-2 grid gap-1.5 text-xs text-[var(--c-muted)]">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="category-generation-mode"
+                checked={generationMode === "append"}
+                onChange={() => setGenerationMode("append")}
+              />
+              Append missing categories
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="category-generation-mode"
+                checked={generationMode === "full_regeneration"}
+                onChange={() => setGenerationMode("full_regeneration")}
+              />
+              Full regeneration
+            </label>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="mt-3 w-full"
+            onClick={() => void handleGenerateCategories()}
+            disabled={categoryBusy !== null}
+          >
+            {categoryBusy === "generate" ? "Generating..." : "Generate Categories"}
+          </Button>
+        </div>
+
+        <div className="rounded-xl border border-[#eadfcb] bg-white/60 p-3">
+          <p className="text-xs font-semibold text-[var(--c-ink)]">Assign Categories</p>
+          <div className="mt-2 grid gap-1.5 text-xs text-[var(--c-muted)]">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="category-assignment-scope"
+                checked={assignmentScope === "uncategorised_posts"}
+                onChange={() => setAssignmentScope("uncategorised_posts")}
+              />
+              Uncategorised posts only
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="category-assignment-scope"
+                checked={assignmentScope === "all_posts"}
+                onChange={() => setAssignmentScope("all_posts")}
+              />
+              All posts
+            </label>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="mt-3 w-full"
+            onClick={() => void handleAssignCategories()}
+            disabled={categoryBusy !== null}
+          >
+            {categoryBusy === "assign" ? "Assigning..." : "Assign Categories"}
+          </Button>
+        </div>
+
+        {categoryMessage ? (
+          <p className="text-xs text-[var(--c-success)]">{categoryMessage}</p>
         ) : null}
-        {categorisationError ? (
-          <p className="text-xs text-[var(--c-error)]">{categorisationError}</p>
+        {categoryError ? (
+          <p className="text-xs text-[var(--c-error)]">{categoryError}</p>
         ) : null}
         <Button
           type="button"

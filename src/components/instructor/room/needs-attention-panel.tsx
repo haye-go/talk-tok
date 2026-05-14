@@ -13,6 +13,7 @@ interface CategoryRef {
 
 export interface NeedsAttentionPanelProps {
   sessionSlug: string;
+  selectedQuestionId: Id<"sessionQuestions"> | undefined;
   uncategorizedCount: number;
   pendingRecategorisationCount: number;
   failedLiveJobCount: number;
@@ -21,6 +22,7 @@ export interface NeedsAttentionPanelProps {
 
 export function NeedsAttentionPanel({
   sessionSlug,
+  selectedQuestionId,
   uncategorizedCount,
   pendingRecategorisationCount,
   failedLiveJobCount,
@@ -30,14 +32,27 @@ export function NeedsAttentionPanel({
     sessionSlug,
     status: "pending",
   });
+  const pendingAssignmentReviews = useQuery(api.categorisation.listAssignmentReviews, {
+    sessionSlug,
+    questionId: selectedQuestionId,
+    status: "pending",
+    limit: 4,
+  });
   const decideRecategorisation = useMutation(api.recategorisation.decide);
-  const triggerCategorisation = useMutation(api.categorisation.triggerForSession);
+  const assignCategories = useMutation(api.categorisation.assignCategories);
+  const setSubmissionCategory = useMutation(api.categorisation.setSubmissionCategory);
 
   const [decidingId, setDecidingId] = useState<string | null>(null);
-  const [triggering, setTriggering] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   const categoryById = new Map(categories.map((category) => [category.id, category]));
-  const totalCount = uncategorizedCount + pendingRecategorisationCount + failedLiveJobCount;
+  const pendingAssignmentReviewCount = pendingAssignmentReviews?.length ?? 0;
+  const totalCount =
+    uncategorizedCount +
+    pendingRecategorisationCount +
+    failedLiveJobCount +
+    pendingAssignmentReviewCount;
 
   async function handleDecide(
     requestId: Id<"recategorizationRequests">,
@@ -57,12 +72,34 @@ export function NeedsAttentionPanel({
     }
   }
 
-  async function handleTriggerCategorisation() {
-    setTriggering(true);
+  async function handleAssignUncategorised() {
+    setAssigning(true);
     try {
-      await triggerCategorisation({ sessionSlug });
+      await assignCategories({
+        sessionSlug,
+        questionId: selectedQuestionId,
+        scope: "uncategorised_posts",
+      });
     } finally {
-      setTriggering(false);
+      setAssigning(false);
+    }
+  }
+
+  async function handleAssignmentReview(
+    reviewId: string,
+    submissionId: Id<"submissions">,
+    categoryId?: Id<"categories">,
+  ) {
+    setReviewingId(reviewId);
+    try {
+      await setSubmissionCategory({
+        sessionSlug,
+        submissionId,
+        categoryId,
+        rationale: categoryId ? "Instructor accepted suggested category." : "Instructor cleared category.",
+      });
+    } finally {
+      setReviewingId(null);
     }
   }
 
@@ -93,11 +130,79 @@ export function NeedsAttentionPanel({
               type="button"
               size="sm"
               variant="secondary"
-              onClick={() => void handleTriggerCategorisation()}
-              disabled={triggering}
+              onClick={() => void handleAssignUncategorised()}
+              disabled={assigning}
             >
-              {triggering ? "Categorising..." : "Run categorisation"}
+              {assigning ? "Assigning..." : "Assign uncategorised"}
             </Button>
+          </div>
+        ) : null}
+
+        {pendingAssignmentReviews && pendingAssignmentReviews.length > 0 ? (
+          <div className="grid gap-2">
+            <p className="font-medium text-[var(--c-ink)]">
+              {pendingAssignmentReviews.length} category suggestion
+              {pendingAssignmentReviews.length === 1 ? "" : "s"} need review
+            </p>
+            {pendingAssignmentReviews.map((review) => {
+              const suggestedCategory = review.suggestedCategoryId
+                ? categoryById.get(review.suggestedCategoryId)
+                : null;
+              const busy = reviewingId === review.id;
+              const preview = review.submissionBody ?? "Submission unavailable.";
+
+              return (
+                <div
+                  key={review.id}
+                  className="grid gap-2 rounded-md border border-[var(--c-hairline)] bg-white px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-[var(--c-ink)]">
+                      {suggestedCategory
+                        ? `Suggested: ${suggestedCategory.name}`
+                        : review.decision === "none"
+                          ? "Suggested: no category"
+                          : "Needs instructor choice"}
+                    </p>
+                    <p className="mt-0.5 line-clamp-2 text-[11px] text-[var(--c-muted)]">
+                      {preview}
+                    </p>
+                    {review.rationale ? (
+                      <p className="mt-1 line-clamp-2 text-[11px] text-[var(--c-muted)]">
+                        {review.rationale}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex justify-end gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        void handleAssignmentReview(review.id, review.submissionId)
+                      }
+                    >
+                      No category
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busy || !review.suggestedCategoryId}
+                      onClick={() =>
+                        void handleAssignmentReview(
+                          review.id,
+                          review.submissionId,
+                          review.suggestedCategoryId ?? undefined,
+                        )
+                      }
+                    >
+                      {busy ? "..." : "Accept"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : null}
 
