@@ -1,4 +1,5 @@
 import { ArrowSquareOut, Plus, SlidersHorizontal } from "@phosphor-icons/react";
+import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { InstructorBrandBar } from "@/components/layout/instructor-brand-bar";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { routes } from "@/lib/routes";
 
 export function InstructorDashboardPage() {
+  const navigate = useNavigate();
   const sessions = useQuery(api.sessions.listForInstructor);
 
   return (
@@ -26,7 +28,7 @@ export function InstructorDashboardPage() {
             <Button
               type="button"
               icon={<Plus size={16} />}
-              onClick={() => (window.location.href = routes.instructorSessionNew())}
+              onClick={() => void navigate({ to: routes.instructorSessionNew() })}
             >
               New session
             </Button>
@@ -39,7 +41,7 @@ export function InstructorDashboardPage() {
               action={
                 <Button
                   type="button"
-                  onClick={() => (window.location.href = routes.instructorSessionNew())}
+                  onClick={() => void navigate({ to: routes.instructorSessionNew() })}
                 >
                   Create session
                 </Button>
@@ -74,7 +76,7 @@ export function InstructorDashboardPage() {
                       variant="secondary"
                       icon={<SlidersHorizontal size={16} />}
                       onClick={() =>
-                        (window.location.href = routes.instructorSessionSetup(session.slug))
+                        void navigate({ to: routes.instructorSessionSetup(session.slug) })
                       }
                     >
                       Open Setup
@@ -83,7 +85,7 @@ export function InstructorDashboardPage() {
                       type="button"
                       icon={<ArrowSquareOut size={16} />}
                       onClick={() =>
-                        (window.location.href = routes.instructorSessionRoom(session.slug))
+                        void navigate({ to: routes.instructorSessionRoom(session.slug) })
                       }
                     >
                       Open Room

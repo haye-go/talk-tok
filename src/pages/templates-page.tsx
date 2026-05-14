@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Archive, Rocket } from "@phosphor-icons/react";
+import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -19,6 +20,7 @@ const MODE_LABELS: Record<string, string> = {
 };
 
 export function TemplatesPage() {
+  const navigate = useNavigate();
   const templates = useQuery(api.sessionTemplates.list, {});
   const createFromTemplate = useMutation(api.sessionTemplates.createSessionFromTemplate);
   const archiveTemplate = useMutation(api.sessionTemplates.archive);
@@ -29,7 +31,7 @@ export function TemplatesPage() {
     setCreatingId(templateId);
     try {
       const session = await createFromTemplate({ templateId });
-      window.location.href = routes.instructorSession(session.slug);
+      await navigate({ to: routes.instructorSession(session.slug) });
     } finally {
       setCreatingId(null);
     }

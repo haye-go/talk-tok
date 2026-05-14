@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowSquareOut, Copy, Play, Rocket, Trash, Warning } from "@phosphor-icons/react";
+import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { AdminShell } from "@/components/layout/admin-shell";
@@ -23,6 +24,7 @@ const TOGGLE_KEYS = [
 ];
 
 export function AdminDemoPage() {
+  const navigate = useNavigate();
   const demoSession = useQuery(api.demo.getDemoSession);
   const health = useQuery(api.demo.health, {});
   const toggles = useQuery(api.demo.listToggles);
@@ -246,7 +248,7 @@ export function AdminDemoPage() {
                   type="button"
                   className="flex items-center gap-1 text-[10px] text-[var(--c-primary)] hover:underline"
                   onClick={() => {
-                    window.location.href = stageSession.instructorPath;
+                    void navigate({ to: stageSession.instructorPath });
                   }}
                 >
                   <ArrowSquareOut size={10} /> Instructor view

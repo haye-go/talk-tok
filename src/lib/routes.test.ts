@@ -25,6 +25,18 @@ describe("routes", () => {
     expect(routes.instructorSession("ethics-ai-healthcare")).toBe(
       "/instructor/session/ethics-ai-healthcare",
     );
+    expect(routes.instructorSessionRoom("ethics-ai-healthcare")).toBe(
+      "/instructor/session/ethics-ai-healthcare?tab=room",
+    );
+    expect(routes.instructorSessionRoom("ethics-ai-healthcare", { mode: "categories" })).toBe(
+      "/instructor/session/ethics-ai-healthcare?tab=room&mode=categories",
+    );
+    expect(routes.instructorSessionSetup("ethics-ai-healthcare")).toBe(
+      "/instructor/session/ethics-ai-healthcare?tab=setup",
+    );
+    expect(routes.instructorSessionReports("ethics-ai-healthcare")).toBe(
+      "/instructor/session/ethics-ai-healthcare?tab=reports",
+    );
     expect(routes.instructorProjector("ethics-ai-healthcare")).toBe(
       "/instructor/session/ethics-ai-healthcare/projector",
     );

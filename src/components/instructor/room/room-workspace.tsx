@@ -1,4 +1,5 @@
 import { ROOM_MODES } from "@/components/instructor/instructor-nav";
+import { Link } from "@tanstack/react-router";
 import { PresenceBar } from "@/components/stream/presence-bar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -78,9 +79,9 @@ export function RoomWorkspace({
           {ROOM_MODES.map((mode) => {
             const Icon = mode.icon;
             return (
-              <a
+              <Link
                 key={mode.id}
-                href={roomModeHref(mode.id)}
+                to={roomModeHref(mode.id)}
                 className={cn(
                   "inline-flex min-h-9 items-center gap-2 rounded-sm border px-3 text-sm font-medium transition",
                   roomMode === mode.id
@@ -90,7 +91,7 @@ export function RoomWorkspace({
               >
                 <Icon size={15} />
                 {mode.label}
-              </a>
+              </Link>
             );
           })}
         </div>
@@ -141,10 +142,7 @@ export function RoomWorkspace({
       ) : null}
 
       {roomMode === "similarity" ? (
-        <RoomSimilarityClusters
-          sessionSlug={sessionSlug}
-          selectedQuestionId={selectedQuestionId}
-        />
+        <RoomSimilarityClusters sessionSlug={sessionSlug} selectedQuestionId={selectedQuestionId} />
       ) : null}
     </div>
   );

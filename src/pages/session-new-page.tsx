@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ArrowsClockwise, Rocket } from "@phosphor-icons/react";
+import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -28,6 +29,7 @@ const MODE_LABELS: Record<string, string> = {
 };
 
 export function SessionNewPage() {
+  const navigate = useNavigate();
   const createSession = useMutation(api.sessions.create);
   const templates = useQuery(api.sessionTemplates.list, {});
   const createFromTemplate = useMutation(api.sessionTemplates.createSessionFromTemplate);
@@ -60,7 +62,7 @@ export function SessionNewPage() {
         modePreset,
         joinCode: joinCode || undefined,
       });
-      window.location.href = routes.instructorSession(session.slug);
+      await navigate({ to: routes.instructorSession(session.slug) });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not create the session.");
     } finally {
@@ -99,7 +101,7 @@ export function SessionNewPage() {
                       const s = await createFromTemplate({
                         templateId: t.id,
                       });
-                      window.location.href = routes.instructorSession(s.slug);
+                      await navigate({ to: routes.instructorSession(s.slug) });
                     } finally {
                       setCreatingTemplateId(null);
                     }

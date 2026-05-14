@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, UserCircle } from "@phosphor-icons/react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Badge } from "@/components/ui/badge";
@@ -51,10 +51,10 @@ export function DemoPersonasPage() {
   return (
     <main className="min-h-dvh bg-[var(--c-canvas)]">
       <div className="flex items-center justify-between border-b border-[var(--c-hairline)] px-6 py-4">
-        <a href={routes.home()} className="flex items-center gap-3 no-underline">
+        <Link to={routes.home()} className="flex items-center gap-3 no-underline">
           <img src="/favicon.svg" alt="" className="h-10 w-10" />
           <span className="font-display text-2xl font-semibold text-[var(--c-ink)]">TalkTok</span>
-        </a>
+        </Link>
         <ButtonLink
           href={routes.home()}
           variant="secondary"

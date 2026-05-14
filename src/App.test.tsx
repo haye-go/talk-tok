@@ -6,6 +6,10 @@ vi.mock("convex/react", () => ({
   useQuery: () => null,
 }));
 
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => () => undefined,
+}));
+
 describe("App", () => {
   it("renders the setup checkpoint", () => {
     const html = renderToString(<App />);

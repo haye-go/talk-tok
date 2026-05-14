@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import type { Id } from "../../../../convex/_generated/dataModel";
 
@@ -36,9 +37,9 @@ export function SelectedQuestionRailCard({
         <p className="mb-2 text-xs font-semibold text-[var(--c-ink)]">Question switcher</p>
         <div className="grid gap-2">
           {questions.map((question) => (
-            <a
+            <Link
               key={question.id}
-              href={questionHref(question.id)}
+              to={questionHref(question.id)}
               className={cn(
                 "rounded-xl border px-3 py-2 text-xs transition",
                 selectedQuestion?.id === question.id
@@ -48,7 +49,7 @@ export function SelectedQuestionRailCard({
             >
               <span className="block truncate font-medium">{question.title}</span>
               <span className="mt-0.5 block text-[10px]">{question.status}</span>
-            </a>
+            </Link>
           ))}
         </div>
       </section>

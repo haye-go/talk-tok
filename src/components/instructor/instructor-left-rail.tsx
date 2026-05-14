@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Presentation } from "@phosphor-icons/react";
+import { Link } from "@tanstack/react-router";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { routes, type InstructorRoomModeId, type InstructorWorkspaceTabId } from "@/lib/routes";
@@ -57,9 +58,9 @@ export function InstructorLeftRail({
           const Icon = tab.icon;
 
           return (
-            <a
+            <Link
               key={tab.id}
-              href={workspaceHref(tab.id)}
+              to={workspaceHref(tab.id)}
               className={cn(
                 "inline-flex min-h-11 items-center justify-between gap-3 rounded-xl px-3 text-sm font-semibold transition",
                 workspaceTab === tab.id
@@ -72,7 +73,7 @@ export function InstructorLeftRail({
                 {tab.label}
               </span>
               <span className="text-[11px] font-semibold text-[#8ea4bb]">{tab.hint}</span>
-            </a>
+            </Link>
           );
         })}
       </nav>
@@ -86,9 +87,9 @@ export function InstructorLeftRail({
             const Icon = mode.icon;
 
             return (
-              <a
+              <Link
                 key={mode.id}
-                href={roomModeHref(mode.id)}
+                to={roomModeHref(mode.id)}
                 className={cn(
                   "inline-flex min-h-10 items-center justify-between gap-3 rounded-xl px-3 text-sm font-semibold transition",
                   roomMode === mode.id
@@ -101,7 +102,7 @@ export function InstructorLeftRail({
                   {mode.label}
                 </span>
                 <span className="text-[11px] font-semibold text-[#8ea4bb]">{mode.hint}</span>
-              </a>
+              </Link>
             );
           })}
         </section>
@@ -128,13 +129,13 @@ export function InstructorLeftRail({
             {urlCopied ? "URL copied!" : "Copy URL"}
           </Button>
         </div>
-        <a
-          href={routes.instructorProjector(sessionSlug)}
+        <Link
+          to={routes.instructorProjector(sessionSlug)}
           className="mt-3 inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-semibold text-[#d9e7f3] transition hover:bg-white/10 hover:text-white"
         >
           <Presentation size={15} />
           Open projector
-        </a>
+        </Link>
       </section>
     </div>
   );

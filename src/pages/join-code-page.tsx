@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { QrCode } from "@phosphor-icons/react";
+import { useNavigate } from "@tanstack/react-router";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { routes } from "@/lib/routes";
 import { normalizeSessionCode } from "@/lib/session-slug";
 
 export function JoinCodePage() {
+  const navigate = useNavigate();
   const [sessionCode, setSessionCode] = useState("");
   const normalizedCode = normalizeSessionCode(sessionCode);
 
@@ -17,7 +19,7 @@ export function JoinCodePage() {
       return;
     }
 
-    window.location.href = routes.join(normalizedCode);
+    void navigate({ to: routes.join(normalizedCode) });
   }
 
   return (

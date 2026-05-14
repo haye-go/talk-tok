@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import { InstructorBrandBar } from "@/components/layout/instructor-brand-bar";
 import { INSTRUCTOR_NAV } from "@/lib/constants";
 
@@ -24,14 +25,14 @@ export function AdminShell({ title, description, children }: AdminShellProps) {
           aria-label="Admin navigation"
         >
           {INSTRUCTOR_NAV.map((item) => (
-            <a
+            <Link
               key={item.path}
-              href={item.path}
+              to={item.path}
               className="flex min-h-10 shrink-0 items-center gap-2 rounded-sm px-3 text-sm text-[var(--c-muted)] hover:bg-[var(--c-surface-soft)] hover:text-[var(--c-ink)]"
             >
               <item.icon size={16} />
               {item.label}
-            </a>
+            </Link>
           ))}
         </nav>
         <main>{children}</main>

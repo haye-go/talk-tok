@@ -9,11 +9,7 @@ import { InstructorShell } from "@/components/layout/instructor-shell";
 import { ErrorState } from "@/components/state/error-state";
 import { LoadingState } from "@/components/state/loading-state";
 import { useInstructorShell } from "@/hooks/use-instructor-shell";
-import {
-  routes,
-  type InstructorRoomModeId,
-  type InstructorWorkspaceTabId,
-} from "@/lib/routes";
+import { routes, type InstructorRoomModeId, type InstructorWorkspaceTabId } from "@/lib/routes";
 
 function isInstructorWorkspaceTab(value: string | null): value is InstructorWorkspaceTabId {
   return value === "room" || value === "setup" || value === "reports";
@@ -35,7 +31,7 @@ export function InstructorSessionPage() {
     : "latest";
   const selectedQuestionId =
     (searchParams.get("questionId") as Id<"sessionQuestions"> | null) ?? undefined;
-  const shell = useInstructorShell(sessionSlug, selectedQuestionId);
+  const shell = useInstructorShell(sessionSlug);
 
   if (shell === undefined) {
     return (
@@ -56,7 +52,13 @@ export function InstructorSessionPage() {
     );
   }
 
-  const { session, selectedQuestion } = shell;
+  const { session } = shell;
+  const selectedQuestion =
+    (selectedQuestionId
+      ? shell.questions.find((question) => question.id === selectedQuestionId)
+      : null) ??
+    shell.currentQuestion ??
+    shell.selectedQuestion;
   const synthesisReleasedForQuestion = selectedQuestion?.synthesisVisible ?? false;
   const reportsReleasedForQuestion = selectedQuestion?.personalReportsVisible ?? false;
   const sessionPrivateVisibility = session.visibilityMode === "private_until_released";
@@ -106,9 +108,7 @@ export function InstructorSessionPage() {
       />
     );
   } else {
-    center = (
-      <SetupWorkspace sessionSlug={sessionSlug} selectedQuestionId={selectedQuestion?.id} />
-    );
+    center = <SetupWorkspace sessionSlug={sessionSlug} selectedQuestionId={selectedQuestion?.id} />;
   }
 
   return (
