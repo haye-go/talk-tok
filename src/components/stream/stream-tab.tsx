@@ -8,10 +8,8 @@ import {
   ParticipantThreadCard,
 } from "@/components/messages/participant-thread-card";
 import { ReactionBar } from "@/components/reactions/reaction-bar";
-import {
-  ResponseComposer,
-  type ResponseComposerSubmit,
-} from "@/components/submission/response-composer";
+import { InlineFollowUpComposer } from "@/components/submission/inline-follow-up-composer";
+import type { ResponseComposerSubmit } from "@/components/submission/response-composer";
 import { SynthesisArtifactCard } from "@/components/synthesis/synthesis-artifact-card";
 import { ParticipantStateSection } from "@/components/layout/participant-state-section";
 import { Badge } from "@/components/ui/badge";
@@ -253,7 +251,9 @@ export function StreamTab({
         <ParticipantThreadCard
           authorLabel={submission.nickname}
           body={submission.body}
-          categoryName={hideCategoryPill ? undefined : (thread.assignment?.categoryName ?? undefined)}
+          categoryName={
+            hideCategoryPill ? undefined : (thread.assignment?.categoryName ?? undefined)
+          }
           categoryTone={categoryColorToTone(thread.assignment?.categoryColor)}
           replies={thread.replies.map((reply) => ({
             id: reply.submission.id,
@@ -295,15 +295,14 @@ export function StreamTab({
         />
 
         {replyOpen ? (
-          <Card title={`Reply to ${submission.nickname}`}>
+          <div>
             {replyError ? <InlineAlert tone="error">{replyError}</InlineAlert> : null}
-            <ResponseComposer
+            <InlineFollowUpComposer
               softWordLimit={softWordLimit}
-              submitLabel="Send reply"
-              placeholder="Respond directly to this point..."
-              onSubmit={(_text, _tone, replySubmission) => handleReply(thread, replySubmission)}
+              onSubmit={(replySubmission) => handleReply(thread, replySubmission)}
+              onCancel={() => setReplyParentId(null)}
             />
-          </Card>
+          </div>
         ) : null}
       </div>
     );
@@ -318,7 +317,11 @@ export function StreamTab({
       );
     }
 
-    return <div className="flex flex-col gap-3">{latestThreads.map((thread) => renderThread(thread))}</div>;
+    return (
+      <div className="flex flex-col gap-3">
+        {latestThreads.map((thread) => renderThread(thread))}
+      </div>
+    );
   }
 
   function renderByCategory() {

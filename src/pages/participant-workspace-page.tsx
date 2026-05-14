@@ -402,6 +402,7 @@ export function ParticipantWorkspacePage({
 
   const followUpComposer = followUpParentId ? (
     <InlineFollowUpComposer
+      softWordLimit={session.responseSoftLimitWords}
       onSubmit={(submission) => handleFollowUp(submission, followUpParentId)}
       onCancel={() => setFollowUpParentId(null)}
     />
@@ -461,8 +462,14 @@ export function ParticipantWorkspacePage({
           {contributionsOpen ? (
             <ResponseComposer
               softWordLimit={session.responseSoftLimitWords}
-              submitLabel={topLevelContributions.length === 0 ? "Submit response" : "Add another point"}
-              placeholder={topLevelContributions.length === 0 ? "Share your perspective..." : "Add a response..."}
+              submitLabel={
+                topLevelContributions.length === 0 ? "Submit response" : "Add another point"
+              }
+              placeholder={
+                topLevelContributions.length === 0
+                  ? "Share your perspective..."
+                  : "Add a response..."
+              }
               onSubmit={(_text, _tone, submission) =>
                 topLevelContributions.length === 0
                   ? handleSubmit(submission)

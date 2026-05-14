@@ -1,18 +1,29 @@
 import { ArrowCircleUp } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { useInputTelemetry } from "@/hooks/use-input-telemetry";
+import { countWords } from "@/lib/submission-telemetry";
 import type { ResponseComposerSubmit } from "@/components/submission/response-composer";
+import { cn } from "@/lib/utils";
 
 interface InlineFollowUpComposerProps {
+  softWordLimit?: number;
   onSubmit: (submission: ResponseComposerSubmit) => Promise<void> | void;
   onCancel: () => void;
 }
 
-export function InlineFollowUpComposer({ onSubmit, onCancel }: InlineFollowUpComposerProps) {
+export function InlineFollowUpComposer({
+  softWordLimit,
+  onSubmit,
+  onCancel,
+}: InlineFollowUpComposerProps) {
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const telemetry = useInputTelemetry();
+  const limit = softWordLimit ?? 200;
+  const wordCount = countWords(text);
+  const atLimit = wordCount >= limit;
+  const nearLimit = wordCount >= limit * 0.8;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -61,7 +72,19 @@ export function InlineFollowUpComposer({ onSubmit, onCancel }: InlineFollowUpCom
         className="w-full resize-none border-none bg-transparent text-xs leading-relaxed text-[var(--c-body)] placeholder:text-[var(--c-muted)] focus:outline-none"
         style={{ fontFamily: "var(--font-body)" }}
       />
-      <div className="mt-1 flex justify-end">
+      <div className="mt-1 flex items-center justify-between">
+        <span
+          className={cn(
+            "text-[10px]",
+            atLimit
+              ? "text-[var(--c-error)]"
+              : nearLimit
+                ? "text-[var(--c-sig-mustard)]"
+                : "text-[var(--c-muted)]",
+          )}
+        >
+          {wordCount}/{limit} words
+        </span>
         <button
           type="button"
           disabled={!text.trim() || submitting}
