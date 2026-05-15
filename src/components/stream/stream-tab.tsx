@@ -389,7 +389,9 @@ export function StreamTab({
           <section className="mt-1 flex flex-col gap-3 border-t border-[var(--c-hairline)] pt-3">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-display text-sm font-medium text-[var(--c-ink)]">Answered</h3>
-              <Badge tone="success">{answeredThreads.length}</Badge>
+              <span className="text-[11px] font-medium text-[var(--c-muted)]">
+                {answeredThreads.length} answered
+              </span>
             </div>
             {answeredThreads.map((thread) => renderThread(thread))}
           </section>
@@ -439,7 +441,9 @@ export function StreamTab({
                       <h4 className="font-display text-sm font-medium text-[var(--c-ink)]">
                         Answered
                       </h4>
-                      <Badge tone="success">{answeredThreads.length}</Badge>
+                      <span className="text-[11px] font-medium text-[var(--c-muted)]">
+                        {answeredThreads.length} answered
+                      </span>
                     </div>
                     {answeredThreads.map((thread) => renderThread(thread, true))}
                   </section>
