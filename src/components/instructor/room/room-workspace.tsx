@@ -146,7 +146,9 @@ export function RoomWorkspace({
                     <h3 className="font-display text-sm font-medium text-[var(--c-ink)]">
                       Answered
                     </h3>
-                    <Badge tone="success">{answeredThreads.length}</Badge>
+                    <span className="text-[11px] font-medium text-[var(--c-muted)]">
+                      {answeredThreads.length} answered
+                    </span>
                   </div>
                   {answeredThreads.map((thread) => (
                     <ThreadCard key={thread.root.submission.id} thread={thread} />

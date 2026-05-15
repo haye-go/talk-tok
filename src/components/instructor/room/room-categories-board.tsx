@@ -39,7 +39,9 @@ function ThreadSectionList({ threads }: { threads: ThreadCardData[] }) {
         <div className="mt-1 grid gap-3 border-t border-[var(--c-hairline)] pt-3">
           <div className="flex items-center justify-between gap-3">
             <h4 className="font-display text-sm font-medium text-[var(--c-ink)]">Answered</h4>
-            <Badge tone="success">{answeredThreads.length}</Badge>
+            <span className="text-[11px] font-medium text-[var(--c-muted)]">
+              {answeredThreads.length} answered
+            </span>
           </div>
           {answeredThreads.map((thread) => (
             <ThreadCard key={thread.root.submission.id} thread={thread} />
@@ -200,12 +202,13 @@ export function RoomCategoriesBoard({
       ) : null}
 
       {uncategorizedThreads.length > 0 ? (
-        <section className="grid gap-3 border-l-4 border-[var(--c-warning)] pl-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="font-display text-base font-medium text-[var(--c-ink)]">
-              Uncategorized
-            </h3>
-            <Badge tone="warning">{uncategorizedThreads.length}</Badge>
+        <section className="rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <Badge tone="warning">Uncategorized</Badge>
+            <span className="text-[11px] text-[var(--c-muted)]">
+              {uncategorizedThreads.length}{" "}
+              {uncategorizedThreads.length === 1 ? "message" : "messages"}
+            </span>
           </div>
           <ThreadSectionList threads={uncategorizedThreads} />
         </section>
@@ -222,20 +225,17 @@ export function RoomCategoriesBoard({
       {categoryGroups.map(({ category, threads }, index) => (
         <section
           key={category.id}
-          className="grid gap-3 border-l-4 pl-4"
-          style={{ borderColor: `var(--c-sig-${categoryColorToTone(category.color, index)})` }}
+          className="rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="font-display text-base font-medium text-[var(--c-ink)]">
-                {category.name}
-              </h3>
-              {category.description ? (
-                <p className="text-xs text-[var(--c-muted)]">{category.description}</p>
-              ) : null}
-            </div>
-            <Badge tone="neutral">{threads.length}</Badge>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <Badge tone={categoryColorToTone(category.color, index)}>{category.name}</Badge>
+            <span className="text-[11px] text-[var(--c-muted)]">
+              {threads.length} {threads.length === 1 ? "message" : "messages"}
+            </span>
           </div>
+          {category.description ? (
+            <p className="mb-3 text-xs text-[var(--c-muted)]">{category.description}</p>
+          ) : null}
           {threads.length > 0 ? (
             <ThreadSectionList threads={threads} />
           ) : (
