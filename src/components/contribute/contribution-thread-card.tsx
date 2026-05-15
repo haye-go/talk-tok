@@ -56,7 +56,7 @@ export function ContributionThreadCard({
 
   return (
     <ParticipantThreadCard
-      authorLabel=""
+      authorLabel="You"
       body={submission.body}
       createdAt={submission.createdAt}
       categoryName={assignment?.categoryName ?? undefined}
