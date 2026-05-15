@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { QrCode } from "@phosphor-icons/react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
@@ -22,22 +22,21 @@ export function JoinPage() {
   const normalizedCode = normalizeSessionCode(sessionCode);
   const session = useQuery(api.sessions.getByJoinCode, { sessionCode: normalizedCode });
   const joinSession = useMutation(api.participants.join);
-  const storedNickname = session ? (readStoredParticipant(session.slug)?.nickname ?? "") : "";
+  const storedParticipant = session ? readStoredParticipant(session.slug) : null;
+  const storedNickname = storedParticipant?.nickname ?? "";
   const [nicknameDraft, setNicknameDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAutoRestoring, setIsAutoRestoring] = useState(false);
+  const autoRestoreSessionRef = useRef<string | null>(null);
   const nickname = nicknameDraft ?? storedNickname;
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
-
-    try {
+  const joinWithNickname = useCallback(
+    async (nextNickname: string) => {
       const clientKey = getOrCreateClientKey();
       const result = await joinSession({
         sessionCode: normalizedCode,
-        nickname,
+        nickname: nextNickname,
         clientKey,
       });
 
@@ -48,6 +47,51 @@ export function JoinPage() {
       });
 
       await navigate({ to: routes.session(result.session.slug) });
+    },
+    [joinSession, navigate, normalizedCode],
+  );
+
+  useEffect(() => {
+    if (!session || !storedNickname || nicknameDraft !== null) {
+      return;
+    }
+
+    if (autoRestoreSessionRef.current === session.slug) {
+      return;
+    }
+
+    autoRestoreSessionRef.current = session.slug;
+    let isActive = true;
+
+    setError(null);
+    setIsAutoRestoring(true);
+
+    void joinWithNickname(storedNickname)
+      .catch((cause) => {
+        if (!isActive) {
+          return;
+        }
+
+        setError(cause instanceof Error ? cause.message : "Could not rejoin the session.");
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsAutoRestoring(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [joinWithNickname, nicknameDraft, session, storedNickname]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      await joinWithNickname(nickname);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not join the session.");
     } finally {
@@ -65,7 +109,10 @@ export function JoinPage() {
             description={`No active session was found for code ${normalizedCode}. Check the code and try again.`}
           />
         ) : null}
-        {session ? (
+        {session && isAutoRestoring ? (
+          <LoadingState label={`Taking you back as ${storedNickname}...`} />
+        ) : null}
+        {session && !isAutoRestoring ? (
           <form className="grid gap-4" onSubmit={handleSubmit}>
             <Input
               label="Session code"
