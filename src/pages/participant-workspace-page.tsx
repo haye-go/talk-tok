@@ -395,7 +395,7 @@ export function ParticipantWorkspacePage({
               }
               placeholder={
                 topLevelContributions.length === 0
-                  ? "Share your perspective..."
+                  ? "Post your questions / thoughts..."
                   : "Add a response..."
               }
               onSubmit={(_text, _tone, submission) =>

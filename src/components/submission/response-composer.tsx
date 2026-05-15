@@ -32,7 +32,7 @@ export function ResponseComposer({
   softWordLimit,
   defaultTone = "spicy",
   submitLabel = "Submit",
-  placeholder = "Share your perspective...",
+  placeholder = "Post your questions / thoughts...",
   disabled = false,
   onSubmit,
   className,

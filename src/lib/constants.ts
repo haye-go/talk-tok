@@ -38,7 +38,7 @@ export const ACTS: ActDefinition[] = [
   {
     id: "submit",
     label: "Submit",
-    subtitle: "Share your perspective",
+    subtitle: "Post your questions / thoughts...",
     color: "var(--c-sig-sky)",
   },
   {
