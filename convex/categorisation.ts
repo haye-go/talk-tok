@@ -1262,14 +1262,17 @@ export const runAssignCategories = internalAction({
       const parsedAssignments = rawAssignments
         .map((raw) => {
           const row = asRecord(raw);
-          const submissionId = row.submissionId;
+          const submissionId = row.submissionId ?? row.submission_id;
 
           if (typeof submissionId !== "string") {
             return null;
           }
 
           const confidence = clampConfidence(row.confidence);
-          const categorySlug = stringOrFallback(row.categorySlug ?? row.categoryName, "");
+          const categorySlug = stringOrFallback(
+            row.categorySlug ?? row.category_slug ?? row.categoryName ?? row.category_name,
+            "",
+          );
 
           return {
             submissionId: submissionId as Id<"submissions">,
@@ -1308,7 +1311,7 @@ export const autoAssignSubmission = internalAction({
         submissionId: args.submissionId,
       });
 
-    if (!questionId || hasAssignment || categories.length === 0) {
+    if (!questionId || hasAssignment) {
       return { skipped: true };
     }
 
@@ -1329,41 +1332,83 @@ export const autoAssignSubmission = internalAction({
       sessionId: session._id,
       questionId,
       feature: "categorisation_auto_assign",
-      promptKey: "category.assign.single.v1",
+      promptKey: "categorisation.session.v1",
       variables: {
         sessionTitle: session.title,
         openingPrompt: question?.prompt ?? session.openingPrompt,
-        categoriesJson: JSON.stringify(
+        categorySoftCap: session.categorySoftCap,
+        existingCategoriesJson: JSON.stringify(
           categories.map((category) => ({
             slug: category.slug,
             name: category.name,
             description: category.description,
           })),
         ),
-        submissionJson: JSON.stringify({
-          id: submission._id,
-          body: submission.body,
-          kind: submission.kind,
-          wordCount: submission.wordCount,
-        }),
+        submissionsJson: JSON.stringify([
+          {
+            id: submission._id,
+            body: submission.body,
+            kind: submission.kind,
+            wordCount: submission.wordCount,
+          },
+        ]),
       },
     });
     const data = asRecord(result.data);
-    const confidence = clampConfidence(data.confidence);
-    const categorySlug = stringOrFallback(data.categorySlug ?? data.categoryName, "");
+    const rawCategories = Array.isArray(data.categories) ? data.categories : [];
+    const rawAssignments = Array.isArray(data.assignments) ? data.assignments : [];
+    const parsedCategories = rawCategories.map((raw, index) => {
+      const row = asRecord(raw);
+      const name = stringOrFallback(row.name, `Category ${index + 1}`);
 
-    await ctx.runMutation(internal.categorisation.applyAssignments, {
+      return {
+        slug: slugify(stringOrFallback(row.slug, name)),
+        name,
+        description: typeof row.description === "string" ? row.description : undefined,
+        color: typeof row.color === "string" ? row.color : undefined,
+      };
+    });
+    const fallbackCategories =
+      parsedCategories.length > 0
+        ? parsedCategories
+        : categories.map((category) => ({
+            slug: category.slug,
+            name: category.name,
+            description: category.description,
+            color: category.color,
+          }));
+    const parsedAssignments = rawAssignments
+      .map((raw) => {
+        const row = asRecord(raw);
+        const submissionId = row.submissionId ?? row.submission_id;
+
+        if (submissionId !== submission._id) {
+          return null;
+        }
+
+        const categorySlug = stringOrFallback(
+          row.categorySlug ?? row.category_slug ?? row.categoryName ?? row.category_name,
+          "",
+        );
+
+        if (!categorySlug) {
+          return null;
+        }
+
+        return {
+          submissionId: submission._id,
+          categorySlug: slugify(categorySlug),
+          confidence: clampConfidence(row.confidence),
+          rationale: typeof row.rationale === "string" ? row.rationale : undefined,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+    await ctx.runMutation(internal.categorisation.applyCategorisation, {
       sessionId: session._id,
       questionId,
-      assignments: [
-        {
-          submissionId: submission._id,
-          categorySlug: categorySlug ? slugify(categorySlug) : undefined,
-          decision: assignmentDecisionFrom(data.decision, confidence),
-          confidence,
-          rationale: typeof data.rationale === "string" ? data.rationale : undefined,
-        },
-      ],
+      categories: fallbackCategories,
+      assignments: parsedAssignments,
     });
 
     return { skipped: false };
@@ -1435,7 +1480,7 @@ export const applyCategorisation = internalMutation({
   args: {
     sessionId: v.id("sessions"),
     questionId: v.optional(v.id("sessionQuestions")),
-    jobId: v.id("aiJobs"),
+    jobId: v.optional(v.id("aiJobs")),
     categories: v.array(
       v.object({
         slug: v.string(),
@@ -1563,12 +1608,14 @@ export const applyCategorisation = internalMutation({
       assigned += 1;
     }
 
-    await ctx.db.patch(args.jobId, {
-      status: "success",
-      progressDone: assigned,
-      progressTotal: args.assignments.length,
-      updatedAt: now,
-    });
+    if (args.jobId) {
+      await ctx.db.patch(args.jobId, {
+        status: "success",
+        progressDone: assigned,
+        progressTotal: args.assignments.length,
+        updatedAt: now,
+      });
+    }
 
     return { assigned, categories: categoryIdsBySlug.size };
   },
@@ -1642,7 +1689,7 @@ export const runForSession = internalAction({
       const parsedAssignments = rawAssignments
         .map((raw) => {
           const row = asRecord(raw);
-          const submissionId = row.submissionId;
+          const submissionId = row.submissionId ?? row.submission_id;
 
           if (typeof submissionId !== "string") {
             return null;
@@ -1650,7 +1697,12 @@ export const runForSession = internalAction({
 
           return {
             submissionId: submissionId as Id<"submissions">,
-            categorySlug: slugify(stringOrFallback(row.categorySlug ?? row.categoryName, "")),
+            categorySlug: slugify(
+              stringOrFallback(
+                row.categorySlug ?? row.category_slug ?? row.categoryName ?? row.category_name,
+                "",
+              ),
+            ),
             confidence: clampConfidence(row.confidence),
             rationale: typeof row.rationale === "string" ? row.rationale : undefined,
           };

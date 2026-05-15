@@ -188,9 +188,6 @@ export function ThreadCard({ thread }: ThreadCardProps) {
             <p className="font-display text-xs font-semibold text-[var(--c-ink)]">
               {submission.nickname}
             </p>
-            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-              {submission.kind.replaceAll("_", " ")}
-            </p>
           </div>
           <div className="ml-auto flex shrink-0 flex-wrap justify-end gap-1">
             {isAnswered ? (
