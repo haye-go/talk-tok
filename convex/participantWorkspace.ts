@@ -921,10 +921,7 @@ export const overview = query({
     const peerThreads =
       needsExplore && canSeeSelectedPeerThreads
         ? selectedQuestionSubmissions
-            .filter(
-              (submission) =>
-                submission.participantId !== participant._id && isTopLevelMessage(submission),
-            )
+            .filter((submission) => isTopLevelMessage(submission))
             .sort(compareThreadRootsByAnswerStatus)
             .slice(0, PEER_RESPONSE_LIMIT)
             .map((submission) => toThread(submission))
@@ -1062,10 +1059,7 @@ export const overview = query({
     const peerResponses =
       needsExplore && session.visibilityMode === "raw_responses_visible"
         ? sessionSubmissions
-            .filter(
-              (submission) =>
-                submission.participantId !== participant._id && isTopLevelMessage(submission),
-            )
+            .filter((submission) => isTopLevelMessage(submission))
             .sort(compareThreadRootsByAnswerStatus)
             .slice(0, PEER_RESPONSE_LIMIT)
             .map((submission) => {
@@ -1081,6 +1075,7 @@ export const overview = query({
                 categorySlug: assignment?.categorySlug,
                 categoryName: assignment?.categoryName,
                 categoryColor: assignment?.categoryColor,
+                isOwn: submission.participantId === participant._id,
               };
             })
         : [];

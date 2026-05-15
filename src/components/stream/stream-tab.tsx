@@ -39,6 +39,7 @@ interface PeerResponse {
   answeredAt?: number;
   answeredBy?: "instructor";
   createdAt: number;
+  isOwn?: boolean;
 }
 
 interface CategorySummary {
@@ -158,7 +159,7 @@ function threadFromPeerResponse(response: PeerResponse): PeerThread {
         reactionCounts: {},
       },
       viewerState: {
-        isOwn: false,
+        isOwn: response.isOwn ?? false,
         hasUpvoted: false,
         myReactions: [],
       },
@@ -290,6 +291,7 @@ export function StreamTab({
     const replyOpen = replyParentId === submission.id;
     const creatingFight = creatingFightFor === submission.id;
     const updatingAnswered = answeringSubmissionId === submission.id;
+    const isOwnThread = thread.root.viewerState.isOwn;
     const instructorAnswerAction = previewPassword ? (
       <ParticipantThreadAction
         disabled={updatingAnswered}
@@ -303,13 +305,14 @@ export function StreamTab({
     return (
       <div key={submission.id} className="flex flex-col gap-2">
         <ParticipantThreadCard
-          authorLabel={submission.nickname}
+          authorLabel={isOwnThread ? "You" : submission.nickname}
           body={submission.body}
           categoryName={
             hideCategoryPill ? undefined : (thread.assignment?.categoryName ?? undefined)
           }
           categoryTone={categoryColorToTone(thread.assignment?.categoryColor)}
           answeredAt={submission.answeredAt}
+          ownership={isOwnThread ? "own" : "peer"}
           replies={thread.replies.map((reply) => ({
             id: reply.submission.id,
             authorLabel: reply.submission.nickname,
@@ -329,7 +332,7 @@ export function StreamTab({
                   {replyOpen ? "Cancel reply" : "Reply"}
                 </ParticipantThreadAction>
                 <ParticipantThreadAction
-                  disabled={!fightEnabled || !mySubmissionId || creatingFight}
+                  disabled={!fightEnabled || !mySubmissionId || creatingFight || isOwnThread}
                   onClick={() => void handleFight(thread)}
                 >
                   <Sword size={12} />
@@ -343,7 +346,7 @@ export function StreamTab({
                   myReactions={thread.root.viewerState.myReactions}
                   mode="upvote"
                   variant="compact"
-                  disabled={!upvotesEnabled}
+                  disabled={!upvotesEnabled || isOwnThread}
                 />
               </>
             ) : (
