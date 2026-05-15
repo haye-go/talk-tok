@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { categoryColorToTone } from "@/lib/category-colors";
+import { splitAndSortAnsweredThreads, type ThreadSortMode } from "@/lib/thread-sorting";
 import { cn } from "@/lib/utils";
 import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
@@ -139,13 +140,6 @@ interface StreamTabProps {
 
 type RoomMode = "latest" | "category" | "synthesis";
 
-function splitAnsweredThreads(threads: PeerThread[]) {
-  return {
-    openThreads: threads.filter((thread) => !thread.root.submission.answeredAt),
-    answeredThreads: threads.filter((thread) => thread.root.submission.answeredAt),
-  };
-}
-
 function threadFromPeerResponse(response: PeerResponse): PeerThread {
   return {
     root: {
@@ -203,6 +197,7 @@ export function StreamTab({
 }: StreamTabProps) {
   const { previewPassword } = useInstructorPreviewAuth();
   const [roomMode, setRoomMode] = useState<RoomMode>("latest");
+  const [sortMode, setSortMode] = useState<ThreadSortMode>("latest");
   const [replyParentId, setReplyParentId] = useState<Id<"submissions"> | null>(null);
   const [replyError, setReplyError] = useState<string | null>(null);
   const [answerError, setAnswerError] = useState<string | null>(null);
@@ -380,7 +375,7 @@ export function StreamTab({
       );
     }
 
-    const { openThreads, answeredThreads } = splitAnsweredThreads(latestThreads);
+    const { openThreads, answeredThreads } = splitAndSortAnsweredThreads(latestThreads, sortMode);
 
     return (
       <div className="flex flex-col gap-3">
@@ -414,7 +409,10 @@ export function StreamTab({
     return (
       <div className="flex flex-col gap-4">
         {visibleSections.map((section, index) => {
-          const { openThreads, answeredThreads } = splitAnsweredThreads(section.threads);
+          const { openThreads, answeredThreads } = splitAndSortAnsweredThreads(
+            section.threads,
+            sortMode,
+          );
 
           return (
             <section
@@ -494,30 +492,56 @@ export function StreamTab({
           ) : null}
           {synthesisAvailable ? <Badge tone="sky">Synthesis ready</Badge> : null}
         </div>
-        <div className="flex rounded-pill border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-0.5">
-          {(
-            [
-              ["latest", TextAlignLeft, "Latest"],
-              ["category", SquaresFour, "By category"],
-              ["synthesis", TextAlignLeft, "Synthesis"],
-            ] as const
-          ).map(([mode, Icon, label]) => (
-            <button
-              key={mode}
-              type="button"
-              disabled={mode === "synthesis" && !synthesisAvailable}
-              onClick={() => setRoomMode(mode)}
-              className={cn(
-                "inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-pill px-2 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45",
-                roomMode === mode
-                  ? "bg-[var(--c-primary)] text-[var(--c-on-primary)]"
-                  : "text-[var(--c-muted)] hover:bg-[var(--c-surface-strong)] hover:text-[var(--c-ink)]",
-              )}
-            >
-              <Icon size={12} />
-              {label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex rounded-pill border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-0.5">
+            {(
+              [
+                ["latest", TextAlignLeft, "Latest"],
+                ["category", SquaresFour, "By category"],
+                ["synthesis", TextAlignLeft, "Synthesis"],
+              ] as const
+            ).map(([mode, Icon, label]) => (
+              <button
+                key={mode}
+                type="button"
+                disabled={mode === "synthesis" && !synthesisAvailable}
+                onClick={() => setRoomMode(mode)}
+                className={cn(
+                  "inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-pill px-2 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+                  roomMode === mode
+                    ? "bg-[var(--c-primary)] text-[var(--c-on-primary)]"
+                    : "text-[var(--c-muted)] hover:bg-[var(--c-surface-strong)] hover:text-[var(--c-ink)]",
+                )}
+              >
+                <Icon size={12} />
+                {label}
+              </button>
+            ))}
+          </div>
+          {roomMode === "latest" || roomMode === "category" ? (
+            <div className="flex rounded-pill border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-0.5">
+              {(
+                [
+                  ["latest", "Latest"],
+                  ["top", "Top"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setSortMode(mode)}
+                  className={cn(
+                    "inline-flex min-h-8 cursor-pointer items-center rounded-pill px-2 text-[11px] font-medium transition-colors",
+                    sortMode === mode
+                      ? "bg-[var(--c-primary)] text-[var(--c-on-primary)]"
+                      : "text-[var(--c-muted)] hover:bg-[var(--c-surface-strong)] hover:text-[var(--c-ink)]",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 

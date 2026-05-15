@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ROOM_MODES } from "@/components/instructor/instructor-nav";
 import { Link } from "@tanstack/react-router";
 import { PresenceBar } from "@/components/stream/presence-bar";
@@ -6,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { useInstructorRoom } from "@/hooks/use-instructor-room";
 import type { InstructorRoomModeId } from "@/lib/routes";
+import { splitAndSortAnsweredThreads, type ThreadSortMode } from "@/lib/thread-sorting";
 import { cn } from "@/lib/utils";
 import type { InputPattern } from "@/lib/submission-telemetry";
 import { ConsensusPulseStub } from "./consensus-pulse-stub";
@@ -13,18 +15,11 @@ import { InputPatternsBar } from "./input-patterns-bar";
 import { NeedsAttentionPanel } from "./needs-attention-panel";
 import { RoomCategoriesBoard } from "./room-categories-board";
 import { RoomSimilarityClusters } from "./room-similarity-clusters";
-import { ThreadCard, type ThreadCardData } from "./thread-card";
+import { ThreadCard } from "./thread-card";
 
 interface CategoryRef {
   id: Id<"categories">;
   name: string;
-}
-
-function splitAnsweredThreads(threads: ThreadCardData[]) {
-  return {
-    openThreads: threads.filter((thread) => !thread.root.submission.answeredAt),
-    answeredThreads: threads.filter((thread) => thread.root.submission.answeredAt),
-  };
 }
 
 export interface RoomWorkspaceProps {
@@ -47,10 +42,14 @@ export function RoomWorkspace({
   categories,
 }: RoomWorkspaceProps) {
   const room = useInstructorRoom(sessionSlug, selectedQuestionId);
+  const [sortMode, setSortMode] = useState<ThreadSortMode>("latest");
 
   const selectedQuestion = room?.selectedQuestion;
   const latestThreads = room?.latestThreads ?? [];
-  const { openThreads: openLatestThreads, answeredThreads } = splitAnsweredThreads(latestThreads);
+  const { openThreads: openLatestThreads, answeredThreads } = splitAndSortAnsweredThreads(
+    latestThreads,
+    sortMode,
+  );
   const threadsByCategory = room?.threadsByCategory ?? [];
   const uncategorizedThreads = room?.uncategorizedThreads ?? [];
   const needsAttention = room?.needsAttention;
@@ -103,6 +102,34 @@ export function RoomWorkspace({
             );
           })}
         </div>
+
+        {roomMode === "latest" || roomMode === "categories" ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--c-muted)]">
+            <span className="font-medium">Sort</span>
+            <div className="flex rounded-pill border border-[var(--c-hairline)] bg-white/50 p-0.5">
+              {(
+                [
+                  ["latest", "Latest"],
+                  ["top", "Top"],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setSortMode(mode)}
+                  className={cn(
+                    "inline-flex min-h-8 cursor-pointer items-center rounded-pill px-3 text-[11px] font-medium transition-colors",
+                    sortMode === mode
+                      ? "bg-[var(--c-primary)] text-[var(--c-on-primary)]"
+                      : "text-[var(--c-muted)] hover:bg-white/70 hover:text-[var(--c-ink)]",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </header>
 
       <NeedsAttentionPanel
@@ -124,7 +151,9 @@ export function RoomWorkspace({
       {roomMode === "latest" ? (
         <section className="grid gap-3">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-medium text-[var(--c-ink)]">Latest threads</h2>
+            <h2 className="font-display text-lg font-medium text-[var(--c-ink)]">
+              {sortMode === "top" ? "Top threads" : "Latest threads"}
+            </h2>
             <Badge tone="neutral">{latestThreads.length}</Badge>
           </div>
           {room === undefined ? (
@@ -166,6 +195,7 @@ export function RoomWorkspace({
           selectedQuestionId={selectedQuestionId}
           categoryGroups={threadsByCategory}
           uncategorizedThreads={uncategorizedThreads}
+          sortMode={sortMode}
         />
       ) : null}
 

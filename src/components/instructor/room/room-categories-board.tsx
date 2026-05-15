@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { categoryColorToTone } from "@/lib/category-colors";
+import { splitAndSortAnsweredThreads, type ThreadSortMode } from "@/lib/thread-sorting";
 import { ThreadCard, type ThreadCardData } from "./thread-card";
 
 interface CategoryGroup {
@@ -20,15 +21,14 @@ interface CategoryGroup {
   threads: ThreadCardData[];
 }
 
-function splitAnsweredThreads(threads: ThreadCardData[]) {
-  return {
-    openThreads: threads.filter((thread) => !thread.root.submission.answeredAt),
-    answeredThreads: threads.filter((thread) => thread.root.submission.answeredAt),
-  };
-}
-
-function ThreadSectionList({ threads }: { threads: ThreadCardData[] }) {
-  const { openThreads, answeredThreads } = splitAnsweredThreads(threads);
+function ThreadSectionList({
+  threads,
+  sortMode,
+}: {
+  threads: ThreadCardData[];
+  sortMode: ThreadSortMode;
+}) {
+  const { openThreads, answeredThreads } = splitAndSortAnsweredThreads(threads, sortMode);
 
   return (
     <div className="grid gap-3">
@@ -57,6 +57,7 @@ export interface RoomCategoriesBoardProps {
   selectedQuestionId: Id<"sessionQuestions"> | undefined;
   categoryGroups: CategoryGroup[];
   uncategorizedThreads: ThreadCardData[];
+  sortMode: ThreadSortMode;
 }
 
 export function RoomCategoriesBoard({
@@ -64,6 +65,7 @@ export function RoomCategoriesBoard({
   selectedQuestionId,
   categoryGroups,
   uncategorizedThreads,
+  sortMode,
 }: RoomCategoriesBoardProps) {
   const { previewPassword } = useInstructorPreviewAuth();
   const createCategory = useMutation(api.categoryManagement.create);
@@ -210,7 +212,7 @@ export function RoomCategoriesBoard({
               {uncategorizedThreads.length === 1 ? "message" : "messages"}
             </span>
           </div>
-          <ThreadSectionList threads={uncategorizedThreads} />
+          <ThreadSectionList threads={uncategorizedThreads} sortMode={sortMode} />
         </section>
       ) : null}
 
@@ -237,7 +239,7 @@ export function RoomCategoriesBoard({
             <p className="mb-3 text-xs text-[var(--c-muted)]">{category.description}</p>
           ) : null}
           {threads.length > 0 ? (
-            <ThreadSectionList threads={threads} />
+            <ThreadSectionList threads={threads} sortMode={sortMode} />
           ) : (
             <Card>
               <p className="text-sm text-[var(--c-muted)]">
