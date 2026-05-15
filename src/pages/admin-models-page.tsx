@@ -1,8 +1,11 @@
 import { GearSix } from "@phosphor-icons/react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
+import { useState } from "react";
 import { api } from "../../convex/_generated/api";
+import type { Doc } from "../../convex/_generated/dataModel";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/state/loading-state";
 import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
@@ -10,6 +13,38 @@ import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 export function AdminModelsPage() {
   const { previewPassword } = useInstructorPreviewAuth();
   const models = useQuery(api.modelSettings.list, previewPassword ? { previewPassword } : "skip");
+  const updateModel = useMutation(api.modelSettings.update);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function handleToggleModel(model: Doc<"modelSettings">) {
+    if (!previewPassword || savingKey) {
+      return;
+    }
+
+    setSavingKey(model.key);
+    setErrorMessage(null);
+
+    try {
+      await updateModel({
+        previewPassword,
+        key: model.key,
+        provider: model.provider,
+        model: model.model,
+        enabled: !model.enabled,
+        features: model.features,
+        inputCostPerMillion: model.inputCostPerMillion,
+        cachedInputCostPerMillion: model.cachedInputCostPerMillion,
+        outputCostPerMillion: model.outputCostPerMillion,
+        reasoningCostPerMillion: model.reasoningCostPerMillion,
+        variablesJson: model.variablesJson,
+      });
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not update model setting.");
+    } finally {
+      setSavingKey(null);
+    }
+  }
 
   return (
     <AdminShell
@@ -19,10 +54,16 @@ export function AdminModelsPage() {
       <div className="grid gap-4">
         <Card title="Status">
           <p className="text-sm text-[var(--c-muted)]">
-            This screen is currently read-only. Model settings are loaded from Convex, but editing
-            and reassignment flows are not exposed here yet.
+            Toggle model availability here. Feature reassignment and pricing edits still use the
+            backend configuration for now.
           </p>
         </Card>
+
+        {errorMessage ? (
+          <Card tone="alert" title="Model update failed">
+            <p className="text-sm text-[var(--c-muted)]">{errorMessage}</p>
+          </Card>
+        ) : null}
 
         {models === undefined && <LoadingState label="Loading model settings..." />}
 
@@ -46,20 +87,37 @@ export function AdminModelsPage() {
             >
               <div className="divide-y divide-[var(--c-hairline)]">
                 {models.map((model) => (
-                  <div key={model._id} className="flex items-center justify-between py-2.5 text-sm">
-                    <div>
+                  <div
+                    key={model._id}
+                    className="flex flex-col gap-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
                       <p className="font-display text-sm font-medium text-[var(--c-ink)]">
                         {model.model}
                       </p>
-                      <p className="text-[10px] text-[var(--c-muted)]">
+                      <p className="text-[10px] text-[var(--c-muted)] sm:max-w-[72ch]">
                         {model.provider} - {model.enabled ? "enabled" : "disabled"}
                         {model.features.length > 0 && ` - ${model.features.join(", ")}`}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
                       <Badge tone={model.enabled ? "success" : "neutral"}>
                         {model.enabled ? "active" : "off"}
                       </Badge>
+                      <Button
+                        type="button"
+                        variant={model.enabled ? "secondary" : "primary"}
+                        size="sm"
+                        disabled={savingKey !== null}
+                        aria-label={`${model.enabled ? "Disable" : "Enable"} ${model.model}`}
+                        onClick={() => void handleToggleModel(model)}
+                      >
+                        {savingKey === model.key
+                          ? "Saving..."
+                          : model.enabled
+                            ? "Disable"
+                            : "Enable"}
+                      </Button>
                     </div>
                   </div>
                 ))}

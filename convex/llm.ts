@@ -29,10 +29,6 @@ function renderTemplate(template: string, variables: JsonRecord) {
   });
 }
 
-function parseModelOverride(value: string | undefined, fallbackKey: string | undefined) {
-  return value || fallbackKey || "openai:gpt-4.1";
-}
-
 function estimateCostUsd(args: {
   inputTokens?: number;
   cachedInputTokens?: number;
@@ -115,6 +111,7 @@ export const loadRuntime = internalQuery({
   args: {
     promptKey: v.string(),
     modelKey: v.optional(v.string()),
+    feature: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const prompt = await ctx.db
@@ -126,21 +123,39 @@ export const loadRuntime = internalQuery({
       throw new Error(`Prompt template missing: ${args.promptKey}`);
     }
 
-    const modelKey = parseModelOverride(prompt.modelOverride, args.modelKey);
-    const modelSetting = await ctx.db
-      .query("modelSettings")
-      .withIndex("by_key", (q) => q.eq("key", modelKey))
-      .unique();
+    const modelKey = args.modelKey ?? prompt.modelOverride;
 
-    if (!modelSetting) {
-      throw new Error(`Model setting missing: ${modelKey}`);
+    if (modelKey) {
+      const modelSetting = await ctx.db
+        .query("modelSettings")
+        .withIndex("by_key", (q) => q.eq("key", modelKey))
+        .unique();
+
+      if (!modelSetting) {
+        throw new Error(`Model setting missing: ${modelKey}`);
+      }
+
+      if (modelSetting.enabled) {
+        return { prompt, modelSetting };
+      }
+
+      if (args.modelKey || !args.feature) {
+        throw new Error(`Model setting is disabled: ${modelKey}`);
+      }
     }
 
-    if (!modelSetting.enabled) {
-      throw new Error(`Model setting is disabled: ${modelKey}`);
+    if (args.feature) {
+      const models = await ctx.db.query("modelSettings").take(100);
+      const fallbackModel = models.find(
+        (model) => model.enabled && model.features.includes(args.feature!),
+      );
+
+      if (fallbackModel) {
+        return { prompt, modelSetting: fallbackModel };
+      }
     }
 
-    return { prompt, modelSetting };
+    throw new Error(`No enabled model setting for feature: ${args.feature ?? "unknown"}`);
   },
 });
 
@@ -270,6 +285,7 @@ export const runJson = internalAction({
     const runtime = await ctx.runQuery(internal.llm.loadRuntime, {
       promptKey: args.promptKey,
       modelKey: args.modelKey,
+      feature: args.feature,
     });
     const variables = asRecord(args.variables);
     const promptVariables = {
