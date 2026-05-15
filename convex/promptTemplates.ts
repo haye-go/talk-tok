@@ -3,6 +3,14 @@ import { mutation, query } from "./_generated/server";
 import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const now = () => Date.now();
+const CATEGORISATION_PROMPT_KEYS = new Set([
+  "categorisation.session.v1",
+  "category.generate.append.v1",
+  "category.generate.full_regeneration.v1",
+  "category.assign.batch.v1",
+  "category.assign.single.v1",
+  "submission.type.classify.v1",
+]);
 
 const DEFAULT_PROMPTS = [
   {
@@ -110,7 +118,7 @@ const DEFAULT_PROMPTS = [
       "Use stable lowercase hyphen slugs.",
       "If no new category is needed, return an empty categories array.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.15,
       maxOutputTokens: 1800,
@@ -140,7 +148,7 @@ const DEFAULT_PROMPTS = [
       "Use stable lowercase hyphen slugs.",
       "The returned categories are the complete active category set.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.15,
       maxOutputTokens: 2200,
@@ -172,7 +180,7 @@ const DEFAULT_PROMPTS = [
       "decision must be exactly one of: auto, review, none.",
       "Do not include posts that are impossible to evaluate from the supplied text.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.1,
       maxOutputTokens: 3000,
@@ -201,7 +209,7 @@ const DEFAULT_PROMPTS = [
       "Return JSON with submissionId, decision, rationale, and categorySlug when decision is auto or review with a suggested category.",
       "decision must be exactly one of: auto, review, none.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0.1,
       maxOutputTokens: 700,
@@ -226,7 +234,7 @@ const DEFAULT_PROMPTS = [
       "Return JSON with type and rationale.",
       "type must be exactly one of: question, comment.",
     ].join("\n"),
-    modelOverride: "openai:gpt-4.1-mini",
+    modelOverride: "openai:gpt-4.1",
     variablesJson: {
       temperature: 0,
       maxOutputTokens: 350,
@@ -481,6 +489,16 @@ export const seedDefaults = mutation({
         .unique();
 
       if (existing) {
+        if (
+          CATEGORISATION_PROMPT_KEYS.has(prompt.key) &&
+          existing.modelOverride !== prompt.modelOverride
+        ) {
+          await ctx.db.patch(existing._id, {
+            modelOverride: prompt.modelOverride,
+            updatedAt: now(),
+          });
+          inserted += 1;
+        }
         continue;
       }
 
