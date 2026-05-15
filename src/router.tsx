@@ -1,5 +1,6 @@
 import { createRoute, createRootRoute, createRouter } from "@tanstack/react-router";
 import App from "./App";
+import { InstructorPreviewGate } from "@/components/instructor/instructor-preview-gate";
 import { RootLayout } from "@/components/layout/root-layout";
 import { AdminModelsPage } from "@/pages/admin-models-page";
 import { AdminObservabilityPage } from "@/pages/admin-observability-page";
@@ -68,19 +69,31 @@ const sessionReviewRoute = createRoute({
 const instructorRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor",
-  component: InstructorDashboardPage,
+  component: () => (
+    <InstructorPreviewGate>
+      <InstructorDashboardPage />
+    </InstructorPreviewGate>
+  ),
 });
 
 const instructorSessionNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/session/new",
-  component: SessionNewPage,
+  component: () => (
+    <InstructorPreviewGate>
+      <SessionNewPage />
+    </InstructorPreviewGate>
+  ),
 });
 
 const instructorSessionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/session/$sessionSlug",
-  component: InstructorSessionPage,
+  component: () => (
+    <InstructorPreviewGate>
+      <InstructorSessionPage />
+    </InstructorPreviewGate>
+  ),
 });
 
 const instructorProjectorRoute = createRoute({
@@ -92,43 +105,71 @@ const instructorProjectorRoute = createRoute({
 const instructorTemplatesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/templates",
-  component: TemplatesPage,
+  component: () => (
+    <InstructorPreviewGate>
+      <TemplatesPage />
+    </InstructorPreviewGate>
+  ),
 });
 
 const instructorAdminModelsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/models",
-  component: AdminModelsPage,
+  component: () => (
+    <InstructorPreviewGate>
+      <AdminModelsPage />
+    </InstructorPreviewGate>
+  ),
 });
 
 const instructorAdminPromptsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/prompts",
-  component: AdminPromptsPage,
+  component: () => (
+    <InstructorPreviewGate>
+      <AdminPromptsPage />
+    </InstructorPreviewGate>
+  ),
 });
 
 const instructorAdminRetrievalRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/retrieval",
-  component: AdminRetrievalPage,
+  component: () => (
+    <InstructorPreviewGate>
+      <AdminRetrievalPage />
+    </InstructorPreviewGate>
+  ),
 });
 
 const instructorAdminProtectionRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/protection",
-  component: AdminProtectionPage,
+  component: () => (
+    <InstructorPreviewGate>
+      <AdminProtectionPage />
+    </InstructorPreviewGate>
+  ),
 });
 
 const instructorAdminObservabilityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/observability",
-  component: AdminObservabilityPage,
+  component: () => (
+    <InstructorPreviewGate>
+      <AdminObservabilityPage />
+    </InstructorPreviewGate>
+  ),
 });
 
 const instructorAdminDemoRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/instructor/admin/demo",
-  component: AdminDemoPage,
+  component: () => (
+    <InstructorPreviewGate>
+      <AdminDemoPage />
+    </InstructorPreviewGate>
+  ),
 });
 
 const routeTree = rootRoute.addChildren([

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 import {
   getCurrentQuestionForSession,
   listQuestionsForSession,
@@ -181,10 +182,12 @@ function isTopLevelMessage(submission: Doc<"submissions">) {
 
 export const room = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -403,10 +406,12 @@ export const room = query({
  */
 export const shell = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -568,10 +573,12 @@ export const shell = query({
  */
 export const setup = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -662,10 +669,12 @@ export const setup = query({
  */
 export const reports = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {

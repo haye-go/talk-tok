@@ -10,6 +10,7 @@ import { LoadingState } from "@/components/state/loading-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { routes } from "@/lib/routes";
 
 const MODE_LABELS: Record<string, string> = {
@@ -21,7 +22,11 @@ const MODE_LABELS: Record<string, string> = {
 
 export function TemplatesPage() {
   const navigate = useNavigate();
-  const templates = useQuery(api.sessionTemplates.list, {});
+  const { previewPassword } = useInstructorPreviewAuth();
+  const templates = useQuery(
+    api.sessionTemplates.list,
+    previewPassword ? { previewPassword } : "skip",
+  );
   const createFromTemplate = useMutation(api.sessionTemplates.createSessionFromTemplate);
   const archiveTemplate = useMutation(api.sessionTemplates.archive);
   const [creatingId, setCreatingId] = useState<Id<"sessionTemplates"> | null>(null);
@@ -30,7 +35,7 @@ export function TemplatesPage() {
   async function handleCreate(templateId: Id<"sessionTemplates">) {
     setCreatingId(templateId);
     try {
-      const session = await createFromTemplate({ templateId });
+      const session = await createFromTemplate({ templateId, previewPassword: previewPassword ?? "" });
       await navigate({ to: routes.instructorSession(session.slug) });
     } finally {
       setCreatingId(null);
@@ -40,7 +45,7 @@ export function TemplatesPage() {
   async function handleArchive(templateId: Id<"sessionTemplates">) {
     setArchivingId(templateId);
     try {
-      await archiveTemplate({ templateId });
+      await archiveTemplate({ templateId, previewPassword: previewPassword ?? "" });
     } finally {
       setArchivingId(null);
     }

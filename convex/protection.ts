@@ -8,6 +8,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const DEFAULT_PROTECTION_SETTINGS = [
   {
@@ -123,9 +124,11 @@ export const seedDefaults = mutation({
 
 export const list = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = args.sessionSlug ? await getSessionBySlug(ctx, args.sessionSlug) : null;
     const globalSettings = await ctx.db
       .query("protectionSettings")
@@ -153,11 +156,13 @@ export const list = query({
 
 export const update = mutation({
   args: {
+    previewPassword: v.string(),
     key: v.string(),
     valueJson: v.any(),
     sessionSlug: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = args.sessionSlug ? await getSessionBySlug(ctx, args.sessionSlug) : null;
     const sessionId = session?._id;
     const existing = await getSetting(ctx, args.key, sessionId);

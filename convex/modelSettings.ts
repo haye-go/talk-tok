@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { action, mutation, query } from "./_generated/server";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -94,8 +95,9 @@ export const seedDefaults = mutation({
 });
 
 export const list = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { previewPassword: v.string() },
+  handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     return await ctx.db.query("modelSettings").collect();
   },
 });
@@ -112,6 +114,7 @@ export const getByKey = query({
 
 export const update = mutation({
   args: {
+    previewPassword: v.string(),
     key: v.string(),
     provider: v.string(),
     model: v.string(),
@@ -124,6 +127,7 @@ export const update = mutation({
     variablesJson: v.any(),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const existing = await ctx.db
       .query("modelSettings")
       .withIndex("by_key", (q) => q.eq("key", args.key))
@@ -151,8 +155,9 @@ export const update = mutation({
 });
 
 export const checkOpenAiKey = action({
-  args: {},
-  handler: async () => {
+  args: { previewPassword: v.string() },
+  handler: async (_ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     return { hasKey: Boolean(process.env.OPENAI_API_KEY) };
   },
 });

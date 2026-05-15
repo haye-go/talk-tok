@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { rateLimiter } from "./components";
 import { createDefaultQuestionForSession } from "./sessionQuestions";
 import { assertCanRequestRecategorisation } from "./questionCapabilities";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const MAX_REASON_LENGTH = 1000;
 const REQUEST_WINDOW_MS = 60_000;
@@ -237,6 +238,7 @@ export const request = mutation({
 
 export const decide = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     requestId: v.id("recategorizationRequests"),
     decision: v.union(v.literal("approved"), v.literal("rejected")),
@@ -244,6 +246,7 @@ export const decide = mutation({
     instructorNote: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
     const requestDoc = await ctx.db.get(args.requestId);
 
@@ -335,12 +338,14 @@ export const decide = mutation({
 
 export const listForSession = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
     status: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {

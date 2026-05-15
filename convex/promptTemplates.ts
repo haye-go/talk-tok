@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const now = () => Date.now();
 
@@ -496,8 +497,9 @@ export const seedDefaults = mutation({
 });
 
 export const list = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { previewPassword: v.string() },
+  handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     return await ctx.db.query("promptTemplates").collect();
   },
 });
@@ -514,6 +516,7 @@ export const getByKey = query({
 
 export const update = mutation({
   args: {
+    previewPassword: v.string(),
     key: v.string(),
     name: v.optional(v.string()),
     surface: v.optional(v.string()),
@@ -523,6 +526,7 @@ export const update = mutation({
     variablesJson: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const existing = await ctx.db
       .query("promptTemplates")
       .withIndex("by_key", (q) => q.eq("key", args.key))

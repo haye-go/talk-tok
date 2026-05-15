@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { createDefaultQuestionForSession } from "./sessionQuestions";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const FOOD_DEMO_SLUG = "best-food-for-a-hackathon-live";
 const RESET_CONFIRMATION = "RESET FOOD HACKATHON SESSION";
@@ -513,11 +514,13 @@ async function seedWarmStart(
 
 export const seedFoodHackathon = mutation({
   args: {
+    previewPassword: v.string(),
     resetExisting: v.optional(v.boolean()),
     includeWarmStart: v.optional(v.boolean()),
     joinCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const existing = await findFoodSession(ctx);
 
     if (existing && !args.resetExisting) {
@@ -610,8 +613,9 @@ export const seedFoodHackathon = mutation({
 });
 
 export const getFoodHackathonSession = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { previewPassword: v.string() },
+  handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await findFoodSession(ctx);
 
     if (!session) {
@@ -639,10 +643,12 @@ export const getFoodHackathonSession = query({
 
 export const resetFoodHackathonSession = mutation({
   args: {
+    previewPassword: v.string(),
     confirmation: v.string(),
     deleteSession: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     if (args.confirmation !== RESET_CONFIRMATION) {
       throw new Error(`Confirmation must be exactly: ${RESET_CONFIRMATION}`);
     }

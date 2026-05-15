@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { createDefaultQuestionForSession } from "./sessionQuestions";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const SESSION_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const TEMPLATE_LIMIT = 80;
@@ -193,6 +194,7 @@ function toPublicTemplate(template: Doc<"sessionTemplates">) {
 
 export const create = mutation({
   args: {
+    previewPassword: v.string(),
     name: v.string(),
     description: v.optional(v.string()),
     title: v.string(),
@@ -209,6 +211,7 @@ export const create = mutation({
     presetCategories: v.optional(v.array(presetCategoryValidator)),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const now = Date.now();
     const name = normalizeText(args.name, "Template name", 3, 120);
     const templateId = await ctx.db.insert("sessionTemplates", {
@@ -247,11 +250,13 @@ export const create = mutation({
 
 export const createFromSession = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     name: v.optional(v.string()),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -309,9 +314,11 @@ export const createFromSession = mutation({
 
 export const list = query({
   args: {
+    previewPassword: v.string(),
     includeArchived: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const templates = args.includeArchived
       ? await ctx.db.query("sessionTemplates").order("desc").take(TEMPLATE_LIMIT)
       : await ctx.db
@@ -326,9 +333,11 @@ export const list = query({
 
 export const archive = mutation({
   args: {
+    previewPassword: v.string(),
     templateId: v.id("sessionTemplates"),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const template = await ctx.db.get(args.templateId);
 
     if (!template) {
@@ -349,12 +358,14 @@ export const archive = mutation({
 
 export const createSessionFromTemplate = mutation({
   args: {
+    previewPassword: v.string(),
     templateId: v.id("sessionTemplates"),
     title: v.optional(v.string()),
     openingPrompt: v.optional(v.string()),
     joinCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const template = await ctx.db.get(args.templateId);
 
     if (!template || template.status !== "active") {

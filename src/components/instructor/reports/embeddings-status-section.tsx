@@ -4,6 +4,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 export interface EmbeddingsStatusSectionProps {
   sessionSlug: string;
@@ -18,13 +19,18 @@ export function EmbeddingsStatusSection({
   embeddingCount,
   submissionCount,
 }: EmbeddingsStatusSectionProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const queueEmbeddings = useMutation(api.semantic.queueEmbeddingsForSession);
   const [busy, setBusy] = useState(false);
 
   async function handleQueue() {
     setBusy(true);
     try {
-      await queueEmbeddings({ sessionSlug, questionId: selectedQuestionId });
+      await queueEmbeddings({
+        sessionSlug,
+        questionId: selectedQuestionId,
+        previewPassword: previewPassword ?? "",
+      });
     } finally {
       setBusy(false);
     }

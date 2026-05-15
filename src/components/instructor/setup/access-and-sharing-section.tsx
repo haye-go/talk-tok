@@ -5,6 +5,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 export interface AccessAndSharingSectionProps {
   sessionSlug: string;
@@ -17,6 +18,7 @@ export function AccessAndSharingSection({
   joinCode,
   joinUrl,
 }: AccessAndSharingSectionProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const saveAsTemplate = useMutation(api.sessionTemplates.createFromSession);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [templateSaved, setTemplateSaved] = useState(false);
@@ -25,7 +27,7 @@ export function AccessAndSharingSection({
   async function handleSaveTemplate() {
     setSavingTemplate(true);
     try {
-      await saveAsTemplate({ sessionSlug });
+      await saveAsTemplate({ sessionSlug, previewPassword: previewPassword ?? "" });
       setTemplateSaved(true);
       setTimeout(() => setTemplateSaved(false), 3000);
     } finally {

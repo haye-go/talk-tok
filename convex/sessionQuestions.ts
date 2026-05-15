@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 type QuestionStatus = "draft" | "released" | "archived";
 
@@ -501,10 +502,12 @@ export const setCurrentQuestion = mutation({
 
 export const setContributionState = mutation({
   args: {
+    previewPassword: v.string(),
     questionId: v.id("sessionQuestions"),
     contributionsOpen: v.boolean(),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const question = await ctx.db.get(args.questionId);
 
     if (!question) {
@@ -547,10 +550,12 @@ export const setContributionState = mutation({
 
 export const updateVisibility = mutation({
   args: {
+    previewPassword: v.string(),
     questionId: v.id("sessionQuestions"),
     visibility: visibilityPatchValidator,
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const question = await ctx.db.get(args.questionId);
 
     if (!question) {

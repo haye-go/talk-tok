@@ -5,6 +5,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { cn } from "@/lib/utils";
 
 interface SynthesisArtifact {
@@ -84,6 +85,7 @@ export function SynthesisMasterDetailPanel({
   sessionPrivateVisibility,
   counts,
 }: SynthesisMasterDetailPanelProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const generateClassSynthesis = useMutation(api.synthesis.generateClassSynthesis);
   const generateCategorySummary = useMutation(api.synthesis.generateCategorySummary);
   const publishArtifact = useMutation(api.synthesis.publishArtifact);
@@ -139,6 +141,7 @@ export function SynthesisMasterDetailPanel({
         sessionSlug,
         questionId: selectedQuestionId,
         ...(forceRegenerate ? { forceRegenerate: true } : {}),
+        previewPassword: previewPassword ?? "",
       });
     } finally {
       setGeneratingClass(false);
@@ -152,6 +155,7 @@ export function SynthesisMasterDetailPanel({
         sessionSlug,
         categoryId,
         ...(forceRegenerate ? { forceRegenerate: true } : {}),
+        previewPassword: previewPassword ?? "",
       });
     } finally {
       setGeneratingCategoryId(null);
@@ -161,7 +165,7 @@ export function SynthesisMasterDetailPanel({
   async function handlePublish(artifactId: Id<"synthesisArtifacts">) {
     setUpdatingArtifactId(artifactId);
     try {
-      await publishArtifact({ sessionSlug, artifactId });
+      await publishArtifact({ sessionSlug, artifactId, previewPassword: previewPassword ?? "" });
     } finally {
       setUpdatingArtifactId(null);
     }
@@ -170,7 +174,7 @@ export function SynthesisMasterDetailPanel({
   async function handleUnpublish(artifactId: Id<"synthesisArtifacts">) {
     setUpdatingArtifactId(artifactId);
     try {
-      await unpublishArtifact({ sessionSlug, artifactId });
+      await unpublishArtifact({ sessionSlug, artifactId, previewPassword: previewPassword ?? "" });
     } finally {
       setUpdatingArtifactId(null);
     }

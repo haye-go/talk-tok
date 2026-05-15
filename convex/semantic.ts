@@ -11,6 +11,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 import { resolveQuestionForRead, resolveQuestionIdForWrite } from "./questionScope";
 
 type EntityType = Doc<"semanticEmbeddings">["entityType"];
@@ -163,11 +164,13 @@ function average(values: number[]) {
 
 export const queueEmbeddingsForSession = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
     entityTypes: v.optional(v.array(entityTypeValidator)),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -787,10 +790,12 @@ export const embedSubmissionAndAssign = internalAction({
 
 export const getSimilarityMap = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -1061,10 +1066,12 @@ export const listEmbeddingsForSession = query({
 
 export const getSemanticStatus = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -1166,10 +1173,12 @@ export const getSemanticStatus = query({
 
 export const refreshSignalsForSession = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args): Promise<{ inserted: number }> => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -1192,10 +1201,12 @@ export const refreshSignalsForSession = mutation({
 
 export const getNoveltyRadar = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -1354,10 +1365,12 @@ export const getNoveltyRadar = query({
 
 export const getCategoryDrift = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {

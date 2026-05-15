@@ -11,6 +11,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 import { resolveQuestionForRead, resolveQuestionIdForWrite } from "./questionScope";
 
 type JsonRecord = Record<string, unknown>;
@@ -226,11 +227,13 @@ async function createQueuedArtifact(
 
 export const generateCategorySummary = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     categoryId: v.id("categories"),
     forceRegenerate: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
     const category = await ctx.db.get(args.categoryId);
 
@@ -295,6 +298,7 @@ export const generateCategorySummary = mutation({
 
 export const generateClassSynthesis = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     kind: v.optional(
       v.union(
@@ -307,6 +311,7 @@ export const generateClassSynthesis = mutation({
     forceRegenerate: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -374,10 +379,12 @@ export const generateClassSynthesis = mutation({
 
 export const publishArtifact = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     artifactId: v.id("synthesisArtifacts"),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
     const artifact = await ctx.db.get(args.artifactId);
 
@@ -411,10 +418,12 @@ export const publishArtifact = mutation({
 
 export const unpublishArtifact = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     artifactId: v.id("synthesisArtifacts"),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
     const artifact = await ctx.db.get(args.artifactId);
 

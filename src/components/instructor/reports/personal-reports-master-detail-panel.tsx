@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { cn } from "@/lib/utils";
 
 interface PersonalReportItem {
@@ -80,6 +81,7 @@ export function PersonalReportsMasterDetailPanel({
   counts,
   reportsReleasedForQuestion,
 }: PersonalReportsMasterDetailPanelProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const generateReports = useMutation(api.personalReports.generateForSession);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +115,11 @@ export function PersonalReportsMasterDetailPanel({
     setBusy(true);
     setError(null);
     try {
-      await generateReports({ sessionSlug, questionId: selectedQuestionId });
+      await generateReports({
+        sessionSlug,
+        questionId: selectedQuestionId,
+        previewPassword: previewPassword ?? "",
+      });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not generate reports.");
     } finally {

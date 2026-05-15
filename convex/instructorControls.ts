@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 import { getCurrentQuestionForSession } from "./sessionQuestions";
 
 const phaseValidator = v.union(
@@ -138,11 +139,13 @@ function toPublicSessionControl(
 
 export const updatePhase = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     phase: phaseValidator,
     currentAct: v.optional(actValidator),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -178,10 +181,12 @@ export const updatePhase = mutation({
 
 export const updateVisibility = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     visibilityMode: visibilityModeValidator,
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -215,6 +220,7 @@ export const updateVisibility = mutation({
 
 export const updateSettings = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     title: v.optional(v.string()),
     openingPrompt: v.optional(v.string()),
@@ -227,6 +233,7 @@ export const updateSettings = mutation({
     summaryGateEnabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {

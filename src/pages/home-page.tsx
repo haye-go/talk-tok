@@ -8,7 +8,7 @@ import { DEMO_SESSION_SLUG } from "@/lib/constants";
 import { routes } from "@/lib/routes";
 
 export function HomePage() {
-  const demoSession = useQuery(api.demo.getDemoSession);
+  const demoSession = useQuery(api.demo.getDemoSession, {});
 
   return (
     <main className="min-h-dvh bg-[var(--c-canvas)] p-6">

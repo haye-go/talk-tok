@@ -11,6 +11,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 import { resolveQuestionForRead, resolveQuestionIdForWrite } from "./questionScope";
 
 type JsonRecord = Record<string, unknown>;
@@ -250,12 +251,14 @@ export const generateMine = mutation({
 
 export const generateForSession = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
     participantIds: v.optional(v.array(v.id("participants"))),
     forceRegenerate: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {

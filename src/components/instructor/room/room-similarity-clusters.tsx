@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MetricTile } from "@/components/ui/metric-tile";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 export interface RoomSimilarityClustersProps {
   sessionSlug: string;
@@ -16,18 +17,29 @@ export function RoomSimilarityClusters({
   sessionSlug,
   selectedQuestionId,
 }: RoomSimilarityClustersProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const questionScopedArgs = selectedQuestionId
-    ? { sessionSlug, questionId: selectedQuestionId }
-    : { sessionSlug };
-  const semanticStatus = useQuery(api.semantic.getSemanticStatus, questionScopedArgs);
-  const similarityMap = useQuery(api.semantic.getSimilarityMap, questionScopedArgs);
+    ? { sessionSlug, questionId: selectedQuestionId, previewPassword: previewPassword ?? "" }
+    : { sessionSlug, previewPassword: previewPassword ?? "" };
+  const semanticStatus = useQuery(
+    api.semantic.getSemanticStatus,
+    previewPassword ? questionScopedArgs : "skip",
+  );
+  const similarityMap = useQuery(
+    api.semantic.getSimilarityMap,
+    previewPassword ? questionScopedArgs : "skip",
+  );
   const queueEmbeddings = useMutation(api.semantic.queueEmbeddingsForSession);
   const [embeddingBusy, setEmbeddingBusy] = useState(false);
 
   async function handleQueueEmbeddings() {
     setEmbeddingBusy(true);
     try {
-      await queueEmbeddings({ sessionSlug, questionId: selectedQuestionId });
+      await queueEmbeddings({
+        sessionSlug,
+        questionId: selectedQuestionId,
+        previewPassword: previewPassword ?? "",
+      });
     } finally {
       setEmbeddingBusy(false);
     }

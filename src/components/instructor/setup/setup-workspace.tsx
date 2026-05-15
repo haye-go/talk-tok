@@ -8,6 +8,7 @@ import {
 } from "@/components/instructor/session-controls-card";
 import { useInstructorSetup } from "@/hooks/use-instructor-setup";
 import { useInstructorShell } from "@/hooks/use-instructor-shell";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { AiReadinessSection } from "./ai-readiness-section";
 import { CategoryTaxonomyEditor } from "./category-taxonomy-editor";
 import { FollowUpDraftEditor } from "./follow-up-draft-editor";
@@ -22,15 +23,22 @@ function isBusyStatus(status?: string) {
 }
 
 export function SetupWorkspace({ sessionSlug, selectedQuestionId }: SetupWorkspaceProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const setup = useInstructorSetup(sessionSlug, selectedQuestionId);
   const shell = useInstructorShell(sessionSlug, selectedQuestionId);
   const updateVisibility = useMutation(api.instructorControls.updateVisibility);
   const updateSettings = useMutation(api.instructorControls.updateSettings);
   const questionScopedArgs = selectedQuestionId
-    ? { sessionSlug, questionId: selectedQuestionId }
-    : { sessionSlug };
-  const questionBaseline = useQuery(api.questionBaselines.getForQuestion, questionScopedArgs);
-  const aiJobs = useQuery(api.jobs.listForSession, { ...questionScopedArgs, limit: 80 });
+    ? { sessionSlug, questionId: selectedQuestionId, previewPassword: previewPassword ?? "" }
+    : { sessionSlug, previewPassword: previewPassword ?? "" };
+  const questionBaseline = useQuery(
+    api.questionBaselines.getForQuestion,
+    previewPassword ? questionScopedArgs : "skip",
+  );
+  const aiJobs = useQuery(
+    api.jobs.listForSession,
+    previewPassword ? { ...questionScopedArgs, limit: 80 } : "skip",
+  );
 
   if (!setup || !shell) {
     return (
@@ -68,11 +76,11 @@ export function SetupWorkspace({ sessionSlug, selectedQuestionId }: SetupWorkspa
     : null;
 
   async function handleVisibilityChange(visibilityMode: VisibilityMode) {
-    await updateVisibility({ sessionSlug, visibilityMode });
+    await updateVisibility({ sessionSlug, visibilityMode, previewPassword: previewPassword ?? "" });
   }
 
   async function handleSettingsSave(settings: SessionSettingsUpdate) {
-    await updateSettings({ sessionSlug, ...settings });
+    await updateSettings({ sessionSlug, ...settings, previewPassword: previewPassword ?? "" });
   }
 
   return (

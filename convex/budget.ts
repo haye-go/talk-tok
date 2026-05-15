@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalQuery, query, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -104,9 +105,11 @@ export const checkSessionBudget = internalQuery({
 
 export const getSessionSpend = query({
   args: {
+    previewPassword: v.string(),
     sessionId: v.id("sessions"),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const budget = await getBudgetSettingForSession(ctx, args.sessionId);
     const perSessionEstimatedCostUsd = numberFrom(
       budget.perSessionEstimatedCostUsd,

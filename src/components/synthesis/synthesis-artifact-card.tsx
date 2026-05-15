@@ -26,6 +26,7 @@ interface SynthesisArtifactCardProps {
   artifact: Artifact;
   sessionSlug: string;
   isInstructor?: boolean;
+  previewPassword?: string;
 }
 
 const KIND_ICON: Record<string, typeof Sparkle> = {
@@ -72,6 +73,7 @@ export function SynthesisArtifactCard({
   artifact,
   sessionSlug,
   isInstructor,
+  previewPassword,
 }: SynthesisArtifactCardProps) {
   const Icon = KIND_ICON[artifact.kind] ?? Sparkle;
   const tone = STATUS_TONE[artifact.status] ?? "neutral";
@@ -88,7 +90,7 @@ export function SynthesisArtifactCard({
     setBusy(true);
     try {
       const args = { sessionSlug, artifactId: artifact.id };
-      if (action === "publish") await publish(args);
+      if (action === "publish") await publish({ ...args, previewPassword: previewPassword ?? "" });
       else if (action === "finalize") await finalize(args);
       else await archive(args);
     } finally {

@@ -12,6 +12,7 @@ import {
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
 import { createDefaultQuestionForSession } from "./sessionQuestions";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 type JsonRecord = Record<string, unknown>;
 type AssignmentDecision = "auto" | "review" | "none";
@@ -348,6 +349,7 @@ export const listAssignmentsForSession = query({
 
 export const listAssignmentReviews = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
     status: v.optional(
@@ -356,6 +358,7 @@ export const listAssignmentReviews = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -399,11 +402,13 @@ export const listAssignmentReviews = query({
 
 export const generateCategories = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
     mode: categoryGenerationModeValidator,
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -439,11 +444,13 @@ export const generateCategories = mutation({
 
 export const assignCategories = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
     scope: categoryAssignmentScopeValidator,
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -479,12 +486,14 @@ export const assignCategories = mutation({
 
 export const setSubmissionCategory = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     submissionId: v.id("submissions"),
     categoryId: v.optional(v.id("categories")),
     rationale: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
     const submission = await ctx.db.get(args.submissionId);
 

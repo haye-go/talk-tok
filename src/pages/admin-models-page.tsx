@@ -5,9 +5,11 @@ import { AdminShell } from "@/components/layout/admin-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/state/loading-state";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 export function AdminModelsPage() {
-  const models = useQuery(api.modelSettings.list);
+  const { previewPassword } = useInstructorPreviewAuth();
+  const models = useQuery(api.modelSettings.list, previewPassword ? { previewPassword } : "skip");
 
   return (
     <AdminShell

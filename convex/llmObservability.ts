@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const DEFAULT_CALL_LIMIT = 80;
 const MAX_CALL_LIMIT = 200;
@@ -89,10 +90,12 @@ function summarize(calls: Doc<"llmCalls">[]) {
 
 export const recentCalls = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const limit = Math.min(MAX_CALL_LIMIT, Math.max(1, args.limit ?? DEFAULT_CALL_LIMIT));
 
     if (args.sessionSlug) {
@@ -118,10 +121,12 @@ export const recentCalls = query({
 
 export const summary = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.optional(v.string()),
     sinceMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const since = args.sinceMs ?? 0;
     const calls = args.sessionSlug
       ? await getSessionBySlug(ctx, args.sessionSlug).then(async (session) =>

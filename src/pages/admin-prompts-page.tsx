@@ -7,10 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/state/loading-state";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { cn } from "@/lib/utils";
 
 export function AdminPromptsPage() {
-  const prompts = useQuery(api.promptTemplates.list);
+  const { previewPassword } = useInstructorPreviewAuth();
+  const prompts = useQuery(api.promptTemplates.list, previewPassword ? { previewPassword } : "skip");
   const updatePrompt = useMutation(api.promptTemplates.update);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [editedTemplate, setEditedTemplate] = useState("");
@@ -31,6 +33,7 @@ export function AdminPromptsPage() {
       await updatePrompt({
         key: selected.key,
         userTemplate: editedTemplate,
+        previewPassword: previewPassword ?? "",
       });
     } finally {
       setSaving(false);

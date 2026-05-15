@@ -30,6 +30,8 @@ import type * as participantWorkspace from "../participantWorkspace.js";
 import type * as participants from "../participants.js";
 import type * as personalReports from "../personalReports.js";
 import type * as positionShifts from "../positionShifts.js";
+import type * as previewAuth from "../previewAuth.js";
+import type * as previewAuthGuard from "../previewAuthGuard.js";
 import type * as promptTemplates from "../promptTemplates.js";
 import type * as protection from "../protection.js";
 import type * as questionBaselines from "../questionBaselines.js";
@@ -74,6 +76,8 @@ declare const fullApi: ApiFromModules<{
   participants: typeof participants;
   personalReports: typeof personalReports;
   positionShifts: typeof positionShifts;
+  previewAuth: typeof previewAuth;
+  previewAuthGuard: typeof previewAuthGuard;
   promptTemplates: typeof promptTemplates;
   protection: typeof protection;
   questionBaselines: typeof questionBaselines;

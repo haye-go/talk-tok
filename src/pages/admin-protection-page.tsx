@@ -3,9 +3,11 @@ import { api } from "../../convex/_generated/api";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { Card } from "@/components/ui/card";
 import { LoadingState } from "@/components/state/loading-state";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 export function AdminProtectionPage() {
-  const settings = useQuery(api.protection.list, {});
+  const { previewPassword } = useInstructorPreviewAuth();
+  const settings = useQuery(api.protection.list, previewPassword ? { previewPassword } : "skip");
 
   return (
     <AdminShell

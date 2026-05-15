@@ -9,6 +9,7 @@ import {
 } from "@/components/instructor/argument-map-graph";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 export interface ArgumentMapSectionProps {
   sessionSlug: string;
@@ -31,13 +32,18 @@ export function ArgumentMapSection({
   errorMessage,
   graph,
 }: ArgumentMapSectionProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const generateArgumentMap = useMutation(api.argumentMap.generateForSession);
   const [busy, setBusy] = useState(false);
 
   async function handleGenerate() {
     setBusy(true);
     try {
-      await generateArgumentMap({ sessionSlug, questionId: selectedQuestionId });
+      await generateArgumentMap({
+        sessionSlug,
+        questionId: selectedQuestionId,
+        previewPassword: previewPassword ?? "",
+      });
     } finally {
       setBusy(false);
     }

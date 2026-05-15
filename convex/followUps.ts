@@ -9,6 +9,7 @@ import {
   canAnswerFollowUp,
   canSubmitToQuestion,
 } from "./questionCapabilities";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const FOLLOW_UP_LIMIT = 80;
 const TARGET_LIMIT = 20;
@@ -316,6 +317,7 @@ async function toPublicPrompt(ctx: QueryCtx | MutationCtx, prompt: Doc<"followUp
 
 export const create = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     title: v.optional(v.string()),
     prompt: v.string(),
@@ -326,6 +328,7 @@ export const create = mutation({
     activateNow: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {

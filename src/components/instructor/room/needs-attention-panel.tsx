@@ -5,6 +5,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 interface CategoryRef {
   id: Id<"categories">;
@@ -28,16 +29,23 @@ export function NeedsAttentionPanel({
   failedLiveJobCount,
   categories,
 }: NeedsAttentionPanelProps) {
-  const pendingRequests = useQuery(api.recategorisation.listForSession, {
-    sessionSlug,
-    status: "pending",
-  });
-  const pendingAssignmentReviews = useQuery(api.categorisation.listAssignmentReviews, {
-    sessionSlug,
-    questionId: selectedQuestionId,
-    status: "pending",
-    limit: 4,
-  });
+  const { previewPassword } = useInstructorPreviewAuth();
+  const pendingRequests = useQuery(
+    api.recategorisation.listForSession,
+    previewPassword ? { sessionSlug, status: "pending", previewPassword } : "skip",
+  );
+  const pendingAssignmentReviews = useQuery(
+    api.categorisation.listAssignmentReviews,
+    previewPassword
+      ? {
+          sessionSlug,
+          questionId: selectedQuestionId,
+          status: "pending",
+          limit: 4,
+          previewPassword,
+        }
+      : "skip",
+  );
   const decideRecategorisation = useMutation(api.recategorisation.decide);
   const assignCategories = useMutation(api.categorisation.assignCategories);
   const setSubmissionCategory = useMutation(api.categorisation.setSubmissionCategory);
@@ -66,6 +74,7 @@ export function NeedsAttentionPanel({
         requestId,
         decision,
         categoryId,
+        previewPassword: previewPassword ?? "",
       });
     } finally {
       setDecidingId(null);
@@ -79,6 +88,7 @@ export function NeedsAttentionPanel({
         sessionSlug,
         questionId: selectedQuestionId,
         scope: "uncategorised_posts",
+        previewPassword: previewPassword ?? "",
       });
     } finally {
       setAssigning(false);
@@ -99,6 +109,7 @@ export function NeedsAttentionPanel({
         rationale: categoryId
           ? "Instructor accepted suggested category."
           : "Instructor cleared category.",
+        previewPassword: previewPassword ?? "",
       });
     } finally {
       setReviewingId(null);

@@ -1,6 +1,7 @@
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { cn } from "@/lib/utils";
 
 type VisibilityPatch = {
@@ -36,6 +37,7 @@ export function ReleaseInteractionRailCard({
   selectedQuestion,
   summaryGateEnabled,
 }: ReleaseInteractionRailCardProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const updateQuestionVisibility = useMutation(api.sessionQuestions.updateVisibility);
   const setContributionState = useMutation(api.sessionQuestions.setContributionState);
   const updateSessionSettings = useMutation(api.instructorControls.updateSettings);
@@ -44,7 +46,11 @@ export function ReleaseInteractionRailCard({
 
   function patchQuestion(patch: VisibilityPatch) {
     if (!selectedQuestion) return;
-    void updateQuestionVisibility({ questionId: selectedQuestion.id, visibility: patch });
+    void updateQuestionVisibility({
+      questionId: selectedQuestion.id,
+      visibility: patch,
+      previewPassword: previewPassword ?? "",
+    });
   }
 
   const rows: Array<{
@@ -66,6 +72,7 @@ export function ReleaseInteractionRailCard({
         void setContributionState({
           questionId: selectedQuestion.id,
           contributionsOpen: !selectedQuestion.contributionsOpen,
+          previewPassword: previewPassword ?? "",
         });
       },
     },
@@ -112,6 +119,7 @@ export function ReleaseInteractionRailCard({
         void updateSessionSettings({
           sessionSlug,
           summaryGateEnabled: !summaryGateEnabled,
+          previewPassword: previewPassword ?? "",
         });
       },
     },

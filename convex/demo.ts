@@ -8,6 +8,7 @@ import {
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { createDefaultQuestionForSession } from "./sessionQuestions";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const DEMO_SLUG = "teach-anything-university-demo";
 const DEMO_JOIN_CODE = "SPARK";
@@ -447,9 +448,11 @@ async function countSessionQuestionsBySession(
 
 export const seed = mutation({
   args: {
+    previewPassword: v.string(),
     resetExisting: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const existing = await findDemoSession(ctx);
     const legacySessions = await findLegacyDemoSessions(ctx);
 
@@ -2079,11 +2082,13 @@ export const verifyQuestionMigration = query({
 
 export const resetSession = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.optional(v.string()),
     confirmation: v.string(),
     deleteSession: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     if (args.confirmation !== RESET_CONFIRMATION) {
       throw new Error(`Confirmation must be exactly: ${RESET_CONFIRMATION}`);
     }
@@ -2129,8 +2134,13 @@ export const resetSession = mutation({
 });
 
 export const getDemoSession = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    previewPassword: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    if (args.previewPassword !== undefined) {
+      requireInstructorPreviewPassword(args.previewPassword);
+    }
     const session = await findDemoSession(ctx);
 
     if (!session) {
@@ -2181,9 +2191,11 @@ export const listDemoPersonas = query({
 
 export const health = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = args.sessionSlug
       ? await ctx.db
           .query("sessions")
@@ -2243,6 +2255,7 @@ export const health = query({
 
 export const setToggle = mutation({
   args: {
+    previewPassword: v.string(),
     key: v.union(
       v.literal("simulateAiFailure"),
       v.literal("simulateBudgetExceeded"),
@@ -2252,6 +2265,7 @@ export const setToggle = mutation({
     valueJson: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const existing = await ctx.db
       .query("demoToggles")
       .withIndex("by_key", (q) => q.eq("key", args.key))
@@ -2279,8 +2293,9 @@ export const setToggle = mutation({
 });
 
 export const listToggles = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { previewPassword: v.string() },
+  handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     return await ctx.db.query("demoToggles").take(50);
   },
 });

@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { createDefaultQuestionForSession } from "./sessionQuestions";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const MAX_CATEGORY_NAME_LENGTH = 80;
 const MAX_CATEGORY_DESCRIPTION_LENGTH = 400;
@@ -154,6 +155,7 @@ export const listForSession = query({
 
 export const create = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
     name: v.string(),
@@ -161,6 +163,7 @@ export const create = mutation({
     color: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {
@@ -231,6 +234,7 @@ export const create = mutation({
 
 export const update = mutation({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     categoryId: v.id("categories"),
     name: v.string(),
@@ -238,6 +242,7 @@ export const update = mutation({
     color: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
     const category = await ctx.db.get(args.categoryId);
 

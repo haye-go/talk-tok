@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const DEFAULT_JOB_LIMIT = 80;
 const MAX_JOB_LIMIT = 200;
@@ -41,6 +42,7 @@ function toPublicJob(job: Doc<"aiJobs">) {
 
 export const listForSession = query({
   args: {
+    previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
     status: v.optional(
@@ -54,6 +56,7 @@ export const listForSession = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const session = await getSessionBySlug(ctx, args.sessionSlug);
 
     if (!session) {

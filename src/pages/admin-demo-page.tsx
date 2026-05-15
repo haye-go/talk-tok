@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { Switch } from "@/components/ui/switch";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 interface DemoToggle {
   key: string;
@@ -25,15 +26,17 @@ const TOGGLE_KEYS = [
 
 export function AdminDemoPage() {
   const navigate = useNavigate();
-  const demoSession = useQuery(api.demo.getDemoSession);
-  const health = useQuery(api.demo.health, {});
-  const toggles = useQuery(api.demo.listToggles);
+  const { previewPassword } = useInstructorPreviewAuth();
+  const previewArgs = previewPassword ? { previewPassword } : "skip";
+  const demoSession = useQuery(api.demo.getDemoSession, previewArgs);
+  const health = useQuery(api.demo.health, previewArgs);
+  const toggles = useQuery(api.demo.listToggles, previewArgs);
 
   const seed = useMutation(api.demo.seed);
   const resetSession = useMutation(api.demo.resetSession);
   const setToggle = useMutation(api.demo.setToggle);
 
-  const stageSession = useQuery(api.stageDemo.getFoodHackathonSession);
+  const stageSession = useQuery(api.stageDemo.getFoodHackathonSession, previewArgs);
   const seedStage = useMutation(api.stageDemo.seedFoodHackathon);
   const resetStage = useMutation(api.stageDemo.resetFoodHackathonSession);
 
@@ -59,7 +62,7 @@ export function AdminDemoPage() {
   async function handleSeed() {
     setSeeding(true);
     try {
-      await seed({ resetExisting });
+      await seed({ resetExisting, previewPassword: previewPassword ?? "" });
     } finally {
       setSeeding(false);
     }
@@ -69,7 +72,7 @@ export function AdminDemoPage() {
     if (confirmPhrase !== "RESET DEMO SESSION") return;
     setResetting(true);
     try {
-      await resetSession({ confirmation: "RESET DEMO SESSION" });
+      await resetSession({ confirmation: "RESET DEMO SESSION", previewPassword: previewPassword ?? "" });
       setConfirmPhrase("");
     } finally {
       setResetting(false);
@@ -83,6 +86,7 @@ export function AdminDemoPage() {
       const result = await seedStage({
         includeWarmStart: stageWarmStart,
         joinCode: stageJoinCode || undefined,
+        previewPassword: previewPassword ?? "",
       });
       setStageSeedResult(result);
     } finally {
@@ -94,7 +98,10 @@ export function AdminDemoPage() {
     if (stageConfirm !== "RESET FOOD HACKATHON SESSION") return;
     setStageResetting(true);
     try {
-      await resetStage({ confirmation: "RESET FOOD HACKATHON SESSION" });
+      await resetStage({
+        confirmation: "RESET FOOD HACKATHON SESSION",
+        previewPassword: previewPassword ?? "",
+      });
       setStageConfirm("");
       setStageSeedResult(null);
     } finally {
@@ -184,7 +191,9 @@ export function AdminDemoPage() {
                 <span className="text-xs text-[var(--c-ink)]">{label}</span>
                 <Switch
                   checked={toggleMap.get(key) ?? false}
-                  onCheckedChange={(enabled) => void setToggle({ key, enabled })}
+                  onCheckedChange={(enabled) =>
+                    void setToggle({ key, enabled, previewPassword: previewPassword ?? "" })
+                  }
                   label=""
                 />
               </div>

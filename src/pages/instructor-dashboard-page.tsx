@@ -7,11 +7,16 @@ import { EmptyState } from "@/components/state/empty-state";
 import { LoadingState } from "@/components/state/loading-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { routes } from "@/lib/routes";
 
 export function InstructorDashboardPage() {
   const navigate = useNavigate();
-  const sessions = useQuery(api.sessions.listForInstructor);
+  const { previewPassword } = useInstructorPreviewAuth();
+  const sessions = useQuery(
+    api.sessions.listForInstructor,
+    previewPassword ? { previewPassword } : "skip",
+  );
 
   return (
     <div className="min-h-dvh bg-[var(--c-canvas)]">

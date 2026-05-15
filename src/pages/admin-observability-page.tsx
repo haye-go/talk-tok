@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { LoadingState } from "@/components/state/loading-state";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 interface CsvRow {
   [key: string]: string | number | boolean | null | undefined;
@@ -63,11 +64,20 @@ function downloadCsv(rows: CsvRow[], filename: string) {
 }
 
 export function AdminObservabilityPage() {
+  const { previewPassword } = useInstructorPreviewAuth();
   const [sessionFilter, setSessionFilter] = useState("");
   const [expandedCallId, setExpandedCallId] = useState<string | null>(null);
 
-  const summaryArgs = sessionFilter ? { sessionSlug: sessionFilter } : {};
-  const callsArgs = sessionFilter ? { sessionSlug: sessionFilter, limit: 50 } : { limit: 50 };
+  const summaryArgs = previewPassword
+    ? sessionFilter
+      ? { sessionSlug: sessionFilter, previewPassword }
+      : { previewPassword }
+    : "skip";
+  const callsArgs = previewPassword
+    ? sessionFilter
+      ? { sessionSlug: sessionFilter, limit: 50, previewPassword }
+      : { limit: 50, previewPassword }
+    : "skip";
 
   const summary = useQuery(api.llmObservability.summary, summaryArgs);
   const recentCalls = useQuery(api.llmObservability.recentCalls, callsArgs);

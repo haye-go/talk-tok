@@ -5,6 +5,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { cn } from "@/lib/utils";
 
 const AI_READINESS_FEATURES = [
@@ -92,16 +93,29 @@ export function AiReadinessSection({
   baselineBusy,
   baselineCanGenerate,
 }: AiReadinessSectionProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const generateBaseline = useMutation(api.questionBaselines.generateForQuestion);
   const checkOpenAiKey = useAction(api.modelSettings.checkOpenAiKey);
-  const modelSettings = useQuery(api.modelSettings.list);
-  const promptTemplates = useQuery(api.promptTemplates.list);
+  const modelSettings = useQuery(
+    api.modelSettings.list,
+    previewPassword ? { previewPassword } : "skip",
+  );
+  const promptTemplates = useQuery(
+    api.promptTemplates.list,
+    previewPassword ? { previewPassword } : "skip",
+  );
   const sessionBudget = useQuery(
     api.budget.getSessionSpend,
-    sessionId ? { sessionId } : "skip",
+    sessionId && previewPassword ? { sessionId, previewPassword } : "skip",
   );
-  const recentLlmCalls = useQuery(api.llmObservability.recentCalls, { sessionSlug, limit: 12 });
-  const demoToggles = useQuery(api.demo.listToggles, {});
+  const recentLlmCalls = useQuery(
+    api.llmObservability.recentCalls,
+    previewPassword ? { sessionSlug, limit: 12, previewPassword } : "skip",
+  );
+  const demoToggles = useQuery(
+    api.demo.listToggles,
+    previewPassword ? { previewPassword } : "skip",
+  );
 
   const [openAiKeyState, setOpenAiKeyState] = useState<
     "checking" | "ready" | "missing" | "error"
@@ -109,8 +123,9 @@ export function AiReadinessSection({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!previewPassword) return;
     let cancelled = false;
-    void checkOpenAiKey()
+    void checkOpenAiKey({ previewPassword })
       .then((result) => {
         if (!cancelled) setOpenAiKeyState(result.hasKey ? "ready" : "missing");
       })
@@ -120,7 +135,7 @@ export function AiReadinessSection({
     return () => {
       cancelled = true;
     };
-  }, [checkOpenAiKey]);
+  }, [checkOpenAiKey, previewPassword]);
 
   const enabledModelFeatures = new Set(
     (modelSettings ?? []).filter((setting) => setting.enabled).flatMap((setting) => setting.features ?? []),
@@ -162,6 +177,7 @@ export function AiReadinessSection({
         sessionSlug,
         questionId: selectedQuestionId,
         forceRegenerate,
+        previewPassword: previewPassword ?? "",
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not generate baseline.");

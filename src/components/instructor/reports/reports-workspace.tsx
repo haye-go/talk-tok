@@ -3,6 +3,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { AiJobStatusPanel, type AiJobStatusItem } from "@/components/instructor/ai-job-status-panel";
 import { useInstructorReports } from "@/hooks/use-instructor-reports";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { ArgumentMapSection } from "./argument-map-section";
 import { CategoryDriftSection } from "./category-drift-section";
 import { EmbeddingsStatusSection } from "./embeddings-status-section";
@@ -49,14 +50,27 @@ export function ReportsWorkspace({
   synthesisReleasedForQuestion,
   reportsReleasedForQuestion,
 }: ReportsWorkspaceProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const reports = useInstructorReports(sessionSlug, selectedQuestionId);
   const questionScopedArgs = selectedQuestionId
-    ? { sessionSlug, questionId: selectedQuestionId }
-    : { sessionSlug };
-  const semanticStatus = useQuery(api.semantic.getSemanticStatus, questionScopedArgs);
-  const noveltyRadar = useQuery(api.semantic.getNoveltyRadar, questionScopedArgs);
-  const categoryDrift = useQuery(api.semantic.getCategoryDrift, questionScopedArgs);
-  const argumentGraph = useQuery(api.argumentMap.getVisualizationGraph, questionScopedArgs);
+    ? { sessionSlug, questionId: selectedQuestionId, previewPassword: previewPassword ?? "" }
+    : { sessionSlug, previewPassword: previewPassword ?? "" };
+  const semanticStatus = useQuery(
+    api.semantic.getSemanticStatus,
+    previewPassword ? questionScopedArgs : "skip",
+  );
+  const noveltyRadar = useQuery(
+    api.semantic.getNoveltyRadar,
+    previewPassword ? questionScopedArgs : "skip",
+  );
+  const categoryDrift = useQuery(
+    api.semantic.getCategoryDrift,
+    previewPassword ? questionScopedArgs : "skip",
+  );
+  const argumentGraph = useQuery(
+    api.argumentMap.getVisualizationGraph,
+    previewPassword ? questionScopedArgs : "skip",
+  );
 
   if (!reports) {
     return (

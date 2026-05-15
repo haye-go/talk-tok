@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { createDefaultQuestionForSession } from "./sessionQuestions";
+import { requireInstructorPreviewPassword } from "./previewAuthGuard";
 
 const SESSION_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const MAX_SLUG_ATTEMPTS = 50;
@@ -158,6 +159,7 @@ function toPublicSession(session: Doc<"sessions">, participantCount?: number) {
 
 export const create = mutation({
   args: {
+    previewPassword: v.string(),
     title: v.string(),
     openingPrompt: v.string(),
     modePreset: v.optional(
@@ -171,6 +173,7 @@ export const create = mutation({
     joinCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const now = Date.now();
     const title = normalizeTitle(args.title);
     const openingPrompt = normalizeOpeningPrompt(args.openingPrompt);
@@ -216,8 +219,11 @@ export const create = mutation({
 });
 
 export const listForInstructor = query({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    previewPassword: v.string(),
+  },
+  handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const sessions = await ctx.db.query("sessions").order("desc").collect();
 
     return await Promise.all(

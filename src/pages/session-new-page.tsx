@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { cn } from "@/lib/utils";
 import { routes } from "@/lib/routes";
 
@@ -30,8 +31,12 @@ const MODE_LABELS: Record<string, string> = {
 
 export function SessionNewPage() {
   const navigate = useNavigate();
+  const { previewPassword } = useInstructorPreviewAuth();
   const createSession = useMutation(api.sessions.create);
-  const templates = useQuery(api.sessionTemplates.list, {});
+  const templates = useQuery(
+    api.sessionTemplates.list,
+    previewPassword ? { previewPassword } : "skip",
+  );
   const createFromTemplate = useMutation(api.sessionTemplates.createSessionFromTemplate);
   const [creatingTemplateId, setCreatingTemplateId] = useState<Id<"sessionTemplates"> | null>(null);
   const [title, setTitle] = useState("");
@@ -61,6 +66,7 @@ export function SessionNewPage() {
         openingPrompt,
         modePreset,
         joinCode: joinCode || undefined,
+        previewPassword: previewPassword ?? "",
       });
       await navigate({ to: routes.instructorSession(session.slug) });
     } catch (cause) {
@@ -100,6 +106,7 @@ export function SessionNewPage() {
                     try {
                       const s = await createFromTemplate({
                         templateId: t.id,
+                        previewPassword: previewPassword ?? "",
                       });
                       await navigate({ to: routes.instructorSession(s.slug) });
                     } finally {

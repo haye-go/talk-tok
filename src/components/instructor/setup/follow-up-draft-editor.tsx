@@ -5,6 +5,7 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 interface CategoryItem {
   id: Id<"categories">;
@@ -35,6 +36,7 @@ export function FollowUpDraftEditor({
   categories,
   followUps,
 }: FollowUpDraftEditorProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const createFollowUp = useMutation(api.followUps.create);
 
   const [openCategoryId, setOpenCategoryId] = useState<Id<"categories"> | null>(null);
@@ -63,6 +65,7 @@ export function FollowUpDraftEditor({
         targetMode: "categories",
         categoryIds: [categoryId],
         activateNow: true,
+        previewPassword: previewPassword ?? "",
       });
       setOpenCategoryId(null);
       setFollowUpPrompt("");

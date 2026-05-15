@@ -3,6 +3,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 export interface NoveltySignalsSectionProps {
   sessionSlug: string;
@@ -19,6 +20,7 @@ export function NoveltySignalsSection({
   ready,
   hasEmbeddings,
 }: NoveltySignalsSectionProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const refreshSignals = useMutation(api.semantic.refreshSignalsForSession);
 
   return (
@@ -28,7 +30,13 @@ export function NoveltySignalsSection({
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => void refreshSignals({ sessionSlug, questionId: selectedQuestionId })}
+          onClick={() =>
+            void refreshSignals({
+              sessionSlug,
+              questionId: selectedQuestionId,
+              previewPassword: previewPassword ?? "",
+            })
+          }
           disabled={!hasEmbeddings}
         >
           Refresh Signals

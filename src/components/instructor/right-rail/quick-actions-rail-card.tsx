@@ -3,6 +3,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 type CategoryGenerationMode = "append" | "full_regeneration";
 type CategoryAssignmentScope = "uncategorised_posts" | "all_posts";
@@ -16,6 +17,7 @@ export function QuickActionsRailCard({
   sessionSlug,
   selectedQuestionId,
 }: QuickActionsRailCardProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const generateCategories = useMutation(api.categorisation.generateCategories);
   const assignCategories = useMutation(api.categorisation.assignCategories);
   const generateClassSynthesis = useMutation(api.synthesis.generateClassSynthesis);
@@ -37,6 +39,7 @@ export function QuickActionsRailCard({
         sessionSlug,
         questionId: selectedQuestionId,
         mode: generationMode,
+        previewPassword: previewPassword ?? "",
       });
       setCategoryMessage(
         generationMode === "append"
@@ -61,6 +64,7 @@ export function QuickActionsRailCard({
         sessionSlug,
         questionId: selectedQuestionId,
         scope: assignmentScope,
+        previewPassword: previewPassword ?? "",
       });
       setCategoryMessage(
         assignmentScope === "uncategorised_posts"
@@ -80,7 +84,11 @@ export function QuickActionsRailCard({
     if (!selectedQuestionId) return;
     setSynthBusy(true);
     try {
-      await generateClassSynthesis({ sessionSlug, questionId: selectedQuestionId });
+      await generateClassSynthesis({
+        sessionSlug,
+        questionId: selectedQuestionId,
+        previewPassword: previewPassword ?? "",
+      });
     } finally {
       setSynthBusy(false);
     }

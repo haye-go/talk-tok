@@ -4,6 +4,7 @@ import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { categoryColorToTone } from "@/lib/category-colors";
 
 interface CategoryItem {
@@ -25,6 +26,7 @@ export function CategoryTaxonomyEditor({
   selectedQuestionId,
   categories,
 }: CategoryTaxonomyEditorProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const createCategory = useMutation(api.categoryManagement.create);
   const updateCategory = useMutation(api.categoryManagement.update);
 
@@ -46,6 +48,7 @@ export function CategoryTaxonomyEditor({
         questionId: selectedQuestionId,
         name: addCategoryName.trim(),
         description: addCategoryDescription.trim() || undefined,
+        previewPassword: previewPassword ?? "",
       });
       setAddCategoryName("");
       setAddCategoryDescription("");
@@ -73,6 +76,7 @@ export function CategoryTaxonomyEditor({
         categoryId,
         name: editingCategoryName.trim(),
         description: editingCategoryDescription.trim() || undefined,
+        previewPassword: previewPassword ?? "",
       });
       setEditingCategoryId(null);
     } catch (cause) {
