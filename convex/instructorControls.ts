@@ -133,6 +133,7 @@ function toPublicSessionControl(
     telemetryEnabled: session.telemetryEnabled,
     fightMeEnabled: session.fightMeEnabled,
     summaryGateEnabled: session.summaryGateEnabled,
+    autoAssignUncertainCategories: session.autoAssignUncertainCategories ?? false,
     updatedAt: session.updatedAt,
   };
 }
@@ -231,6 +232,7 @@ export const updateSettings = mutation({
     telemetryEnabled: v.optional(v.boolean()),
     fightMeEnabled: v.optional(v.boolean()),
     summaryGateEnabled: v.optional(v.boolean()),
+    autoAssignUncertainCategories: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     requireInstructorPreviewPassword(args.previewPassword);
@@ -250,6 +252,7 @@ export const updateSettings = mutation({
       telemetryEnabled?: boolean;
       fightMeEnabled?: boolean;
       summaryGateEnabled?: boolean;
+      autoAssignUncertainCategories?: boolean;
       updatedAt: number;
     } = {
       updatedAt: Date.now(),
@@ -294,6 +297,10 @@ export const updateSettings = mutation({
 
     if (args.summaryGateEnabled !== undefined) {
       patch.summaryGateEnabled = args.summaryGateEnabled;
+    }
+
+    if (args.autoAssignUncertainCategories !== undefined) {
+      patch.autoAssignUncertainCategories = args.autoAssignUncertainCategories;
     }
 
     await ctx.db.patch(session._id, patch);

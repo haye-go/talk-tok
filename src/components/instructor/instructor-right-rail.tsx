@@ -87,6 +87,7 @@ export function InstructorRightRail({
       <QuickActionsRailCard
         sessionSlug={sessionSlug}
         selectedQuestionId={selectedQuestion?.id}
+        autoAssignUncertainCategories={shell.visibility.autoAssignUncertainCategories}
       />
 
       <LiveActivityRailSection activity={shell.activity} />

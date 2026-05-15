@@ -1004,7 +1004,11 @@ export const applyAssignments = internalMutation({
         continue;
       }
 
-      if (assignmentInput.decision === "auto" && category) {
+      const shouldAutoAssign =
+        assignmentInput.decision === "auto" ||
+        (assignmentInput.decision === "review" && (session.autoAssignUncertainCategories ?? false));
+
+      if (shouldAutoAssign && category) {
         for (const existing of assignmentsForQuestion) {
           await ctx.db.delete(existing._id);
         }

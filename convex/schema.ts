@@ -47,6 +47,7 @@ export default defineSchema({
     telemetryEnabled: v.boolean(),
     fightMeEnabled: v.boolean(),
     summaryGateEnabled: v.boolean(),
+    autoAssignUncertainCategories: v.optional(v.boolean()),
     createdAt: timestamp,
     updatedAt: timestamp,
   })

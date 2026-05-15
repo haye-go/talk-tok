@@ -70,6 +70,7 @@ function toSessionSnapshot(session: Doc<"sessions">, participantCount: number) {
     telemetryEnabled: session.telemetryEnabled,
     fightMeEnabled: session.fightMeEnabled,
     summaryGateEnabled: session.summaryGateEnabled,
+    autoAssignUncertainCategories: session.autoAssignUncertainCategories ?? false,
     participantCount,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
@@ -551,6 +552,7 @@ export const shell = query({
         anonymityMode: session.anonymityMode,
         fightMeEnabled: session.fightMeEnabled,
         summaryGateEnabled: session.summaryGateEnabled,
+        autoAssignUncertainCategories: session.autoAssignUncertainCategories ?? false,
         telemetryEnabled: session.telemetryEnabled,
       },
       counters: {

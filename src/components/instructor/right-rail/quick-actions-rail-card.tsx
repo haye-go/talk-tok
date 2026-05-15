@@ -11,16 +11,19 @@ type CategoryAssignmentScope = "uncategorised_posts" | "all_posts";
 export interface QuickActionsRailCardProps {
   sessionSlug: string;
   selectedQuestionId: Id<"sessionQuestions"> | undefined;
+  autoAssignUncertainCategories: boolean;
 }
 
 export function QuickActionsRailCard({
   sessionSlug,
   selectedQuestionId,
+  autoAssignUncertainCategories,
 }: QuickActionsRailCardProps) {
   const { previewPassword } = useInstructorPreviewAuth();
   const generateCategories = useMutation(api.categorisation.generateCategories);
   const assignCategories = useMutation(api.categorisation.assignCategories);
   const generateClassSynthesis = useMutation(api.synthesis.generateClassSynthesis);
+  const updateSessionSettings = useMutation(api.instructorControls.updateSettings);
 
   const [generationMode, setGenerationMode] = useState<CategoryGenerationMode>("append");
   const [assignmentScope, setAssignmentScope] =
@@ -28,6 +31,7 @@ export function QuickActionsRailCard({
   const [categoryBusy, setCategoryBusy] = useState<"generate" | "assign" | null>(null);
   const [categoryMessage, setCategoryMessage] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [toggleBusy, setToggleBusy] = useState(false);
   const [synthBusy, setSynthBusy] = useState(false);
 
   async function handleGenerateCategories() {
@@ -77,6 +81,30 @@ export function QuickActionsRailCard({
       );
     } finally {
       setCategoryBusy(null);
+    }
+  }
+
+  async function handleToggleUncertainCategories() {
+    setToggleBusy(true);
+    setCategoryMessage(null);
+    setCategoryError(null);
+    try {
+      await updateSessionSettings({
+        sessionSlug,
+        autoAssignUncertainCategories: !autoAssignUncertainCategories,
+        previewPassword: previewPassword ?? "",
+      });
+      setCategoryMessage(
+        !autoAssignUncertainCategories
+          ? "Unsure categories will be auto-assigned."
+          : "Unsure categories will need review.",
+      );
+    } catch (error) {
+      setCategoryError(
+        error instanceof Error ? error.message : "Failed to update category assignment mode.",
+      );
+    } finally {
+      setToggleBusy(false);
     }
   }
 
@@ -136,6 +164,26 @@ export function QuickActionsRailCard({
 
         <div className="rounded-xl border border-[#eadfcb] bg-white/60 p-3">
           <p className="text-xs font-semibold text-[var(--c-ink)]">Assign Categories</p>
+          <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-[#eadfcb] bg-[#fffaf2] px-3 py-2">
+            <span className="text-xs leading-4 text-[var(--c-muted)]">
+              Auto-assign unsure categories
+            </span>
+            <button
+              type="button"
+              disabled={toggleBusy}
+              onClick={() => void handleToggleUncertainCategories()}
+              className={[
+                "rounded-full px-2.5 py-1 text-[10px] font-bold transition",
+                autoAssignUncertainCategories
+                  ? "bg-[#dff6f0] text-[#0f766e] hover:bg-[#cdebd9]"
+                  : "bg-[#edf2f7] text-[var(--c-muted)] hover:bg-[#dfe6ed]",
+                toggleBusy ? "cursor-wait opacity-70" : "cursor-pointer",
+              ].join(" ")}
+              aria-pressed={autoAssignUncertainCategories}
+            >
+              {toggleBusy ? "Saving" : autoAssignUncertainCategories ? "On" : "Off"}
+            </button>
+          </div>
           <div className="mt-2 grid gap-1.5 text-xs text-[var(--c-muted)]">
             <label className="inline-flex items-center gap-2">
               <input
