@@ -93,12 +93,9 @@ interface PersonalReportSummary {
   status: string;
   participationBand?: string | null;
   reasoningBand?: string | null;
-  originalityBand?: string | null;
-  responsivenessBand?: string | null;
   summary?: string | null;
   contributionTrace?: string | null;
   argumentEvolution?: string | null;
-  growthOpportunity?: string | null;
   error?: string | null;
 }
 
@@ -128,13 +125,6 @@ const BAND_LABELS: Record<string, string> = {
   solid: "Solid",
   strong: "Strong",
   exceptional: "Exceptional",
-  common: "Common",
-  above_average: "Above Avg",
-  distinctive: "Distinctive",
-  novel: "Novel",
-  limited: "Limited",
-  responsive: "Responsive",
-  highly_responsive: "Highly Responsive",
 };
 
 export function MyZoneTab({
@@ -366,29 +356,11 @@ function PersonalReportSection({
               {BAND_LABELS[personalReport.reasoningBand] ?? personalReport.reasoningBand}
             </Badge>
           ) : null}
-          {personalReport.originalityBand ? (
-            <Badge tone="mustard">
-              {BAND_LABELS[personalReport.originalityBand] ?? personalReport.originalityBand}
-            </Badge>
-          ) : null}
-          {personalReport.responsivenessBand ? (
-            <Badge tone="cream">
-              {BAND_LABELS[personalReport.responsivenessBand] ?? personalReport.responsivenessBand}
-            </Badge>
-          ) : null}
         </div>
         {personalReport.summary ? (
           <p className="mt-3 text-sm leading-relaxed text-[var(--c-body)]">
             {personalReport.summary}
           </p>
-        ) : null}
-        {personalReport.growthOpportunity ? (
-          <div className="mt-3 rounded-md bg-[var(--c-sig-cream)] p-3">
-            <p className="text-xs font-medium text-[var(--c-sig-mustard)]">Growth opportunity</p>
-            <p className="mt-1 text-sm leading-relaxed text-[var(--c-on-sig-light-body)]">
-              {personalReport.growthOpportunity}
-            </p>
-          </div>
         ) : null}
       </Card>
     );

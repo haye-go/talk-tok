@@ -32,17 +32,6 @@ const reasoningBandValidator = v.union(
   v.literal("strong"),
   v.literal("exceptional"),
 );
-const originalityBandValidator = v.union(
-  v.literal("common"),
-  v.literal("above_average"),
-  v.literal("distinctive"),
-  v.literal("novel"),
-);
-const responsivenessBandValidator = v.union(
-  v.literal("limited"),
-  v.literal("responsive"),
-  v.literal("highly_responsive"),
-);
 
 function normalizeSessionSlug(value: string) {
   return value
@@ -104,12 +93,9 @@ function toReport(report: Doc<"personalReports">) {
     status: report.status,
     participationBand: report.participationBand,
     reasoningBand: report.reasoningBand,
-    originalityBand: report.originalityBand,
-    responsivenessBand: report.responsivenessBand,
     summary: report.summary,
     contributionTrace: report.contributionTrace,
     argumentEvolution: report.argumentEvolution,
-    growthOpportunity: report.growthOpportunity,
     citedArtifactIds: report.citedArtifactIds,
     promptTemplateKey: report.promptTemplateKey,
     llmCallId: report.llmCallId,
@@ -564,12 +550,9 @@ export const markReportSuccess = internalMutation({
     jobId: v.id("aiJobs"),
     participationBand: participationBandValidator,
     reasoningBand: reasoningBandValidator,
-    originalityBand: originalityBandValidator,
-    responsivenessBand: responsivenessBandValidator,
     summary: v.string(),
     contributionTrace: v.string(),
     argumentEvolution: v.string(),
-    growthOpportunity: v.string(),
     citedArtifactIds: v.array(v.id("synthesisArtifacts")),
     promptTemplateKey: v.string(),
     llmCallId: v.id("llmCalls"),
@@ -580,12 +563,12 @@ export const markReportSuccess = internalMutation({
       status: "success",
       participationBand: args.participationBand,
       reasoningBand: args.reasoningBand,
-      originalityBand: args.originalityBand,
-      responsivenessBand: args.responsivenessBand,
+      originalityBand: undefined,
+      responsivenessBand: undefined,
       summary: args.summary,
       contributionTrace: args.contributionTrace,
       argumentEvolution: args.argumentEvolution,
-      growthOpportunity: args.growthOpportunity,
+      growthOpportunity: undefined,
       citedArtifactIds: args.citedArtifactIds,
       promptTemplateKey: args.promptTemplateKey,
       llmCallId: args.llmCallId,
@@ -688,7 +671,6 @@ export const generateReport = internalAction({
               submissionId: row.submissionId,
               status: row.status,
               reasoningBand: row.reasoningBand,
-              originalityBand: row.originalityBand,
               specificityBand: row.specificityBand,
               summary: row.summary,
             })),
@@ -730,16 +712,6 @@ export const generateReport = internalAction({
           ["emerging", "solid", "strong", "exceptional"] as const,
           "solid",
         ),
-        originalityBand: bandOrDefault(
-          data.originalityBand,
-          ["common", "above_average", "distinctive", "novel"] as const,
-          "above_average",
-        ),
-        responsivenessBand: bandOrDefault(
-          data.responsivenessBand,
-          ["limited", "responsive", "highly_responsive"] as const,
-          "responsive",
-        ),
         summary: stringOrFallback(data.summary, "Your discussion report is ready."),
         contributionTrace: stringOrFallback(
           data.contributionTrace,
@@ -748,10 +720,6 @@ export const generateReport = internalAction({
         argumentEvolution: stringOrFallback(
           data.argumentEvolution,
           "Your argument evolution will become clearer as more follow-ups are added.",
-        ),
-        growthOpportunity: stringOrFallback(
-          data.growthOpportunity,
-          "Try engaging directly with an opposing view in the next round.",
         ),
         citedArtifactIds: artifacts.slice(0, 8).map((artifact) => artifact._id),
         promptTemplateKey: "report.personal.v1",

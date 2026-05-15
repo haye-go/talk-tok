@@ -29,8 +29,6 @@ interface PersonalReport {
   status: string;
   participationBand?: string | null;
   reasoningBand?: string | null;
-  originalityBand?: string | null;
-  responsivenessBand?: string | null;
   summary?: string | null;
   error?: string | null;
   generatedAt?: number | null;
@@ -53,13 +51,6 @@ const BAND_LABELS: Record<string, string> = {
   solid: "Solid",
   strong: "Strong",
   exceptional: "Exceptional",
-  common: "Common",
-  above_average: "Above Avg",
-  distinctive: "Distinctive",
-  novel: "Novel",
-  limited: "Limited",
-  responsive: "Responsive",
-  highly_responsive: "Highly Responsive",
 };
 
 export function SynthesizeAct({
@@ -172,11 +163,6 @@ export function SynthesizeAct({
               {personalReport.reasoningBand && (
                 <Badge tone="peach" className="text-[9px]">
                   {BAND_LABELS[personalReport.reasoningBand] ?? personalReport.reasoningBand}
-                </Badge>
-              )}
-              {personalReport.originalityBand && (
-                <Badge tone="mustard" className="text-[9px]">
-                  {BAND_LABELS[personalReport.originalityBand] ?? personalReport.originalityBand}
                 </Badge>
               )}
             </div>

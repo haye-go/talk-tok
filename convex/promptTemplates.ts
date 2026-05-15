@@ -11,6 +11,11 @@ const CATEGORISATION_PROMPT_KEYS = new Set([
   "category.assign.single.v1",
   "submission.type.classify.v1",
 ]);
+const SYNC_DEFAULT_PROMPT_KEYS = new Set(["report.personal.v1"]);
+
+function jsonEqual(left: unknown, right: unknown) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
 
 const DEFAULT_PROMPTS = [
   {
@@ -420,7 +425,7 @@ const DEFAULT_PROMPTS = [
     surface: "personal_report",
     systemPrompt: [
       "You write a private participant reflection report for a live discussion.",
-      "Focus on reasoning, responsiveness, originality, and contribution trace.",
+      "Focus on participation, reasoning, contribution trace, and argument evolution.",
       "Use telemetry only as soft context, not as proof of misconduct.",
       "Keep the tone constructive, specific, and non-accusatory.",
       "Return strict JSON matching the requested schema.",
@@ -437,7 +442,7 @@ const DEFAULT_PROMPTS = [
       "Fight Me summaries: {{fightDebriefsJson}}",
       "Published synthesis artifacts: {{artifactsJson}}",
       "",
-      "Return JSON with participationBand, reasoningBand, originalityBand, responsivenessBand, summary, contributionTrace, argumentEvolution, growthOpportunity.",
+      "Return JSON with participationBand, reasoningBand, summary, contributionTrace, argumentEvolution.",
     ].join("\n"),
     modelOverride: "openai:gpt-4.1",
     variablesJson: {
@@ -489,6 +494,27 @@ export const seedDefaults = mutation({
         .unique();
 
       if (existing) {
+        if (
+          SYNC_DEFAULT_PROMPT_KEYS.has(prompt.key) &&
+          (existing.name !== prompt.name ||
+            existing.surface !== prompt.surface ||
+            existing.systemPrompt !== prompt.systemPrompt ||
+            existing.userTemplate !== prompt.userTemplate ||
+            existing.modelOverride !== prompt.modelOverride ||
+            !jsonEqual(existing.variablesJson, prompt.variablesJson))
+        ) {
+          await ctx.db.patch(existing._id, {
+            name: prompt.name,
+            surface: prompt.surface,
+            systemPrompt: prompt.systemPrompt,
+            userTemplate: prompt.userTemplate,
+            modelOverride: prompt.modelOverride,
+            variablesJson: prompt.variablesJson,
+            version: existing.version + 1,
+            updatedAt: now(),
+          });
+          inserted += 1;
+        }
         if (
           CATEGORISATION_PROMPT_KEYS.has(prompt.key) &&
           existing.modelOverride !== prompt.modelOverride

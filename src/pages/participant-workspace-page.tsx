@@ -47,19 +47,6 @@ const REASONING_LABELS: Record<string, string> = {
   exceptional: "Exceptional",
 };
 
-const ORIGINALITY_LABELS: Record<string, string> = {
-  common: "Common",
-  above_average: "Above Avg",
-  distinctive: "Distinctive",
-  novel: "Novel",
-};
-
-const RESPONSIVENESS_LABELS: Record<string, string> = {
-  limited: "Limited",
-  responsive: "Responsive",
-  highly_responsive: "Highly Responsive",
-};
-
 interface ParticipantWorkspacePageProps {
   sessionSlug: string;
   initialTab?: TabId;
@@ -71,12 +58,9 @@ interface PersonalReportView {
   status: "queued" | "processing" | "error" | "success";
   participationBand?: string | null;
   reasoningBand?: string | null;
-  originalityBand?: string | null;
-  responsivenessBand?: string | null;
   summary?: string | null;
   contributionTrace?: string | null;
   argumentEvolution?: string | null;
-  growthOpportunity?: string | null;
   generatedAt?: number | null;
   error?: string | null;
 }
@@ -739,20 +723,12 @@ function ReviewDetail({ report, generating, onGenerate }: ReviewDetailProps) {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         <MetricTile
           label="Participation"
           value={PARTICIPATION_LABELS[report.participationBand ?? ""] ?? "-"}
         />
         <MetricTile label="Reasoning" value={REASONING_LABELS[report.reasoningBand ?? ""] ?? "-"} />
-        <MetricTile
-          label="Originality"
-          value={ORIGINALITY_LABELS[report.originalityBand ?? ""] ?? "-"}
-        />
-        <MetricTile
-          label="Responsiveness"
-          value={RESPONSIVENESS_LABELS[report.responsivenessBand ?? ""] ?? "-"}
-        />
       </div>
 
       {report.summary ? (
@@ -770,17 +746,6 @@ function ReviewDetail({ report, generating, onGenerate }: ReviewDetailProps) {
       {report.argumentEvolution ? (
         <Card title="Argument Evolution">
           <p className="text-xs leading-relaxed text-[var(--c-body)]">{report.argumentEvolution}</p>
-        </Card>
-      ) : null}
-
-      {report.growthOpportunity ? (
-        <Card tone="cream">
-          <p className="font-display text-xs font-semibold text-[var(--c-sig-mustard)]">
-            Growth Opportunity
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--c-on-sig-light-body)]">
-            {report.growthOpportunity}
-          </p>
         </Card>
       ) : null}
 

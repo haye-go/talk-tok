@@ -17,12 +17,9 @@ interface PersonalReportItem {
   status: "queued" | "processing" | "success" | "error";
   participationBand?: string | null;
   reasoningBand?: string | null;
-  originalityBand?: string | null;
-  responsivenessBand?: string | null;
   summary?: string | null;
   contributionTrace?: string | null;
   argumentEvolution?: string | null;
-  growthOpportunity?: string | null;
   submissionCount: number;
   followUpCount: number;
   fightCount: number;
@@ -130,8 +127,7 @@ export function PersonalReportsMasterDetailPanel({
   return (
     <Card title="Personal Reports">
       <p className="mb-3 text-xs leading-5 text-[var(--c-muted)]">
-        Reports can be generated before they are released. Select a learner to preview their
-        report.
+        Reports can be generated before they are released. Select a learner to preview their report.
       </p>
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <Badge tone={reportsReleasedForQuestion ? "success" : "warning"}>
@@ -142,12 +138,16 @@ export function PersonalReportsMasterDetailPanel({
             <strong className="text-[var(--c-ink)]">{counts.total}</strong>{" "}
             <span className="text-[var(--c-muted)]">total</span>
           </span>
-          <span aria-hidden className="text-[var(--c-muted)]">·</span>
+          <span aria-hidden className="text-[var(--c-muted)]">
+            ·
+          </span>
           <span>
             <strong className="text-[var(--c-ink)]">{counts.success}</strong>{" "}
             <span className="text-[var(--c-muted)]">success</span>
           </span>
-          <span aria-hidden className="text-[var(--c-muted)]">·</span>
+          <span aria-hidden className="text-[var(--c-muted)]">
+            ·
+          </span>
           <span>
             <strong
               className={
@@ -160,11 +160,11 @@ export function PersonalReportsMasterDetailPanel({
             </strong>{" "}
             <span className="text-[var(--c-muted)]">processing</span>
           </span>
-          <span aria-hidden className="text-[var(--c-muted)]">·</span>
+          <span aria-hidden className="text-[var(--c-muted)]">
+            ·
+          </span>
           <span>
-            <strong
-              className={counts.error > 0 ? "text-[var(--c-error)]" : "text-[var(--c-ink)]"}
-            >
+            <strong className={counts.error > 0 ? "text-[var(--c-error)]" : "text-[var(--c-ink)]"}>
               {counts.error}
             </strong>{" "}
             <span className="text-[var(--c-muted)]">error</span>
@@ -255,26 +255,14 @@ export function PersonalReportsMasterDetailPanel({
               {selected.argumentEvolution ? (
                 <DetailBlock label="Argument Evolution" body={selected.argumentEvolution} />
               ) : null}
-              {selected.growthOpportunity ? (
-                <DetailBlock label="Growth Opportunity" body={selected.growthOpportunity} />
-              ) : null}
 
-              {(selected.participationBand ||
-                selected.reasoningBand ||
-                selected.originalityBand ||
-                selected.responsivenessBand) ? (
+              {selected.participationBand || selected.reasoningBand ? (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {selected.participationBand ? (
                     <Badge tone="sky">Participation: {selected.participationBand}</Badge>
                   ) : null}
                   {selected.reasoningBand ? (
                     <Badge tone="sky">Reasoning: {selected.reasoningBand}</Badge>
-                  ) : null}
-                  {selected.originalityBand ? (
-                    <Badge tone="mustard">Originality: {selected.originalityBand}</Badge>
-                  ) : null}
-                  {selected.responsivenessBand ? (
-                    <Badge tone="sky">Responsiveness: {selected.responsivenessBand}</Badge>
                   ) : null}
                 </div>
               ) : null}
