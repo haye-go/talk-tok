@@ -58,6 +58,8 @@ type PublicSubmissionResult = {
   pasteEventCount: number;
   keystrokeCount: number;
   inputPattern: "composed_gradually" | "likely_pasted" | "mixed" | "unknown";
+  answeredAt?: number;
+  answeredBy?: "instructor";
   createdAt: number;
 };
 
@@ -216,6 +218,8 @@ function toSubmission(
     compositionMs: submission.compositionMs,
     pasteEventCount: submission.pasteEventCount,
     inputPattern: submission.inputPattern,
+    answeredAt: submission.answeredAt,
+    answeredBy: submission.answeredBy,
     createdAt: submission.createdAt,
   };
 }
@@ -334,6 +338,17 @@ function isTopLevelMessage(submission: Doc<"submissions">) {
     !submission.followUpPromptId &&
     (submission.kind === "initial" || submission.kind === "additional_point")
   );
+}
+
+function compareThreadRootsByAnswerStatus(left: Doc<"submissions">, right: Doc<"submissions">) {
+  const leftAnswered = Boolean(left.answeredAt);
+  const rightAnswered = Boolean(right.answeredAt);
+
+  if (leftAnswered !== rightAnswered) {
+    return leftAnswered ? 1 : -1;
+  }
+
+  return right.createdAt - left.createdAt;
 }
 
 export const overview = query({
@@ -910,7 +925,7 @@ export const overview = query({
               (submission) =>
                 submission.participantId !== participant._id && isTopLevelMessage(submission),
             )
-            .sort((left, right) => right.createdAt - left.createdAt)
+            .sort(compareThreadRootsByAnswerStatus)
             .slice(0, PEER_RESPONSE_LIMIT)
             .map((submission) => toThread(submission))
         : [];
@@ -1047,7 +1062,11 @@ export const overview = query({
     const peerResponses =
       needsExplore && session.visibilityMode === "raw_responses_visible"
         ? sessionSubmissions
-            .filter((submission) => submission.participantId !== participant._id)
+            .filter(
+              (submission) =>
+                submission.participantId !== participant._id && isTopLevelMessage(submission),
+            )
+            .sort(compareThreadRootsByAnswerStatus)
             .slice(0, PEER_RESPONSE_LIMIT)
             .map((submission) => {
               const assignment = assignmentBySubmission.get(submission._id);

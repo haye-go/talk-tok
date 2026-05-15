@@ -20,6 +20,36 @@ interface CategoryGroup {
   threads: ThreadCardData[];
 }
 
+function splitAnsweredThreads(threads: ThreadCardData[]) {
+  return {
+    openThreads: threads.filter((thread) => !thread.root.submission.answeredAt),
+    answeredThreads: threads.filter((thread) => thread.root.submission.answeredAt),
+  };
+}
+
+function ThreadSectionList({ threads }: { threads: ThreadCardData[] }) {
+  const { openThreads, answeredThreads } = splitAnsweredThreads(threads);
+
+  return (
+    <div className="grid gap-3">
+      {openThreads.map((thread) => (
+        <ThreadCard key={thread.root.submission.id} thread={thread} />
+      ))}
+      {answeredThreads.length > 0 ? (
+        <div className="mt-1 grid gap-3 border-t border-[var(--c-hairline)] pt-3">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="font-display text-sm font-medium text-[var(--c-ink)]">Answered</h4>
+            <Badge tone="success">{answeredThreads.length}</Badge>
+          </div>
+          {answeredThreads.map((thread) => (
+            <ThreadCard key={thread.root.submission.id} thread={thread} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export interface RoomCategoriesBoardProps {
   sessionSlug: string;
   selectedQuestionId: Id<"sessionQuestions"> | undefined;
@@ -177,9 +207,7 @@ export function RoomCategoriesBoard({
             </h3>
             <Badge tone="warning">{uncategorizedThreads.length}</Badge>
           </div>
-          {uncategorizedThreads.map((thread) => (
-            <ThreadCard key={thread.root.submission.id} thread={thread} />
-          ))}
+          <ThreadSectionList threads={uncategorizedThreads} />
         </section>
       ) : null}
 
@@ -209,7 +237,7 @@ export function RoomCategoriesBoard({
             <Badge tone="neutral">{threads.length}</Badge>
           </div>
           {threads.length > 0 ? (
-            threads.map((thread) => <ThreadCard key={thread.root.submission.id} thread={thread} />)
+            <ThreadSectionList threads={threads} />
           ) : (
             <Card>
               <p className="text-sm text-[var(--c-muted)]">

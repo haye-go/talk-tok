@@ -168,6 +168,8 @@ function toSubmission(
     categoryName: assignment?.categoryName,
     categorySlug: assignment?.categorySlug,
     categoryStatus: assignment?.categoryStatus,
+    answeredAt: submission.answeredAt,
+    answeredBy: submission.answeredBy,
     createdAt: submission.createdAt,
   };
 }
@@ -178,6 +180,17 @@ function isTopLevelMessage(submission: Doc<"submissions">) {
     !submission.followUpPromptId &&
     (submission.kind === "initial" || submission.kind === "additional_point")
   );
+}
+
+function compareThreadRootsByAnswerStatus(left: Doc<"submissions">, right: Doc<"submissions">) {
+  const leftAnswered = Boolean(left.answeredAt);
+  const rightAnswered = Boolean(right.answeredAt);
+
+  if (leftAnswered !== rightAnswered) {
+    return leftAnswered ? 1 : -1;
+  }
+
+  return right.createdAt - left.createdAt;
 }
 
 export const room = query({
@@ -359,7 +372,7 @@ export const room = query({
 
     const latestThreads = submissions
       .filter(isTopLevelMessage)
-      .sort((left, right) => right.createdAt - left.createdAt)
+      .sort(compareThreadRootsByAnswerStatus)
       .map(toThread);
     const threadsByCategory = activeCategories.map((category) => ({
       category: {

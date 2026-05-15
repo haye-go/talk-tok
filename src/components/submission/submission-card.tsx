@@ -18,6 +18,8 @@ export interface SubmissionCardData {
   pasteEventCount: number;
   keystrokeCount: number;
   compositionMs?: number;
+  answeredAt?: number;
+  answeredBy?: "instructor";
   createdAt: number;
 }
 
@@ -71,6 +73,7 @@ export function SubmissionCard({
             {submission.classifiedType}
           </Badge>
         ) : null}
+        {submission.answeredAt ? <Badge tone="success">Answered</Badge> : null}
         <Badge tone={submission.inputPattern === "likely_pasted" ? "warning" : "neutral"}>
           {inputPatternLabel(submission.inputPattern)}
         </Badge>

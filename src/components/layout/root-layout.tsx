@@ -1,5 +1,10 @@
 import { Outlet } from "@tanstack/react-router";
+import { InstructorPreviewAuthProvider } from "@/hooks/use-instructor-preview-auth";
 
 export function RootLayout() {
-  return <Outlet />;
+  return (
+    <InstructorPreviewAuthProvider>
+      <Outlet />
+    </InstructorPreviewAuthProvider>
+  );
 }

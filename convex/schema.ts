@@ -148,6 +148,8 @@ export default defineSchema({
       v.literal("mixed"),
       v.literal("unknown"),
     ),
+    answeredAt: v.optional(timestamp),
+    answeredBy: v.optional(v.literal("instructor")),
     createdAt: timestamp,
   })
     .index("by_session", ["sessionId"])

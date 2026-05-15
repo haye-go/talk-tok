@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { ChatCircleText, SquaresFour, Sword, TextAlignLeft } from "@phosphor-icons/react";
+import {
+  ArrowCounterClockwise,
+  ChatCircleText,
+  CheckCircle,
+  SquaresFour,
+  Sword,
+  TextAlignLeft,
+} from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { api } from "../../../convex/_generated/api";
@@ -17,6 +24,7 @@ import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { categoryColorToTone } from "@/lib/category-colors";
 import { cn } from "@/lib/utils";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 
 interface PeerResponse {
   id: Id<"submissions">;
@@ -27,6 +35,8 @@ interface PeerResponse {
   categoryId?: Id<"categories"> | null;
   categoryName?: string | null;
   categoryColor?: string | null;
+  answeredAt?: number;
+  answeredBy?: "instructor";
   createdAt: number;
 }
 
@@ -42,6 +52,8 @@ interface ThreadSubmission {
   nickname: string;
   body: string;
   kind: "initial" | "additional_point" | "reply" | "fight_me_turn";
+  answeredAt?: number;
+  answeredBy?: "instructor";
   createdAt: number;
 }
 
@@ -127,6 +139,13 @@ interface StreamTabProps {
 
 type RoomMode = "latest" | "category" | "synthesis";
 
+function splitAnsweredThreads(threads: PeerThread[]) {
+  return {
+    openThreads: threads.filter((thread) => !thread.root.submission.answeredAt),
+    answeredThreads: threads.filter((thread) => thread.root.submission.answeredAt),
+  };
+}
+
 function threadFromPeerResponse(response: PeerResponse): PeerThread {
   return {
     root: {
@@ -135,6 +154,8 @@ function threadFromPeerResponse(response: PeerResponse): PeerThread {
         nickname: response.nickname,
         body: response.body,
         kind: "initial",
+        answeredAt: response.answeredAt,
+        answeredBy: response.answeredBy,
         createdAt: response.createdAt,
       },
       stats: {
@@ -180,13 +201,19 @@ export function StreamTab({
   mySubmissionId,
   onFightCreated,
 }: StreamTabProps) {
+  const { previewPassword } = useInstructorPreviewAuth();
   const [roomMode, setRoomMode] = useState<RoomMode>("latest");
   const [replyParentId, setReplyParentId] = useState<Id<"submissions"> | null>(null);
   const [replyError, setReplyError] = useState<string | null>(null);
+  const [answerError, setAnswerError] = useState<string | null>(null);
   const [creatingFightFor, setCreatingFightFor] = useState<Id<"submissions"> | null>(null);
+  const [answeringSubmissionId, setAnsweringSubmissionId] = useState<Id<"submissions"> | null>(
+    null,
+  );
 
   const createReply = useMutation(api.submissions.create);
   const createChallenge = useMutation(api.fightMe.createChallenge);
+  const setAnswered = useMutation(api.submissionStatus.setAnswered);
 
   const cats = categories ?? [];
   const latestThreads = peerThreads ?? (peerResponses ?? []).map(threadFromPeerResponse);
@@ -241,10 +268,42 @@ export function StreamTab({
     }
   }
 
+  async function handleToggleAnswered(thread: PeerThread) {
+    if (!previewPassword || answeringSubmissionId) {
+      return;
+    }
+
+    const submission = thread.root.submission;
+
+    setAnswerError(null);
+    setAnsweringSubmissionId(submission.id);
+    try {
+      await setAnswered({
+        previewPassword,
+        submissionId: submission.id,
+        answered: !submission.answeredAt,
+      });
+    } catch (cause) {
+      setAnswerError(cause instanceof Error ? cause.message : "Could not update answer status.");
+    } finally {
+      setAnsweringSubmissionId(null);
+    }
+  }
+
   function renderThread(thread: PeerThread, hideCategoryPill = false) {
     const submission = thread.root.submission;
     const replyOpen = replyParentId === submission.id;
     const creatingFight = creatingFightFor === submission.id;
+    const updatingAnswered = answeringSubmissionId === submission.id;
+    const instructorAnswerAction = previewPassword ? (
+      <ParticipantThreadAction
+        disabled={updatingAnswered}
+        onClick={() => void handleToggleAnswered(thread)}
+      >
+        {submission.answeredAt ? <ArrowCounterClockwise size={12} /> : <CheckCircle size={12} />}
+        {updatingAnswered ? "Saving..." : submission.answeredAt ? "Reopen" : "Mark answered"}
+      </ParticipantThreadAction>
+    ) : null;
 
     return (
       <div key={submission.id} className="flex flex-col gap-2">
@@ -255,6 +314,7 @@ export function StreamTab({
             hideCategoryPill ? undefined : (thread.assignment?.categoryName ?? undefined)
           }
           categoryTone={categoryColorToTone(thread.assignment?.categoryColor)}
+          answeredAt={submission.answeredAt}
           replies={thread.replies.map((reply) => ({
             id: reply.submission.id,
             authorLabel: reply.submission.nickname,
@@ -265,6 +325,7 @@ export function StreamTab({
           actions={
             sessionSlug && clientKey ? (
               <>
+                {instructorAnswerAction}
                 <ParticipantThreadAction
                   disabled={!repliesEnabled}
                   onClick={() => setReplyParentId(replyOpen ? null : submission.id)}
@@ -290,7 +351,9 @@ export function StreamTab({
                   disabled={!upvotesEnabled}
                 />
               </>
-            ) : null
+            ) : (
+              instructorAnswerAction
+            )
           }
         />
 
@@ -317,9 +380,20 @@ export function StreamTab({
       );
     }
 
+    const { openThreads, answeredThreads } = splitAnsweredThreads(latestThreads);
+
     return (
       <div className="flex flex-col gap-3">
-        {latestThreads.map((thread) => renderThread(thread))}
+        {openThreads.map((thread) => renderThread(thread))}
+        {answeredThreads.length > 0 ? (
+          <section className="mt-1 flex flex-col gap-3 border-t border-[var(--c-hairline)] pt-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-display text-sm font-medium text-[var(--c-ink)]">Answered</h3>
+              <Badge tone="success">{answeredThreads.length}</Badge>
+            </div>
+            {answeredThreads.map((thread) => renderThread(thread))}
+          </section>
+        ) : null}
       </div>
     );
   }
@@ -337,28 +411,43 @@ export function StreamTab({
 
     return (
       <div className="flex flex-col gap-4">
-        {visibleSections.map((section, index) => (
-          <section
-            key={section.category?.id ?? "uncategorized"}
-            className="rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
-          >
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              {section.category ? (
-                <Badge tone={categoryColorToTone(section.category.color, index)}>
-                  {section.category.name}
-                </Badge>
-              ) : (
-                <Badge tone="neutral">Uncategorized</Badge>
-              )}
-              <span className="text-[11px] text-[var(--c-muted)]">
-                {section.threadCount} {section.threadCount === 1 ? "message" : "messages"}
-              </span>
-            </div>
-            <div className="flex flex-col gap-3">
-              {section.threads.map((t) => renderThread(t, true))}
-            </div>
-          </section>
-        ))}
+        {visibleSections.map((section, index) => {
+          const { openThreads, answeredThreads } = splitAnsweredThreads(section.threads);
+
+          return (
+            <section
+              key={section.category?.id ?? "uncategorized"}
+              className="rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3"
+            >
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                {section.category ? (
+                  <Badge tone={categoryColorToTone(section.category.color, index)}>
+                    {section.category.name}
+                  </Badge>
+                ) : (
+                  <Badge tone="neutral">Uncategorized</Badge>
+                )}
+                <span className="text-[11px] text-[var(--c-muted)]">
+                  {section.threadCount} {section.threadCount === 1 ? "message" : "messages"}
+                </span>
+              </div>
+              <div className="flex flex-col gap-3">
+                {openThreads.map((thread) => renderThread(thread, true))}
+                {answeredThreads.length > 0 ? (
+                  <section className="mt-1 flex flex-col gap-3 border-t border-[var(--c-hairline)] pt-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <h4 className="font-display text-sm font-medium text-[var(--c-ink)]">
+                        Answered
+                      </h4>
+                      <Badge tone="success">{answeredThreads.length}</Badge>
+                    </div>
+                    {answeredThreads.map((thread) => renderThread(thread, true))}
+                  </section>
+                ) : null}
+              </div>
+            </section>
+          );
+        })}
       </div>
     );
   }
@@ -440,6 +529,8 @@ export function StreamTab({
           </div>
         </Card>
       ) : null}
+
+      {answerError ? <InlineAlert tone="error">{answerError}</InlineAlert> : null}
 
       {!canSeeRawPeerResponses ? (
         <ParticipantStateSection kind="hidden" title="Peer responses">

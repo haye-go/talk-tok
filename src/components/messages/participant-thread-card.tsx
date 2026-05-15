@@ -17,6 +17,7 @@ interface ParticipantThreadCardProps {
   body: string;
   categoryName?: string;
   categoryTone?: NonNullable<BadgeProps["tone"]>;
+  answeredAt?: number;
   replies?: ParticipantThreadReply[];
   actions?: ReactNode;
   children?: ReactNode;
@@ -69,6 +70,7 @@ export function ParticipantThreadCard({
   body,
   categoryName,
   categoryTone = "neutral",
+  answeredAt,
   replies = [],
   actions,
   children,
@@ -87,22 +89,36 @@ export function ParticipantThreadCard({
         className,
       )}
     >
-      {(authorLabel || categoryName) ? (
+      {authorLabel || categoryName || answeredAt ? (
         <div className="flex items-start justify-between gap-3">
           {authorLabel ? (
             <p className="min-w-0 font-display text-xs font-semibold text-[var(--c-ink)]">
               {authorLabel}
             </p>
           ) : null}
-          {categoryName ? (
-            <Badge tone={categoryTone} className="ml-auto min-h-5 shrink-0 px-2 text-[10px]">
-              {categoryName}
-            </Badge>
-          ) : null}
+          <div className="ml-auto flex shrink-0 flex-wrap justify-end gap-1">
+            {answeredAt ? (
+              <Badge tone="success" className="min-h-5 px-2 text-[10px]">
+                Answered
+              </Badge>
+            ) : null}
+            {categoryName ? (
+              <Badge tone={categoryTone} className="min-h-5 px-2 text-[10px]">
+                {categoryName}
+              </Badge>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
-      <p className={cn("text-xs leading-relaxed text-[var(--c-body)]", (authorLabel || categoryName) && "mt-1.5")}>{body}</p>
+      <p
+        className={cn(
+          "text-xs leading-relaxed text-[var(--c-body)]",
+          (authorLabel || categoryName || answeredAt) && "mt-1.5",
+        )}
+      >
+        {body}
+      </p>
 
       {hasActionBar ? (
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1">

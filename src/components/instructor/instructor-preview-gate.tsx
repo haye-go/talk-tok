@@ -2,10 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { LockKey } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import {
-  InstructorPreviewAuthProvider,
-  useInstructorPreviewAuth,
-} from "@/hooks/use-instructor-preview-auth";
+import { useInstructorPreviewAuth } from "@/hooks/use-instructor-preview-auth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -73,9 +70,5 @@ function InstructorPreviewGateInner({ children }: { children: ReactNode }) {
 }
 
 export function InstructorPreviewGate({ children }: { children: ReactNode }) {
-  return (
-    <InstructorPreviewAuthProvider>
-      <InstructorPreviewGateInner>{children}</InstructorPreviewGateInner>
-    </InstructorPreviewAuthProvider>
-  );
+  return <InstructorPreviewGateInner>{children}</InstructorPreviewGateInner>;
 }

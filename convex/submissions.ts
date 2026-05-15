@@ -128,6 +128,8 @@ function toPublicSubmission(
     pasteEventCount: submission.pasteEventCount,
     keystrokeCount: submission.keystrokeCount,
     inputPattern: submission.inputPattern,
+    answeredAt: submission.answeredAt,
+    answeredBy: submission.answeredBy,
     createdAt: submission.createdAt,
   };
 }

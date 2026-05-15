@@ -13,11 +13,18 @@ import { InputPatternsBar } from "./input-patterns-bar";
 import { NeedsAttentionPanel } from "./needs-attention-panel";
 import { RoomCategoriesBoard } from "./room-categories-board";
 import { RoomSimilarityClusters } from "./room-similarity-clusters";
-import { ThreadCard } from "./thread-card";
+import { ThreadCard, type ThreadCardData } from "./thread-card";
 
 interface CategoryRef {
   id: Id<"categories">;
   name: string;
+}
+
+function splitAnsweredThreads(threads: ThreadCardData[]) {
+  return {
+    openThreads: threads.filter((thread) => !thread.root.submission.answeredAt),
+    answeredThreads: threads.filter((thread) => thread.root.submission.answeredAt),
+  };
 }
 
 export interface RoomWorkspaceProps {
@@ -43,6 +50,7 @@ export function RoomWorkspace({
 
   const selectedQuestion = room?.selectedQuestion;
   const latestThreads = room?.latestThreads ?? [];
+  const { openThreads: openLatestThreads, answeredThreads } = splitAnsweredThreads(latestThreads);
   const threadsByCategory = room?.threadsByCategory ?? [];
   const uncategorizedThreads = room?.uncategorizedThreads ?? [];
   const needsAttention = room?.needsAttention;
@@ -128,9 +136,24 @@ export function RoomWorkspace({
               <p className="text-sm text-[var(--c-muted)]">No submissions yet.</p>
             </Card>
           ) : (
-            latestThreads.map((thread) => (
-              <ThreadCard key={thread.root.submission.id} thread={thread} />
-            ))
+            <div className="grid gap-3">
+              {openLatestThreads.map((thread) => (
+                <ThreadCard key={thread.root.submission.id} thread={thread} />
+              ))}
+              {answeredThreads.length > 0 ? (
+                <div className="mt-2 grid gap-3 border-t border-[var(--c-hairline)] pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-display text-sm font-medium text-[var(--c-ink)]">
+                      Answered
+                    </h3>
+                    <Badge tone="success">{answeredThreads.length}</Badge>
+                  </div>
+                  {answeredThreads.map((thread) => (
+                    <ThreadCard key={thread.root.submission.id} thread={thread} />
+                  ))}
+                </div>
+              ) : null}
+            </div>
           )}
         </section>
       ) : null}

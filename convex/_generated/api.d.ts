@@ -44,6 +44,7 @@ import type * as sessionQuestions from "../sessionQuestions.js";
 import type * as sessionTemplates from "../sessionTemplates.js";
 import type * as sessions from "../sessions.js";
 import type * as stageDemo from "../stageDemo.js";
+import type * as submissionStatus from "../submissionStatus.js";
 import type * as submissions from "../submissions.js";
 import type * as synthesis from "../synthesis.js";
 
@@ -90,6 +91,7 @@ declare const fullApi: ApiFromModules<{
   sessionTemplates: typeof sessionTemplates;
   sessions: typeof sessions;
   stageDemo: typeof stageDemo;
+  submissionStatus: typeof submissionStatus;
   submissions: typeof submissions;
   synthesis: typeof synthesis;
 }>;
