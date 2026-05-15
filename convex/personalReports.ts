@@ -56,6 +56,57 @@ function bandOrDefault<T extends string>(value: unknown, allowed: readonly T[], 
   return typeof value === "string" && allowed.includes(value as T) ? (value as T) : fallback;
 }
 
+function inferredSubmissionType(submission: Doc<"submissions">) {
+  if (submission.classifiedType) {
+    return {
+      type: submission.classifiedType,
+      source: submission.classifiedTypeSource ?? "classified",
+    };
+  }
+
+  return {
+    type: submission.body.includes("?") ? "question" : "comment",
+    source: "heuristic",
+  };
+}
+
+function buildContributionMode(submissions: Doc<"submissions">[]) {
+  let questions = 0;
+  let comments = 0;
+
+  for (const submission of submissions) {
+    const inferred = inferredSubmissionType(submission);
+    if (inferred.type === "question") {
+      questions += 1;
+    } else {
+      comments += 1;
+    }
+  }
+
+  const total = questions + comments;
+  const mode =
+    total === 0
+      ? "no_submissions"
+      : questions / total >= 0.67
+        ? "mostly_questions"
+        : comments / total >= 0.67
+          ? "mostly_comments"
+          : "mixed";
+
+  return {
+    mode,
+    questions,
+    comments,
+    total,
+    guidance:
+      mode === "mostly_questions"
+        ? "Evaluate this as Q&A participation. Questions do not need to make fully supported arguments."
+        : mode === "mostly_comments"
+          ? "Evaluate this mainly as comment or argument participation."
+          : "Evaluate this as mixed Q&A and comment participation.",
+  };
+}
+
 async function hashClientKey(clientKey: string) {
   const data = new TextEncoder().encode(clientKey);
   const digest = await crypto.subtle.digest("SHA-256", data);
@@ -628,6 +679,7 @@ export const generateReport = internalAction({
         variables: {
           sessionTitle: session.title,
           openingPrompt: question?.prompt ?? session.openingPrompt,
+          contributionModeJson: JSON.stringify(buildContributionMode(submissions)),
           questionJson: JSON.stringify(
             question
               ? {
@@ -658,6 +710,8 @@ export const generateReport = internalAction({
             submissions.map((submission) => ({
               id: submission._id,
               body: submission.body,
+              classifiedType: inferredSubmissionType(submission).type,
+              classifiedTypeSource: inferredSubmissionType(submission).source,
               kind: submission.kind,
               wordCount: submission.wordCount,
               inputPattern: submission.inputPattern,
@@ -712,15 +766,9 @@ export const generateReport = internalAction({
           ["emerging", "solid", "strong", "exceptional"] as const,
           "solid",
         ),
-        summary: stringOrFallback(data.summary, "Your discussion report is ready."),
-        contributionTrace: stringOrFallback(
-          data.contributionTrace,
-          "Your contributions were included in the session discussion record.",
-        ),
-        argumentEvolution: stringOrFallback(
-          data.argumentEvolution,
-          "Your argument evolution will become clearer as more follow-ups are added.",
-        ),
+        summary: stringOrFallback(data.summary, ""),
+        contributionTrace: stringOrFallback(data.contributionTrace, ""),
+        argumentEvolution: stringOrFallback(data.argumentEvolution, ""),
         citedArtifactIds: artifacts.slice(0, 8).map((artifact) => artifact._id),
         promptTemplateKey: "report.personal.v1",
         llmCallId: result.llmCallId,

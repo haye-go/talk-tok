@@ -628,9 +628,11 @@ function MeTabContent({
         positionShifts={positionShifts}
         personalReport={personalReport}
         personalReportsVisible={personalReportsVisible}
+        generatingReport={generatingReport}
         loading={loading}
         onViewFight={onViewFight}
         onViewReport={onViewReport}
+        onGenerateReport={onGenerateReport}
       />
       <Card eyebrow="Settings">
         <form className="grid gap-3" onSubmit={(event) => void onNicknameSubmit(event)}>

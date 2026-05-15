@@ -105,9 +105,11 @@ interface MyZoneTabProps {
   positionShifts?: PositionShift[];
   personalReport?: PersonalReportSummary | null;
   personalReportsVisible?: boolean;
+  generatingReport?: boolean;
   loading?: boolean;
   onViewFight?: (fightSlug: string) => void;
   onViewReport?: () => void;
+  onGenerateReport?: () => Promise<void>;
 }
 
 function formatTime(timestamp: number) {
@@ -133,9 +135,11 @@ export function MyZoneTab({
   positionShifts,
   personalReport,
   personalReportsVisible = false,
+  generatingReport = false,
   loading,
   onViewFight,
   onViewReport,
+  onGenerateReport,
 }: MyZoneTabProps) {
   const archiveSections = myArchiveByQuestion ?? [];
   const fights = fightThreads ?? [];
@@ -156,7 +160,9 @@ export function MyZoneTab({
       <PersonalReportSection
         personalReport={personalReport}
         personalReportsVisible={personalReportsVisible}
+        generatingReport={generatingReport}
         onViewReport={onViewReport}
+        onGenerateReport={onGenerateReport}
       />
 
       {contributionCount > 0 || followUpCount > 0 || fightCount > 0 || shiftCount > 0 ? (
@@ -306,11 +312,15 @@ export function MyZoneTab({
 function PersonalReportSection({
   personalReport,
   personalReportsVisible,
+  generatingReport,
   onViewReport,
+  onGenerateReport,
 }: {
   personalReport?: PersonalReportSummary | null;
   personalReportsVisible: boolean;
+  generatingReport: boolean;
   onViewReport?: () => void;
+  onGenerateReport?: () => Promise<void>;
 }) {
   if (!personalReportsVisible) {
     if (personalReport?.status === "queued" || personalReport?.status === "processing") {
@@ -387,7 +397,23 @@ function PersonalReportSection({
   }
 
   return (
-    <ParticipantStateSection kind="waiting" title="Your report">
+    <ParticipantStateSection
+      kind="waiting"
+      title="Your report"
+      action={
+        onGenerateReport ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={generatingReport}
+            onClick={() => void onGenerateReport()}
+          >
+            {generatingReport ? "Requesting..." : "Generate report"}
+          </Button>
+        ) : undefined
+      }
+    >
       Your report has not been generated yet.
     </ParticipantStateSection>
   );
