@@ -341,7 +341,7 @@ export function ParticipantWorkspacePage({
     />
   ) : null;
 
-  const promptLabel = selectedQuestion?.isCurrent ? "Current question" : "Released question";
+  const promptLabel = selectedQuestion?.isCurrent ? "Current Topic" : "Released question";
 
   return (
     <ParticipantShell
