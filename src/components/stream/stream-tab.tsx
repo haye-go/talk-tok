@@ -307,6 +307,7 @@ export function StreamTab({
         <ParticipantThreadCard
           authorLabel={isOwnThread ? "You" : submission.nickname}
           body={submission.body}
+          createdAt={submission.createdAt}
           categoryName={
             hideCategoryPill ? undefined : (thread.assignment?.categoryName ?? undefined)
           }

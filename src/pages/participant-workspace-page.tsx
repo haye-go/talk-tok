@@ -340,6 +340,8 @@ export function ParticipantWorkspacePage({
   ) : null;
 
   const promptLabel = selectedQuestion?.isCurrent ? "Current Topic" : "Released question";
+  const showParticipantIdentity =
+    activeTab !== "contribute" || session.anonymityMode !== "anonymous_to_peers";
 
   return (
     <ParticipantShell
@@ -347,6 +349,7 @@ export function ParticipantWorkspacePage({
       joinCode={session.joinCode}
       nickname={participant.nickname}
       sessionSlug={sessionSlug}
+      showIdentity={showParticipantIdentity}
       prompt={selectedPrompt}
       promptLabel={promptLabel}
       capabilities={{

@@ -1,8 +1,5 @@
 import { ThemeToggle } from "@/components/theme-toggle";
-import {
-  DemoIdentityControls,
-  getDemoDisplayNickname,
-} from "@/components/demo/demo-identity-bar";
+import { DemoIdentityControls, getDemoDisplayNickname } from "@/components/demo/demo-identity-bar";
 import { Badge } from "@/components/ui/badge";
 
 interface ParticipantTopBarProps {
@@ -10,6 +7,7 @@ interface ParticipantTopBarProps {
   joinCode: string;
   nickname: string;
   sessionSlug: string;
+  showIdentity?: boolean;
 }
 
 export function ParticipantTopBar({
@@ -17,6 +15,7 @@ export function ParticipantTopBar({
   joinCode,
   nickname,
   sessionSlug,
+  showIdentity = true,
 }: ParticipantTopBarProps) {
   const demoNickname = getDemoDisplayNickname(sessionSlug);
 
@@ -42,15 +41,15 @@ export function ParticipantTopBar({
           {demoNickname ? (
             <>
               <DemoIdentityControls sessionSlug={sessionSlug} />
-              <span className="hidden text-xs text-[var(--c-muted)] sm:inline">
-                as <strong className="text-[var(--c-ink)]">{demoNickname}</strong>
-              </span>
+              {showIdentity ? (
+                <span className="hidden text-xs text-[var(--c-muted)] sm:inline">
+                  as <strong className="text-[var(--c-ink)]">{demoNickname}</strong>
+                </span>
+              ) : null}
             </>
-          ) : (
-            <span className="hidden text-xs text-[var(--c-muted)] sm:inline">
-              as {nickname}
-            </span>
-          )}
+          ) : showIdentity ? (
+            <span className="hidden text-xs text-[var(--c-muted)] sm:inline">as {nickname}</span>
+          ) : null}
           <ThemeToggle />
         </div>
       </div>

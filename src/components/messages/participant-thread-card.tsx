@@ -15,6 +15,7 @@ export interface ParticipantThreadReply {
 interface ParticipantThreadCardProps {
   authorLabel: string;
   body: string;
+  createdAt?: number;
   categoryName?: string;
   categoryTone?: NonNullable<BadgeProps["tone"]>;
   answeredAt?: number;
@@ -65,9 +66,17 @@ function ParticipantThreadReplies({ replies }: { replies: ParticipantThreadReply
   );
 }
 
+function formatTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function ParticipantThreadCard({
   authorLabel,
   body,
+  createdAt,
   categoryName,
   categoryTone = "neutral",
   answeredAt,
@@ -79,7 +88,7 @@ export function ParticipantThreadCard({
 }: ParticipantThreadCardProps) {
   const [showReplies, setShowReplies] = useState(true);
   const hasReplies = replies.length > 0;
-  const hasActionBar = actions || hasReplies;
+  const hasActionBar = createdAt || actions || hasReplies;
 
   return (
     <article
@@ -122,19 +131,24 @@ export function ParticipantThreadCard({
 
       {hasActionBar ? (
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1">
-          {hasReplies ? (
-            <ParticipantThreadAction onClick={() => setShowReplies((v) => !v)}>
-              <CaretDown
-                size={12}
-                className={cn("transition-transform", showReplies && "rotate-180")}
-              />
-              {showReplies
-                ? "Hide replies"
-                : `${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
-            </ParticipantThreadAction>
-          ) : (
-            <span />
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {createdAt ? (
+              <span className="text-[10px] text-[var(--c-muted)] opacity-75">
+                {formatTime(createdAt)}
+              </span>
+            ) : null}
+            {hasReplies ? (
+              <ParticipantThreadAction onClick={() => setShowReplies((v) => !v)}>
+                <CaretDown
+                  size={12}
+                  className={cn("transition-transform", showReplies && "rotate-180")}
+                />
+                {showReplies
+                  ? "Hide replies"
+                  : `${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
+              </ParticipantThreadAction>
+            ) : null}
+          </div>
           {actions ? <div className="flex flex-wrap items-center gap-1">{actions}</div> : null}
         </div>
       ) : null}

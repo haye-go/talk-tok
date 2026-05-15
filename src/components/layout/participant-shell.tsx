@@ -29,6 +29,7 @@ export interface ParticipantShellProps {
   joinCode: string;
   nickname: string;
   sessionSlug: string;
+  showIdentity?: boolean;
   prompt: string;
   promptLabel: string;
   capabilities: StatusCapabilities;
@@ -51,6 +52,7 @@ export function ParticipantShell({
   joinCode,
   nickname,
   sessionSlug,
+  showIdentity = true,
   prompt,
   promptLabel,
   capabilities,
@@ -91,9 +93,12 @@ export function ParticipantShell({
         joinCode={joinCode}
         nickname={nickname}
         sessionSlug={sessionSlug}
+        showIdentity={showIdentity}
       />
 
-      <div className={`relative z-10 transition-shadow duration-300 lg:hidden ${scrolled ? "shadow-[0_4px_12px_color-mix(in_oklch,var(--c-ink),transparent_88%)]" : "shadow-none"}`}>
+      <div
+        className={`relative z-10 transition-shadow duration-300 lg:hidden ${scrolled ? "shadow-[0_4px_12px_color-mix(in_oklch,var(--c-ink),transparent_88%)]" : "shadow-none"}`}
+      >
         <ParticipantQuestionBar
           prompt={prompt}
           promptLabel={promptLabel}
@@ -106,7 +111,10 @@ export function ParticipantShell({
       <div className="flex min-h-0 flex-1">
         <ParticipantNavRail activeTab={activeTab} onTabChange={onActiveTabChange} />
 
-        <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:px-6 lg:py-5" onScroll={handleScroll}>
+        <main
+          className="min-h-0 flex-1 overflow-y-auto p-4 lg:px-6 lg:py-5"
+          onScroll={handleScroll}
+        >
           <div className="mx-auto w-full max-w-3xl xl:max-w-4xl">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -117,9 +125,7 @@ export function ParticipantShell({
                   {tab?.label}
                 </h2>
               </div>
-              {activeTab === "contribute" ? (
-                <PresenceBar typing={presenceTyping} />
-              ) : null}
+              {activeTab === "contribute" ? <PresenceBar typing={presenceTyping} /> : null}
             </div>
             <ParticipantStatusBanner activeTab={activeTab} {...capabilities} />
             <div className="mt-3">{content[activeTab]}</div>

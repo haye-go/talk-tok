@@ -58,6 +58,7 @@ export function ContributionThreadCard({
     <ParticipantThreadCard
       authorLabel=""
       body={submission.body}
+      createdAt={submission.createdAt}
       categoryName={assignment?.categoryName ?? undefined}
       categoryTone={categoryColorToTone(undefined, 0)}
       replies={replyItems}
