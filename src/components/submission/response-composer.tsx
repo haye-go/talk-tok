@@ -1,36 +1,28 @@
 import { ClipboardText, PencilSimple } from "@phosphor-icons/react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { ToneSelector } from "@/components/submission/tone-selector";
 import { useInputTelemetry } from "@/hooks/use-input-telemetry";
 import { countWords, type InputTelemetrySnapshot } from "@/lib/submission-telemetry";
 import { cn } from "@/lib/utils";
 
 export interface ResponseComposerSubmit {
   body: string;
-  tone: string;
   telemetry: InputTelemetrySnapshot;
 }
 
 interface ResponseComposerProps {
   wordLimit?: number;
   softWordLimit?: number;
-  defaultTone?: string;
   submitLabel?: string;
   placeholder?: string;
   disabled?: boolean;
-  onSubmit?: (
-    text: string,
-    tone: string,
-    submission: ResponseComposerSubmit,
-  ) => Promise<void> | void;
+  onSubmit?: (text: string, submission: ResponseComposerSubmit) => Promise<void> | void;
   className?: string;
 }
 
 export function ResponseComposer({
   wordLimit,
   softWordLimit,
-  defaultTone = "spicy",
   submitLabel = "Submit",
   placeholder = "Post your questions / thoughts...",
   disabled = false,
@@ -39,7 +31,6 @@ export function ResponseComposer({
 }: ResponseComposerProps) {
   const telemetry = useInputTelemetry();
   const [text, setText] = useState("");
-  const [tone, setTone] = useState(defaultTone);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [focused, setFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -66,10 +57,9 @@ export function ResponseComposer({
     try {
       const submission = {
         body: text,
-        tone,
         telemetry: telemetry.snapshot(text),
       };
-      await onSubmit?.(text, tone, submission);
+      await onSubmit?.(text, submission);
       setText("");
       telemetry.reset();
     } finally {
@@ -127,7 +117,7 @@ export function ResponseComposer({
       )}
       {expanded ? (
         <>
-          <div className="mt-2 flex items-center justify-between pt-2">
+          <div className="mt-2 flex items-center pt-2">
             <div className="flex items-center gap-2 text-[10px]">
               <span
                 className={cn(
@@ -149,7 +139,6 @@ export function ResponseComposer({
                 {telemetry.pasteEventCount}
               </span>
             </div>
-            <ToneSelector value={tone} onChange={setTone} />
           </div>
           <Button
             className="mt-2 w-full"

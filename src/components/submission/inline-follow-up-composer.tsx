@@ -35,7 +35,7 @@ export function InlineFollowUpComposer({
 
     setSubmitting(true);
     try {
-      await onSubmit({ body, tone: "spicy", telemetry: telemetry.snapshot(body) });
+      await onSubmit({ body, telemetry: telemetry.snapshot(body) });
       setText("");
     } finally {
       setSubmitting(false);

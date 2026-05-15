@@ -193,7 +193,6 @@ export function ParticipantWorkspacePage({
         body: sub.body,
         questionId: workspace?.selectedQuestion?.id,
         kind: "initial",
-        tone: (sub.tone as "gentle" | "direct" | "spicy" | "roast") ?? undefined,
         telemetry: sub.telemetry,
       });
     } catch (cause) {
@@ -212,7 +211,6 @@ export function ParticipantWorkspacePage({
         body: sub.body,
         questionId: workspace?.selectedQuestion?.id,
         kind: "additional_point",
-        tone: (sub.tone as "gentle" | "direct" | "spicy" | "roast") ?? undefined,
         telemetry: sub.telemetry,
       });
     } catch (cause) {
@@ -398,7 +396,7 @@ export function ParticipantWorkspacePage({
                   ? "Post your questions / thoughts..."
                   : "Add a response..."
               }
-              onSubmit={(_text, _tone, submission) =>
+              onSubmit={(_text, submission) =>
                 topLevelContributions.length === 0
                   ? handleSubmit(submission)
                   : handleAddAnotherPoint(submission)

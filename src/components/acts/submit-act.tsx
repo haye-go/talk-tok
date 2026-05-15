@@ -5,13 +5,11 @@ import { MOCK_SESSION, MOCK_STREAM_RESPONSES } from "@/lib/mock-data";
 interface SubmitActProps {
   topic?: string;
   wordLimit?: number;
-  critiqueTone?: string;
 }
 
 export function SubmitAct({
   topic = MOCK_SESSION.topic,
   wordLimit = MOCK_SESSION.wordLimit,
-  critiqueTone = MOCK_SESSION.critiqueTone,
 }: SubmitActProps) {
   return (
     <div className="space-y-3">
@@ -21,7 +19,7 @@ export function SubmitAct({
         </p>
       </div>
 
-      <ResponseComposer wordLimit={wordLimit} defaultTone={critiqueTone} />
+      <ResponseComposer wordLimit={wordLimit} />
 
       <StreamPreview
         items={MOCK_STREAM_RESPONSES.map((r) => ({
