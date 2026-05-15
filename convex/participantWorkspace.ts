@@ -364,6 +364,7 @@ export const overview = query({
     const needsExplore = activeTab === "all" || activeTab === "explore";
     const needsFight = activeTab === "all" || activeTab === "fight";
     const needsMe = activeTab === "all" || activeTab === "me";
+    const needsFightSummary = true;
     const needsRoomThreads = needsContribute || needsExplore;
     const needsAssignments = needsContribute || needsExplore || needsMe;
     const needsPresence = needsContribute;
@@ -446,14 +447,14 @@ export const overview = query({
             .order("desc")
             .take(80)
         : Promise.resolve([]),
-      needsFight || needsMe
+      needsFightSummary || needsFight || needsMe
         ? ctx.db
             .query("fightThreads")
             .withIndex("by_attacker", (q) => q.eq("attackerParticipantId", participant._id))
             .order("desc")
             .take(FIGHT_THREAD_LIMIT)
         : Promise.resolve([]),
-      needsFight || needsMe
+      needsFightSummary || needsFight || needsMe
         ? ctx.db
             .query("fightThreads")
             .withIndex("by_defender", (q) => q.eq("defenderParticipantId", participant._id))

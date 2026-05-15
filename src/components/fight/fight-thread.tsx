@@ -56,7 +56,19 @@ export function FightThread({
   const isPending = thread.status === "pending_acceptance";
   const isActive = thread.status === "active";
   const isMyTurn = isActive && thread.currentTurnParticipantId === myParticipantId;
+  const isAttacker = thread.attacker?.id === myParticipantId;
+  const isDefender = thread.defender?.id === myParticipantId;
   const modeLabel = thread.mode === "vs_ai" ? "vs AI" : "1v1";
+  const contextSubmission =
+    thread.mode === "real_1v1"
+      ? thread.defenderSubmission
+      : (thread.attackerSubmission ?? thread.defenderSubmission);
+  const contextLabel =
+    thread.mode === "real_1v1"
+      ? isDefender
+        ? "Your post being challenged"
+        : "Post you challenged"
+      : "Your position";
 
   return (
     <div>
@@ -85,32 +97,16 @@ export function FightThread({
         </div>
       )}
 
-      {(thread.attackerSubmission || thread.defenderSubmission) && (
+      {contextSubmission && (
         <div className="border-b border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
-          {thread.attackerSubmission && (
-            <div className="mb-2">
-              <p className="text-[10px] text-[var(--c-muted)]">
-                {thread.attacker?.nickname ?? "Attacker"}'s position:
-              </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-[var(--c-body)]">
-                {thread.attackerSubmission.body.length > 100
-                  ? `${thread.attackerSubmission.body.slice(0, 100)}...`
-                  : thread.attackerSubmission.body}
-              </p>
-            </div>
-          )}
-          {thread.defenderSubmission && (
-            <div>
-              <p className="text-[10px] text-[var(--c-muted)]">
-                {thread.defender?.nickname ?? "Defender"}'s position:
-              </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-[var(--c-body)]">
-                {thread.defenderSubmission.body.length > 100
-                  ? `${thread.defenderSubmission.body.slice(0, 100)}...`
-                  : thread.defenderSubmission.body}
-              </p>
-            </div>
-          )}
+          <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--c-muted)]">
+            {contextLabel}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--c-body)]">
+            {contextSubmission.body.length > 140
+              ? `${contextSubmission.body.slice(0, 140)}...`
+              : contextSubmission.body}
+          </p>
         </div>
       )}
 
@@ -141,7 +137,7 @@ export function FightThread({
             sessionSlug={sessionSlug}
             fightSlug={fightSlug}
             clientKey={clientKey}
-            isMyTurn={isMyTurn}
+            mode={isMyTurn ? "turn" : "waiting"}
             turnDeadlineAt={thread.turnDeadlineAt ?? undefined}
             existingDraft={thread.myDraft?.body}
             placeholder={isMyTurn ? "Your rebuttal..." : "Waiting for opponent's turn..."}
@@ -149,19 +145,27 @@ export function FightThread({
         </div>
       )}
 
-      {isPending && clientKey && sessionSlug && fightSlug && (
+      {isPending && isAttacker && clientKey && sessionSlug && fightSlug && (
         <div className="p-3">
           <p className="mb-2 text-xs text-[var(--c-muted)]">
-            Your opponent hasn&apos;t accepted yet. You can draft your opening — it won&apos;t be sent until the fight starts.
+            Your opponent hasn&apos;t accepted yet. Draft your opening attack now; it will send if
+            they accept.
           </p>
           <FightDraftComposer
             sessionSlug={sessionSlug}
             fightSlug={fightSlug}
             clientKey={clientKey}
-            isMyTurn={false}
+            mode="pending-draft"
             existingDraft={thread.myDraft?.body}
             placeholder="Draft your opening attack while waiting..."
           />
+        </div>
+      )}
+
+      {isPending && isDefender && (
+        <div className="p-3 text-xs text-[var(--c-muted)]">
+          A challenger is waiting for your response. Accept or decline the challenge from the Fight
+          tab prompt.
         </div>
       )}
 

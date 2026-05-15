@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type FormEvent } from "react";
-import { ChartBar, CircleNotch } from "@phosphor-icons/react";
+import { ChartBar, CircleNotch, Sword, X } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ContributionThreadCard } from "@/components/contribute/contribution-thread-card";
+import { FightCountdown } from "@/components/fight/fight-countdown";
 import { FightHome } from "@/components/fight/fight-home";
 import { FightThread } from "@/components/fight/fight-thread";
 import { ParticipantShell } from "@/components/layout/participant-shell";
@@ -65,6 +66,10 @@ interface PersonalReportView {
   error?: string | null;
 }
 
+type IncomingFight = NonNullable<
+  ReturnType<typeof useParticipantWorkspace>
+>["fightMe"]["pendingIncoming"][number];
+
 function parseParticipantTab(value: string | null): TabId | null {
   if (!value) return null;
   return TABS.some((tab) => tab.id === value) ? (value as TabId) : null;
@@ -122,12 +127,16 @@ export function ParticipantWorkspacePage({
   const submitAndQueue = useMutation(api.participantWorkspace.submitAndQueueFeedback);
   const createSubmission = useMutation(api.submissions.create);
   const generateReport = useMutation(api.personalReports.generateMine);
+  const acceptChallenge = useMutation(api.fightMe.acceptChallenge);
+  const declineChallenge = useMutation(api.fightMe.declineChallenge);
 
   const [nicknameDraft, setNicknameDraft] = useState<string | null>(null);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [dismissedFightAlertId, setDismissedFightAlertId] = useState<string | null>(null);
+  const [fightAlertBusy, setFightAlertBusy] = useState<"accept" | "decline" | null>(null);
   const touchedPresenceKey = useRef<string | null>(null);
 
   useEffect(() => {
@@ -233,6 +242,28 @@ export function ParticipantWorkspacePage({
     }
   }
 
+  async function handleAcceptFightAlert(fightSlugToAccept: string) {
+    if (fightAlertBusy) return;
+    setFightAlertBusy("accept");
+    try {
+      await acceptChallenge({ sessionSlug, clientKey, fightSlug: fightSlugToAccept });
+      void navigate({ to: routes.sessionFight(sessionSlug, fightSlugToAccept) });
+    } finally {
+      setFightAlertBusy(null);
+    }
+  }
+
+  async function handleDeclineFightAlert(fightId: string, fightSlugToDecline: string) {
+    if (fightAlertBusy) return;
+    setFightAlertBusy("decline");
+    try {
+      await declineChallenge({ sessionSlug, clientKey, fightSlug: fightSlugToDecline });
+      setDismissedFightAlertId(fightId);
+    } finally {
+      setFightAlertBusy(null);
+    }
+  }
+
   function handleTabChange(nextTab: TabId) {
     setLocalActiveTab(nextTab);
     void navigate({
@@ -326,167 +357,281 @@ export function ParticipantWorkspacePage({
   const promptLabel = selectedQuestion?.isCurrent ? "Current Topic" : "Released question";
   const showParticipantIdentity =
     activeTab !== "contribute" || session.anonymityMode !== "anonymous_to_peers";
+  const incomingFightAlert =
+    activeTab === "fight"
+      ? null
+      : (ws?.fightMe.pendingIncoming.find(
+          (fight) => fight.id !== dismissedFightAlertId && fight.status === "pending_acceptance",
+        ) ?? null);
 
   return (
-    <ParticipantShell
-      sessionTitle={session.title}
-      joinCode={session.joinCode}
-      nickname={participant.nickname}
-      sessionSlug={sessionSlug}
-      showIdentity={showParticipantIdentity}
-      prompt={selectedPrompt}
-      promptLabel={promptLabel}
-      capabilities={{
-        contributionsOpen,
-        hasContributions: topLevelContributions.length > 0,
-        canSeeRawPeerResponses,
-        canSeeCategorySummary,
-        synthesisVisible: selectedQuestion?.synthesisVisible ?? false,
-        fightEnabled: canUseFight,
-        personalReportsVisible: selectedQuestion?.personalReportsVisible ?? false,
-      }}
-      releasedQuestions={releasedQuestions.map((q) => ({
-        id: q.id,
-        title: q.title,
-        isCurrent: q.isCurrent,
-      }))}
-      selectedQuestionId={selectedQuestion?.id ?? null}
-      onSelectQuestion={(questionId) =>
-        setSelectedQuestionOverrideId(questionId as typeof selectedQuestionOverrideId)
-      }
-      presenceTyping={ws?.presenceAggregate.typing ?? 0}
-      activeTab={activeTab}
-      onActiveTabChange={handleTabChange}
-      contribute={
-        <div className="grid gap-4">
-          {submissionError ? <InlineAlert tone="error">{submissionError}</InlineAlert> : null}
+    <>
+      {incomingFightAlert ? (
+        <IncomingFightAlert
+          fight={incomingFightAlert}
+          busy={fightAlertBusy}
+          onAccept={() => void handleAcceptFightAlert(incomingFightAlert.slug)}
+          onDecline={() =>
+            void handleDeclineFightAlert(incomingFightAlert.id, incomingFightAlert.slug)
+          }
+          onDismiss={() => setDismissedFightAlertId(incomingFightAlert.id)}
+          onView={() =>
+            void navigate({ to: routes.sessionFight(sessionSlug, incomingFightAlert.slug) })
+          }
+        />
+      ) : null}
+      <ParticipantShell
+        sessionTitle={session.title}
+        joinCode={session.joinCode}
+        nickname={participant.nickname}
+        sessionSlug={sessionSlug}
+        showIdentity={showParticipantIdentity}
+        prompt={selectedPrompt}
+        promptLabel={promptLabel}
+        capabilities={{
+          contributionsOpen,
+          hasContributions: topLevelContributions.length > 0,
+          canSeeRawPeerResponses,
+          canSeeCategorySummary,
+          synthesisVisible: selectedQuestion?.synthesisVisible ?? false,
+          fightEnabled: canUseFight,
+          personalReportsVisible: selectedQuestion?.personalReportsVisible ?? false,
+        }}
+        releasedQuestions={releasedQuestions.map((q) => ({
+          id: q.id,
+          title: q.title,
+          isCurrent: q.isCurrent,
+        }))}
+        selectedQuestionId={selectedQuestion?.id ?? null}
+        onSelectQuestion={(questionId) =>
+          setSelectedQuestionOverrideId(questionId as typeof selectedQuestionOverrideId)
+        }
+        presenceTyping={ws?.presenceAggregate.typing ?? 0}
+        activeTab={activeTab}
+        onActiveTabChange={handleTabChange}
+        contribute={
+          <div className="grid gap-4">
+            {submissionError ? <InlineAlert tone="error">{submissionError}</InlineAlert> : null}
 
-          {!contributionsOpen && topLevelContributions.length === 0 ? (
-            <ParticipantStateSection kind="locked" title="Contributions paused">
-              This question is browseable, but new contributions are closed until the instructor
-              reopens it.
-            </ParticipantStateSection>
-          ) : null}
+            {!contributionsOpen && topLevelContributions.length === 0 ? (
+              <ParticipantStateSection kind="locked" title="Contributions paused">
+                This question is browseable, but new contributions are closed until the instructor
+                reopens it.
+              </ParticipantStateSection>
+            ) : null}
 
-          {!contributionsOpen ? (
-            <p className="text-xs text-[var(--c-muted)]">New contributions are paused.</p>
-          ) : null}
+            {!contributionsOpen ? (
+              <p className="text-xs text-[var(--c-muted)]">New contributions are paused.</p>
+            ) : null}
 
-          {contributionsOpen ? (
-            <ResponseComposer
+            {contributionsOpen ? (
+              <ResponseComposer
+                softWordLimit={session.responseSoftLimitWords}
+                submitLabel={
+                  topLevelContributions.length === 0 ? "Submit response" : "Add another point"
+                }
+                placeholder={
+                  topLevelContributions.length === 0
+                    ? "Post your questions / thoughts..."
+                    : "Add a response..."
+                }
+                onSubmit={(_text, submission) =>
+                  topLevelContributions.length === 0
+                    ? handleSubmit(submission)
+                    : handleAddAnotherPoint(submission)
+                }
+              />
+            ) : null}
+
+            {myThreads.length > 0 ? (
+              <div className="grid gap-3">
+                {myThreads.map((thread, index) => {
+                  const submission = thread.root.submission;
+
+                  return (
+                    <ContributionThreadCard
+                      key={submission.id}
+                      submission={submission}
+                      assignment={thread.assignment}
+                      followUps={thread.replies.map((reply) => ({
+                        id: reply.submission.id,
+                        body: reply.submission.body,
+                        createdAt: reply.submission.createdAt,
+                        followUpTitle: reply.submission.kind === "reply" ? "Reply" : "Follow-up",
+                      }))}
+                      isLatest={index === 0}
+                      onAddFollowUp={() => setFollowUpParentId(submission.id)}
+                    >
+                      {followUpParentId === submission.id ? followUpComposer : null}
+                    </ContributionThreadCard>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        }
+        explore={
+          <div className="grid gap-4">
+            <StreamTab
+              peerResponses={ws?.recentPeerResponses}
+              peerThreads={ws?.peerThreads}
+              peerThreadsByCategory={ws?.peerThreadsByCategory}
+              categories={ws?.categorySummary}
+              synthesisArtifacts={synthesisArtifacts}
+              synthesisView={ws?.synthesisView}
+              synthesisVisible={selectedQuestion?.synthesisVisible ?? false}
+              synthesisBlockedBySession={session.visibilityMode === "private_until_released"}
+              canSeeRawPeerResponses={canSeeRawPeerResponses}
+              canSeeCategorySummary={canSeeCategorySummary}
+              repliesEnabled={repliesEnabled}
+              upvotesEnabled={upvotesEnabled}
+              fightEnabled={canUseFight}
+              selectedQuestionId={selectedQuestion?.id}
               softWordLimit={session.responseSoftLimitWords}
-              submitLabel={
-                topLevelContributions.length === 0 ? "Submit response" : "Add another point"
-              }
-              placeholder={
-                topLevelContributions.length === 0
-                  ? "Post your questions / thoughts..."
-                  : "Add a response..."
-              }
-              onSubmit={(_text, submission) =>
-                topLevelContributions.length === 0
-                  ? handleSubmit(submission)
-                  : handleAddAnotherPoint(submission)
+              sessionSlug={sessionSlug}
+              clientKey={clientKey}
+              mySubmissionId={primaryContribution?.id}
+              onFightCreated={(nextFightSlug) =>
+                void navigate({ to: routes.sessionFight(sessionSlug, nextFightSlug) })
               }
             />
-          ) : null}
-
-          {myThreads.length > 0 ? (
-            <div className="grid gap-3">
-              {myThreads.map((thread, index) => {
-                const submission = thread.root.submission;
-
-                return (
-                  <ContributionThreadCard
-                    key={submission.id}
-                    submission={submission}
-                    assignment={thread.assignment}
-                    followUps={thread.replies.map((reply) => ({
-                      id: reply.submission.id,
-                      body: reply.submission.body,
-                      createdAt: reply.submission.createdAt,
-                      followUpTitle: reply.submission.kind === "reply" ? "Reply" : "Follow-up",
-                    }))}
-                    isLatest={index === 0}
-                    onAddFollowUp={() => setFollowUpParentId(submission.id)}
-                  >
-                    {followUpParentId === submission.id ? followUpComposer : null}
-                  </ContributionThreadCard>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
-      }
-      explore={
-        <div className="grid gap-4">
-          <StreamTab
-            peerResponses={ws?.recentPeerResponses}
-            peerThreads={ws?.peerThreads}
-            peerThreadsByCategory={ws?.peerThreadsByCategory}
-            categories={ws?.categorySummary}
-            synthesisArtifacts={synthesisArtifacts}
-            synthesisView={ws?.synthesisView}
-            synthesisVisible={selectedQuestion?.synthesisVisible ?? false}
-            synthesisBlockedBySession={session.visibilityMode === "private_until_released"}
-            canSeeRawPeerResponses={canSeeRawPeerResponses}
-            canSeeCategorySummary={canSeeCategorySummary}
-            repliesEnabled={repliesEnabled}
-            upvotesEnabled={upvotesEnabled}
-            fightEnabled={canUseFight}
-            selectedQuestionId={selectedQuestion?.id}
-            softWordLimit={session.responseSoftLimitWords}
+          </div>
+        }
+        fight={
+          <FightTabContent
             sessionSlug={sessionSlug}
             clientKey={clientKey}
+            myParticipantId={participant.id}
+            myFights={ws?.fightMe.mine ?? []}
+            pendingIncoming={ws?.fightMe.pendingIncoming ?? []}
+            currentFight={ws?.fightMe.current ?? null}
+            fightMeEnabled={ws?.session.fightMeEnabled ?? session.fightMeEnabled}
             mySubmissionId={primaryContribution?.id}
-            onFightCreated={(nextFightSlug) =>
+            canUseFight={canUseFight}
+            canUseFightMe={canUseFightMe}
+            fightSlug={fightSlug}
+            onNavigateToThread={(nextFightSlug) =>
               void navigate({ to: routes.sessionFight(sessionSlug, nextFightSlug) })
             }
+            onNavigateToTab={handleTabChange}
           />
+        }
+        me={
+          <MeTabContent
+            showReviewDetail={showReviewDetail}
+            report={report ?? null}
+            generatingReport={generatingReport}
+            onGenerateReport={handleGenerateReport}
+            myArchiveByQuestion={ws?.myArchiveByQuestion}
+            fightThreads={ws?.fightMe.mine}
+            positionShifts={ws?.positionShifts}
+            personalReport={ws?.personalReport}
+            personalReportsVisible={selectedQuestion?.personalReportsVisible ?? false}
+            loading={ws === undefined}
+            onViewFight={(nextFightSlug) =>
+              void navigate({ to: routes.sessionFight(sessionSlug, nextFightSlug) })
+            }
+            onViewReport={() => void navigate({ to: routes.sessionReview(sessionSlug) })}
+            nickname={nickname}
+            nicknameError={nicknameError ?? undefined}
+            onNicknameChange={(value) => setNicknameDraft(value)}
+            onNicknameSubmit={handleNicknameSubmit}
+          />
+        }
+      />
+    </>
+  );
+}
+
+interface IncomingFightAlertProps {
+  fight: IncomingFight;
+  busy: "accept" | "decline" | null;
+  onAccept: () => void;
+  onDecline: () => void;
+  onDismiss: () => void;
+  onView: () => void;
+}
+
+function IncomingFightAlert({
+  fight,
+  busy,
+  onAccept,
+  onDecline,
+  onDismiss,
+  onView,
+}: IncomingFightAlertProps) {
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="incoming-fight-title"
+    >
+      <div className="w-full max-w-md rounded-lg border border-[var(--c-tab-fight)] bg-[var(--c-surface-soft)] p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-pill bg-[var(--c-tab-fight)] text-[var(--c-on-sig-dark)]">
+              <Sword size={20} />
+            </span>
+            <div>
+              <p
+                id="incoming-fight-title"
+                className="font-display text-lg font-semibold text-[var(--c-ink)]"
+              >
+                Incoming fight challenge
+              </p>
+              <p className="mt-1 text-sm text-[var(--c-muted)]">
+                A challenger wants to debate your post.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="rounded-pill p-2 text-[var(--c-muted)] transition hover:bg-[var(--c-surface-strong)] hover:text-[var(--c-ink)]"
+            aria-label="Dismiss fight alert"
+            onClick={onDismiss}
+          >
+            <X size={18} />
+          </button>
         </div>
-      }
-      fight={
-        <FightTabContent
-          sessionSlug={sessionSlug}
-          clientKey={clientKey}
-          myParticipantId={participant.id}
-          myFights={ws?.fightMe.mine ?? []}
-          pendingIncoming={ws?.fightMe.pendingIncoming ?? []}
-          currentFight={ws?.fightMe.current ?? null}
-          fightMeEnabled={ws?.session.fightMeEnabled ?? session.fightMeEnabled}
-          mySubmissionId={primaryContribution?.id}
-          canUseFight={canUseFight}
-          canUseFightMe={canUseFightMe}
-          fightSlug={fightSlug}
-          onNavigateToThread={(nextFightSlug) =>
-            void navigate({ to: routes.sessionFight(sessionSlug, nextFightSlug) })
-          }
-          onNavigateToTab={handleTabChange}
-        />
-      }
-      me={
-        <MeTabContent
-          showReviewDetail={showReviewDetail}
-          report={report ?? null}
-          generatingReport={generatingReport}
-          onGenerateReport={handleGenerateReport}
-          myArchiveByQuestion={ws?.myArchiveByQuestion}
-          fightThreads={ws?.fightMe.mine}
-          positionShifts={ws?.positionShifts}
-          personalReport={ws?.personalReport}
-          personalReportsVisible={selectedQuestion?.personalReportsVisible ?? false}
-          loading={ws === undefined}
-          onViewFight={(nextFightSlug) =>
-            void navigate({ to: routes.sessionFight(sessionSlug, nextFightSlug) })
-          }
-          onViewReport={() => void navigate({ to: routes.sessionReview(sessionSlug) })}
-          nickname={nickname}
-          nicknameError={nicknameError ?? undefined}
-          onNicknameChange={(value) => setNicknameDraft(value)}
-          onNicknameSubmit={handleNicknameSubmit}
-        />
-      }
-    />
+
+        {fight.acceptanceDeadlineAt ? (
+          <div className="mt-4 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-strong)] px-3 py-2">
+            <FightCountdown deadlineAt={fight.acceptanceDeadlineAt} label="Accept before:" />
+          </div>
+        ) : null}
+
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+          <Button
+            type="button"
+            variant="coral"
+            className="flex-1"
+            disabled={busy !== null}
+            onClick={onAccept}
+          >
+            {busy === "accept" ? "Accepting..." : "Accept fight"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="flex-1"
+            disabled={busy !== null}
+            onClick={onView}
+          >
+            View
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="flex-1"
+            disabled={busy !== null}
+            onClick={onDecline}
+          >
+            {busy === "decline" ? "Declining..." : "Decline"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

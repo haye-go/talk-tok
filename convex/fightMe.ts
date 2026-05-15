@@ -284,7 +284,35 @@ function toPublicDebrief(debrief: Doc<"fightDebriefs"> | null) {
   };
 }
 
-async function toPublicThread(ctx: QueryCtx | MutationCtx, thread: Doc<"fightThreads">) {
+function fightDisplayName(
+  session: Doc<"sessions"> | null,
+  participant: Doc<"participants"> | null,
+  role: "attacker" | "defender",
+  viewerParticipantId?: Id<"participants">,
+) {
+  if (!participant) {
+    return role === "attacker" ? "Challenger" : "Defender";
+  }
+
+  if (session?.anonymityMode !== "anonymous_to_peers") {
+    return participant.nickname;
+  }
+
+  if (viewerParticipantId && participant._id === viewerParticipantId) {
+    return "You";
+  }
+
+  return role === "attacker" ? "Challenger" : "Opponent";
+}
+
+async function toPublicThread(
+  ctx: QueryCtx | MutationCtx,
+  thread: Doc<"fightThreads">,
+  options?: {
+    session?: Doc<"sessions">;
+    viewerParticipantId?: Id<"participants">;
+  },
+) {
   const [attacker, defender, attackerSubmission, defenderSubmission, turns, debrief] =
     await Promise.all([
       ctx.db.get(thread.attackerParticipantId),
@@ -302,6 +330,7 @@ async function toPublicThread(ctx: QueryCtx | MutationCtx, thread: Doc<"fightThr
         .take(1)
         .then((rows) => rows[0] ?? null),
     ]);
+  const session = options?.session ?? (await ctx.db.get(thread.sessionId));
 
   return {
     id: thread._id,
@@ -310,10 +339,20 @@ async function toPublicThread(ctx: QueryCtx | MutationCtx, thread: Doc<"fightThr
     mode: thread.mode,
     status: thread.status,
     attacker: attacker
-      ? { id: attacker._id, participantSlug: attacker.participantSlug, nickname: attacker.nickname }
+      ? {
+          id: attacker._id,
+          participantSlug:
+            session?.anonymityMode === "anonymous_to_peers" ? null : attacker.participantSlug,
+          nickname: fightDisplayName(session, attacker, "attacker", options?.viewerParticipantId),
+        }
       : null,
     defender: defender
-      ? { id: defender._id, participantSlug: defender.participantSlug, nickname: defender.nickname }
+      ? {
+          id: defender._id,
+          participantSlug:
+            session?.anonymityMode === "anonymous_to_peers" ? null : defender.participantSlug,
+          nickname: fightDisplayName(session, defender, "defender", options?.viewerParticipantId),
+        }
       : null,
     attackerSubmission: attackerSubmission
       ? { id: attackerSubmission._id, body: attackerSubmission.body }
@@ -555,7 +594,10 @@ export const createChallenge = mutation({
       fightThreadId,
     });
 
-    return await toPublicThread(ctx, (await ctx.db.get(fightThreadId))!);
+    return await toPublicThread(ctx, (await ctx.db.get(fightThreadId))!, {
+      session,
+      viewerParticipantId: attacker._id,
+    });
   },
 });
 
@@ -636,7 +678,10 @@ export const createVsAi = mutation({
       { name: "fightMe.generateAiTurn", retry: true },
     );
 
-    return await toPublicThread(ctx, (await ctx.db.get(fightThreadId))!);
+    return await toPublicThread(ctx, (await ctx.db.get(fightThreadId))!, {
+      session,
+      viewerParticipantId: participant._id,
+    });
   },
 });
 
@@ -783,7 +828,7 @@ export const acceptChallenge = mutation({
     });
 
     updated = (await ctx.db.get(thread._id))!;
-    return await toPublicThread(ctx, updated);
+    return await toPublicThread(ctx, updated, { session, viewerParticipantId: defender._id });
   },
 });
 
@@ -822,7 +867,10 @@ export const declineChallenge = mutation({
       updatedAt: Date.now(),
     });
 
-    return await toPublicThread(ctx, (await ctx.db.get(thread._id))!);
+    return await toPublicThread(ctx, (await ctx.db.get(thread._id))!, {
+      session,
+      viewerParticipantId: defender._id,
+    });
   },
 });
 
@@ -861,7 +909,10 @@ export const cancelChallenge = mutation({
       updatedAt: Date.now(),
     });
 
-    return await toPublicThread(ctx, (await ctx.db.get(thread._id))!);
+    return await toPublicThread(ctx, (await ctx.db.get(thread._id))!, {
+      session,
+      viewerParticipantId: attacker._id,
+    });
   },
 });
 
@@ -924,7 +975,10 @@ export const submitTurn = mutation({
     }
 
     await advanceAfterTurn(ctx, thread, thread.nextTurnNumber);
-    return await toPublicThread(ctx, (await ctx.db.get(thread._id))!);
+    return await toPublicThread(ctx, (await ctx.db.get(thread._id))!, {
+      session,
+      viewerParticipantId: participant._id,
+    });
   },
 });
 
@@ -962,7 +1016,10 @@ export const forfeit = mutation({
     }
 
     await completeThread(ctx, thread, "forfeited");
-    return await toPublicThread(ctx, (await ctx.db.get(thread._id))!);
+    return await toPublicThread(ctx, (await ctx.db.get(thread._id))!, {
+      session,
+      viewerParticipantId: participant._id,
+    });
   },
 });
 
@@ -1003,7 +1060,9 @@ export const listMine = query({
         .filter((thread) => thread.sessionId === session._id)
         .sort((a, b) => b.updatedAt - a.updatedAt)
         .slice(0, THREAD_LIMIT)
-        .map((thread) => toPublicThread(ctx, thread)),
+        .map((thread) =>
+          toPublicThread(ctx, thread, { session, viewerParticipantId: participant._id }),
+        ),
     );
   },
 });
@@ -1073,19 +1132,23 @@ export const getThread = query({
       return null;
     }
 
-    const publicThread = await toPublicThread(ctx, thread);
-
     if (!args.clientKey) {
+      const publicThread = await toPublicThread(ctx, thread, { session });
       return { ...publicThread, myDraft: null };
     }
 
     const participant = await getParticipantByClientKey(ctx, session._id, args.clientKey);
 
     if (!participant) {
+      const publicThread = await toPublicThread(ctx, thread, { session });
       return { ...publicThread, myDraft: null };
     }
 
     const draft = await getDraft(ctx, thread._id, participant._id);
+    const publicThread = await toPublicThread(ctx, thread, {
+      session,
+      viewerParticipantId: participant._id,
+    });
 
     return {
       ...publicThread,
