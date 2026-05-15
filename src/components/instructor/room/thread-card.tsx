@@ -290,7 +290,7 @@ export function ThreadCard({ thread }: ThreadCardProps) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={`delete-post-title-${deleteTarget.submission.id}`}
-            className="w-full max-w-md rounded-lg border border-[var(--c-hairline)] bg-[var(--c-surface)] p-4 shadow-2xl"
+            className="w-full max-w-md rounded-lg border border-[var(--c-hairline)] bg-[#f7f4ee] p-4 shadow-2xl"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -319,7 +319,7 @@ export function ThreadCard({ thread }: ThreadCardProps) {
               </button>
             </div>
 
-            <div className="mt-3 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-soft)] p-3">
+            <div className="mt-3 rounded-md border border-[var(--c-hairline)] bg-white p-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
                 {deleteTarget.submission.nickname}
               </p>
