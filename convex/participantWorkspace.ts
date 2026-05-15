@@ -1088,6 +1088,41 @@ export const overview = query({
     const fightThreads = [...fightThreadsById.values()]
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, FIGHT_THREAD_LIMIT);
+    const pendingIncomingFightThreads = fightThreads.filter(
+      (thread) =>
+        thread.status === "pending_acceptance" && thread.defenderParticipantId === participant._id,
+    );
+    const challengedSubmissionIds = [
+      ...new Set(
+        pendingIncomingFightThreads
+          .map((thread) => thread.defenderSubmissionId)
+          .filter((id): id is Id<"submissions"> => Boolean(id)),
+      ),
+    ];
+    const challengedSubmissions = await Promise.all(
+      challengedSubmissionIds.map(async (submissionId) => await ctx.db.get(submissionId)),
+    );
+    const challengedSubmissionById = new Map(
+      challengedSubmissions
+        .filter((submission): submission is Doc<"submissions"> => Boolean(submission))
+        .map((submission) => [submission._id, submission]),
+    );
+    const toIncomingFightThread = (thread: Doc<"fightThreads">) => {
+      const summary = toFightThread(thread);
+      const challengedSubmission = thread.defenderSubmissionId
+        ? challengedSubmissionById.get(thread.defenderSubmissionId)
+        : null;
+
+      return {
+        ...summary,
+        challengedSubmission: challengedSubmission
+          ? {
+              id: challengedSubmission._id,
+              body: challengedSubmission.body,
+            }
+          : null,
+      };
+    };
 
     return {
       session: toSessionSnapshot(session),
@@ -1140,13 +1175,7 @@ export const overview = query({
         .map(toJob),
       fightMe: {
         mine: fightThreads.map(toFightThread),
-        pendingIncoming: fightThreads
-          .filter(
-            (thread) =>
-              thread.status === "pending_acceptance" &&
-              thread.defenderParticipantId === participant._id,
-          )
-          .map(toFightThread),
+        pendingIncoming: pendingIncomingFightThreads.map(toIncomingFightThread),
         current: fightThreads.find(
           (thread) => thread.status === "active" || thread.status === "pending_acceptance",
         )

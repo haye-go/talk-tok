@@ -601,6 +601,17 @@ function IncomingFightAlert({
           </div>
         ) : null}
 
+        {fight.challengedSubmission ? (
+          <div className="mt-4 rounded-md border border-[var(--c-hairline)] bg-[var(--c-surface-strong)] p-3">
+            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--c-muted)]">
+              Your post being challenged
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-[var(--c-body)]">
+              {fight.challengedSubmission.body}
+            </p>
+          </div>
+        ) : null}
+
         <div className="mt-5 flex flex-col gap-2 sm:flex-row">
           <Button
             type="button"
