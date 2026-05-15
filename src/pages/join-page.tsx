@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  getOrCreateClientKey,
+  getOrCreateParticipantClientKey,
   readStoredParticipant,
   storeParticipant,
 } from "@/lib/client-identity";
@@ -33,7 +33,7 @@ export function JoinPage() {
 
   const joinWithNickname = useCallback(
     async (nextNickname: string) => {
-      const clientKey = getOrCreateClientKey();
+      const clientKey = getOrCreateParticipantClientKey();
       const result = await joinSession({
         sessionCode: normalizedCode,
         nickname: nextNickname,

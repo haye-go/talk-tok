@@ -47,6 +47,27 @@ export function getOrCreateClientKey() {
   return clientKey;
 }
 
+export function getOrCreateParticipantClientKey() {
+  const storage = getStorage();
+
+  if (!storage) {
+    return createClientKey();
+  }
+
+  const existing = storage.getItem(CLIENT_KEY_STORAGE_KEY);
+
+  if (!existing?.startsWith("demo-")) {
+    return getOrCreateClientKey();
+  }
+
+  if (restoreOriginalClientKey()) {
+    return getOrCreateClientKey();
+  }
+
+  storage.removeItem(CLIENT_KEY_STORAGE_KEY);
+  return getOrCreateClientKey();
+}
+
 export function readStoredParticipant(sessionSlug: string) {
   const storage = getStorage();
 

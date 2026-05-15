@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { useParticipantWorkspace } from "@/hooks/use-participant-workspace";
 import {
-  getOrCreateClientKey,
+  getOrCreateParticipantClientKey,
   isDemoClientKey,
   restoreOriginalClientKey,
   setDemoClientKey,
@@ -97,7 +97,7 @@ export function ParticipantWorkspacePage({
       restoreOriginalClientKey();
     }
 
-    return getOrCreateClientKey();
+    return getOrCreateParticipantClientKey();
   }, [sessionSlug]);
 
   const [selectedQuestionOverrideId, setSelectedQuestionOverrideId] =
