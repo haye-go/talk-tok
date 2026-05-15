@@ -28,6 +28,7 @@ export function SetupWorkspace({ sessionSlug, selectedQuestionId }: SetupWorkspa
   const shell = useInstructorShell(sessionSlug, selectedQuestionId);
   const updateVisibility = useMutation(api.instructorControls.updateVisibility);
   const updateSettings = useMutation(api.instructorControls.updateSettings);
+  const updateQuestion = useMutation(api.sessionQuestions.updateQuestion);
   const questionScopedArgs = selectedQuestionId
     ? { sessionSlug, questionId: selectedQuestionId, previewPassword: previewPassword ?? "" }
     : { sessionSlug, previewPassword: previewPassword ?? "" };
@@ -83,6 +84,13 @@ export function SetupWorkspace({ sessionSlug, selectedQuestionId }: SetupWorkspa
     await updateSettings({ sessionSlug, ...settings, previewPassword: previewPassword ?? "" });
   }
 
+  async function handleQuestionSave(
+    questionId: Id<"sessionQuestions">,
+    patch: { title: string; prompt: string },
+  ) {
+    await updateQuestion({ previewPassword: previewPassword ?? "", questionId, ...patch });
+  }
+
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-5 p-5 lg:p-7">
       <header className="border-b border-[#d7e0ea] pb-5">
@@ -105,6 +113,7 @@ export function SetupWorkspace({ sessionSlug, selectedQuestionId }: SetupWorkspa
         metrics={metrics}
         onVisibilityChange={handleVisibilityChange}
         onSettingsSave={handleSettingsSave}
+        onQuestionSave={handleQuestionSave}
       />
 
       <CategoryTaxonomyEditor

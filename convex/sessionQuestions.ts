@@ -345,11 +345,13 @@ export const createQuestion = mutation({
 
 export const updateQuestion = mutation({
   args: {
+    previewPassword: v.string(),
     questionId: v.id("sessionQuestions"),
     title: v.optional(v.string()),
     prompt: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    requireInstructorPreviewPassword(args.previewPassword);
     const question = await ctx.db.get(args.questionId);
 
     if (!question) {
