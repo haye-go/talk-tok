@@ -137,7 +137,9 @@ export function RoomWorkspace({
 
       {roomMode === "categories" ? (
         <RoomCategoriesBoard
-          categoryGroups={threadsByCategory.filter((group) => group.threads.length > 0)}
+          sessionSlug={sessionSlug}
+          selectedQuestionId={selectedQuestionId}
+          categoryGroups={threadsByCategory}
           uncategorizedThreads={uncategorizedThreads}
         />
       ) : null}
