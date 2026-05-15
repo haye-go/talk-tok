@@ -59,7 +59,6 @@ function deriveStatusMessage({
   switch (activeTab) {
     case "contribute":
       if (!contributionsOpen) return "Contributions are paused";
-      if (!hasContributions) return "Add your points";
       return null;
 
     case "explore":
