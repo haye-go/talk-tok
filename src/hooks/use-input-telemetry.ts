@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import { createTelemetrySnapshot, type InputTelemetrySnapshot } from "@/lib/submission-telemetry";
 
@@ -21,6 +21,7 @@ export interface InputTelemetryHandlers {
   onChange: (value: string) => void;
   snapshot: (body: string) => InputTelemetrySnapshot;
   reset: () => void;
+  pasteEventCount: number;
 }
 
 export function useInputTelemetry(): InputTelemetryHandlers {
@@ -28,6 +29,7 @@ export function useInputTelemetry(): InputTelemetryHandlers {
   const pasteEventCount = useRef(0);
   const pastedCharacterCount = useRef(0);
   const keystrokeCount = useRef(0);
+  const [livePasteEventCount, setLivePasteEventCount] = useState(0);
 
   function ensureStarted(value?: string) {
     if (!typingStartedAt.current && value?.trim()) {
@@ -46,6 +48,7 @@ export function useInputTelemetry(): InputTelemetryHandlers {
     onPaste(event) {
       ensureStarted(event.currentTarget.value);
       pasteEventCount.current += 1;
+      setLivePasteEventCount(pasteEventCount.current);
       pastedCharacterCount.current += event.clipboardData.getData("text").length;
     },
     onChange(value) {
@@ -68,6 +71,8 @@ export function useInputTelemetry(): InputTelemetryHandlers {
       pasteEventCount.current = 0;
       pastedCharacterCount.current = 0;
       keystrokeCount.current = 0;
+      setLivePasteEventCount(0);
     },
+    pasteEventCount: livePasteEventCount,
   };
 }

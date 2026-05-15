@@ -1,4 +1,4 @@
-import { ArrowCircleUp } from "@phosphor-icons/react";
+import { ArrowCircleUp, ClipboardText } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { useInputTelemetry } from "@/hooks/use-input-telemetry";
 import { countWords } from "@/lib/submission-telemetry";
@@ -73,18 +73,27 @@ export function InlineFollowUpComposer({
         style={{ fontFamily: "var(--font-body)" }}
       />
       <div className="mt-1 flex items-center justify-between">
-        <span
-          className={cn(
-            "text-[10px]",
-            atLimit
-              ? "text-[var(--c-error)]"
-              : nearLimit
-                ? "text-[var(--c-sig-mustard)]"
-                : "text-[var(--c-muted)]",
-          )}
-        >
-          {wordCount}/{limit} words
-        </span>
+        <div className="flex items-center gap-2 text-[10px]">
+          <span
+            className={cn(
+              atLimit
+                ? "text-[var(--c-error)]"
+                : nearLimit
+                  ? "text-[var(--c-sig-mustard)]"
+                  : "text-[var(--c-muted)]",
+            )}
+          >
+            {wordCount}/{limit} words
+          </span>
+          <span
+            aria-label={`${telemetry.pasteEventCount} paste events`}
+            title={`${telemetry.pasteEventCount} paste events`}
+            className="inline-flex items-center gap-0.5 text-[var(--c-muted)]"
+          >
+            <ClipboardText size={11} weight="bold" aria-hidden="true" />
+            {telemetry.pasteEventCount}
+          </span>
+        </div>
         <button
           type="button"
           disabled={!text.trim() || submitting}

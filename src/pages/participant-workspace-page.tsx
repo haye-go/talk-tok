@@ -137,20 +137,12 @@ export function ParticipantWorkspacePage({
   const touchPresence = useMutation(api.participants.touchPresence);
   const submitAndQueue = useMutation(api.participantWorkspace.submitAndQueueFeedback);
   const createSubmission = useMutation(api.submissions.create);
-  const retryFeedback = useMutation(api.aiFeedback.retryFailed);
-  const requestRecategorisation = useMutation(api.recategorisation.request);
   const generateReport = useMutation(api.personalReports.generateMine);
 
   const [nicknameDraft, setNicknameDraft] = useState<string | null>(null);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
-  const [feedbackQueueWarning, setFeedbackQueueWarning] = useState<string | null>(null);
   const [followUpParentId, setFollowUpParentId] = useState<Id<"submissions"> | null>(null);
-  const [expandedContributionId, setExpandedContributionId] = useState<Id<"submissions"> | null>(
-    null,
-  );
-  const [retryingFeedbackSubmissionId, setRetryingFeedbackSubmissionId] =
-    useState<Id<"submissions"> | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const touchedPresenceKey = useRef<string | null>(null);
 
@@ -194,9 +186,8 @@ export function ParticipantWorkspacePage({
   async function handleSubmit(sub: ResponseComposerSubmit) {
     if (!clientKey) return;
     setSubmissionError(null);
-    setFeedbackQueueWarning(null);
     try {
-      const result = await submitAndQueue({
+      await submitAndQueue({
         sessionSlug,
         clientKey,
         body: sub.body,
@@ -205,12 +196,6 @@ export function ParticipantWorkspacePage({
         tone: (sub.tone as "gentle" | "direct" | "spicy" | "roast") ?? undefined,
         telemetry: sub.telemetry,
       });
-      if (!result.feedbackQueued) {
-        setFeedbackQueueWarning(
-          result.feedbackQueueError ??
-            "Your response was saved, but AI feedback could not be queued.",
-        );
-      }
     } catch (cause) {
       setSubmissionError(cause instanceof Error ? cause.message : "Could not submit response.");
       throw cause;
@@ -220,9 +205,8 @@ export function ParticipantWorkspacePage({
   async function handleAddAnotherPoint(sub: ResponseComposerSubmit) {
     if (!clientKey) return;
     setSubmissionError(null);
-    setFeedbackQueueWarning(null);
     try {
-      const result = await submitAndQueue({
+      await submitAndQueue({
         sessionSlug,
         clientKey,
         body: sub.body,
@@ -231,12 +215,6 @@ export function ParticipantWorkspacePage({
         tone: (sub.tone as "gentle" | "direct" | "spicy" | "roast") ?? undefined,
         telemetry: sub.telemetry,
       });
-      if (!result.feedbackQueued) {
-        setFeedbackQueueWarning(
-          result.feedbackQueueError ??
-            "Your response was saved, but AI feedback could not be queued.",
-        );
-      }
     } catch (cause) {
       setSubmissionError(cause instanceof Error ? cause.message : "Could not add another point.");
       throw cause;
@@ -261,47 +239,6 @@ export function ParticipantWorkspacePage({
       setSubmissionError(cause instanceof Error ? cause.message : "Could not submit follow-up.");
       throw cause;
     }
-  }
-
-  async function handleRetryFeedback(submissionId: Id<"submissions">) {
-    if (!clientKey) return;
-    setFeedbackQueueWarning(null);
-    setRetryingFeedbackSubmissionId(submissionId);
-    try {
-      await retryFeedback({
-        sessionSlug,
-        clientKey,
-        submissionId,
-      });
-    } catch (cause) {
-      setFeedbackQueueWarning(
-        cause instanceof Error ? cause.message : "Could not retry feedback generation.",
-      );
-    } finally {
-      setRetryingFeedbackSubmissionId(null);
-    }
-  }
-
-  async function handleRequestRecategorisation(
-    submissionId: Id<"submissions">,
-    request: {
-      requestedCategoryId?: Id<"categories">;
-      suggestedCategoryName?: string;
-      reason: string;
-    },
-  ) {
-    if (!clientKey) {
-      throw new Error("No submitted response is available for recategorisation.");
-    }
-
-    await requestRecategorisation({
-      sessionSlug,
-      clientKey,
-      submissionId,
-      requestedCategoryId: request.requestedCategoryId,
-      suggestedCategoryName: request.suggestedCategoryName,
-      reason: request.reason,
-    });
   }
 
   async function handleGenerateReport() {
@@ -376,11 +313,6 @@ export function ParticipantWorkspacePage({
   const topLevelContributions = myThreads.map((thread) => thread.root.submission);
 
   const primaryContribution = topLevelContributions[0] ?? null;
-  const activeExpandedContributionId = topLevelContributions.some(
-    (submission) => submission.id === expandedContributionId,
-  )
-    ? expandedContributionId
-    : null;
 
   const canSeeCategorySummary =
     selectedQuestion?.categoryBoardVisible ??
@@ -443,11 +375,6 @@ export function ParticipantWorkspacePage({
       contribute={
         <div className="grid gap-4">
           {submissionError ? <InlineAlert tone="error">{submissionError}</InlineAlert> : null}
-          {feedbackQueueWarning ? (
-            <InlineAlert tone="warning">
-              {feedbackQueueWarning} Open analysis on the saved contribution to retry feedback.
-            </InlineAlert>
-          ) : null}
 
           {!contributionsOpen && topLevelContributions.length === 0 ? (
             <ParticipantStateSection kind="locked" title="Contributions paused">
@@ -488,29 +415,15 @@ export function ParticipantWorkspacePage({
                   <ContributionThreadCard
                     key={submission.id}
                     submission={submission}
-                    feedback={thread.feedbackSummary}
                     assignment={thread.assignment}
-                    categories={ws?.categorySummary}
                     followUps={thread.replies.map((reply) => ({
                       id: reply.submission.id,
                       body: reply.submission.body,
                       createdAt: reply.submission.createdAt,
                       followUpTitle: reply.submission.kind === "reply" ? "Reply" : "Follow-up",
                     }))}
-                    recategorisationRequest={thread.recategorisationRequest}
-                    expanded={activeExpandedContributionId === submission.id}
                     isLatest={index === 0}
-                    onToggleExpanded={() =>
-                      setExpandedContributionId((current) =>
-                        current === submission.id ? null : submission.id,
-                      )
-                    }
-                    onRequestRecategorisation={(request) =>
-                      handleRequestRecategorisation(submission.id, request)
-                    }
                     onAddFollowUp={() => setFollowUpParentId(submission.id)}
-                    onRetryFeedback={() => handleRetryFeedback(submission.id)}
-                    feedbackRetrying={retryingFeedbackSubmissionId === submission.id}
                   >
                     {followUpParentId === submission.id ? followUpComposer : null}
                   </ContributionThreadCard>

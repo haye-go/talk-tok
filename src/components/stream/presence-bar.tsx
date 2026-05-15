@@ -1,4 +1,4 @@
-import { PencilSimple } from "@phosphor-icons/react";
+import { User } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 interface PresenceBarProps {
@@ -14,7 +14,7 @@ export function PresenceBar({ typing = 0, className }: PresenceBarProps) {
         className,
       )}
     >
-      <PencilSimple size={10} weight="bold" />
+      <User size={10} weight="bold" />
       <span className="font-display">{typing}</span>
     </span>
   );

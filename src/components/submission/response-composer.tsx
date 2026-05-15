@@ -1,4 +1,4 @@
-import { PencilSimple } from "@phosphor-icons/react";
+import { ClipboardText, PencilSimple } from "@phosphor-icons/react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { ToneSelector } from "@/components/submission/tone-selector";
@@ -117,7 +117,10 @@ export function ResponseComposer({
           className="flex w-full items-center gap-2 text-left"
         >
           <PencilSimple size={14} className="shrink-0 text-[var(--c-muted)]" />
-          <span className="text-sm text-[var(--c-muted)]" style={{ fontFamily: "var(--font-body)" }}>
+          <span
+            className="text-sm text-[var(--c-muted)]"
+            style={{ fontFamily: "var(--font-body)" }}
+          >
             {placeholder}
           </span>
         </button>
@@ -125,18 +128,27 @@ export function ResponseComposer({
       {expanded ? (
         <>
           <div className="mt-2 flex items-center justify-between pt-2">
-            <span
-              className={cn(
-                "text-[10px]",
-                atLimit
-                  ? "text-[var(--c-error)]"
-                  : nearLimit
-                    ? "text-[var(--c-sig-mustard)]"
-                    : "text-[var(--c-muted)]",
-              )}
-            >
-              {wordCount}/{limit} words
-            </span>
+            <div className="flex items-center gap-2 text-[10px]">
+              <span
+                className={cn(
+                  atLimit
+                    ? "text-[var(--c-error)]"
+                    : nearLimit
+                      ? "text-[var(--c-sig-mustard)]"
+                      : "text-[var(--c-muted)]",
+                )}
+              >
+                {wordCount}/{limit} words
+              </span>
+              <span
+                aria-label={`${telemetry.pasteEventCount} paste events`}
+                title={`${telemetry.pasteEventCount} paste events`}
+                className="inline-flex items-center gap-0.5 text-[var(--c-muted)]"
+              >
+                <ClipboardText size={11} weight="bold" aria-hidden="true" />
+                {telemetry.pasteEventCount}
+              </span>
+            </div>
             <ToneSelector value={tone} onChange={setTone} />
           </div>
           <Button
