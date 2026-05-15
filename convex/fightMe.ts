@@ -11,7 +11,10 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
-import { sourcePostJsonForDebrief, sourceSubmissionIdForDebrief } from "./fightDebriefContext";
+import {
+  sourcePostJsonForDebrief,
+  sourceSubmissionIdForDebrief,
+} from "../src/lib/fight-debrief-context";
 import { assertCanUseFightMe, canUseFightMe } from "./questionCapabilities";
 import { createDefaultQuestionForSession, listQuestionsForSession } from "./sessionQuestions";
 
