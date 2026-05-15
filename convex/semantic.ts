@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import {
+  action,
   internalAction,
   internalMutation,
   internalQuery,
@@ -29,8 +30,22 @@ const FOLLOW_UP_LIMIT = 40;
 const POSITION_SHIFT_LIMIT = 120;
 const CLUSTER_LIMIT = 80;
 const CLUSTER_MEMBER_LIMIT = 300;
-const CLUSTER_JOIN_THRESHOLD = 0.82;
+const DEFAULT_CLUSTER_JOIN_THRESHOLD = 0.6;
+const MIN_CLUSTER_JOIN_THRESHOLD = 0.35;
+const MAX_CLUSTER_JOIN_THRESHOLD = 0.95;
 const NEAREST_EMBEDDING_LIMIT = 64;
+
+type ReclusterSubmissionEmbedding = {
+  embeddingId: Id<"semanticEmbeddings">;
+  submissionId: Id<"submissions">;
+  embedding: number[];
+};
+
+type ReclusterContext = {
+  sessionId: Id<"sessions">;
+  questionId: Id<"sessionQuestions"> | null;
+  embeddings: ReclusterSubmissionEmbedding[];
+} | null;
 
 const entityTypeValidator = v.union(
   v.literal("submission"),
@@ -162,12 +177,23 @@ function average(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function normalizeClusterJoinThreshold(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_CLUSTER_JOIN_THRESHOLD;
+  }
+
+  const bounded = Math.min(MAX_CLUSTER_JOIN_THRESHOLD, Math.max(MIN_CLUSTER_JOIN_THRESHOLD, value));
+
+  return Math.round(bounded * 100) / 100;
+}
+
 export const queueEmbeddingsForSession = mutation({
   args: {
     previewPassword: v.string(),
     sessionSlug: v.string(),
     questionId: v.optional(v.id("sessionQuestions")),
     entityTypes: v.optional(v.array(entityTypeValidator)),
+    clusterJoinThreshold: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     requireInstructorPreviewPassword(args.previewPassword);
@@ -195,12 +221,14 @@ export const queueEmbeddingsForSession = mutation({
 
     const now = Date.now();
     const entityTypes = args.entityTypes ?? ["submission", "synthesisArtifact", "category"];
+    const clusterJoinThreshold = normalizeClusterJoinThreshold(args.clusterJoinThreshold);
     const jobId = await ctx.db.insert("semanticEmbeddingJobs", {
       sessionId: session._id,
       questionId,
       status: "queued",
       requestedBy: "instructor",
       entityTypes,
+      clusterJoinThreshold,
       createdAt: now,
       updatedAt: now,
     });
@@ -474,6 +502,7 @@ export const runEmbeddingJob = internalAction({
           jobId: args.jobId,
         },
       );
+      const clusterJoinThreshold = normalizeClusterJoinThreshold(job.clusterJoinThreshold);
       await ctx.runMutation(internal.semantic.markEmbeddingJobProcessing, {
         jobId: job._id,
         progressTotal: targets.length,
@@ -535,6 +564,7 @@ export const runEmbeddingJob = internalAction({
 
           await ctx.runMutation(internal.semantic.assignSubmissionToSemanticCluster, {
             submissionId: submissionEmbedding.submissionId,
+            clusterJoinThreshold,
             nearest: nearest
               .filter((neighbor) => neighbor._id !== submissionEmbedding.embeddingId)
               .map((neighbor) => ({
@@ -560,6 +590,109 @@ export const runEmbeddingJob = internalAction({
       });
       throw error;
     }
+  },
+});
+
+export const loadReclusterContext = internalQuery({
+  args: {
+    sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
+  },
+  handler: async (ctx, args): Promise<ReclusterContext> => {
+    const session = await getSessionBySlug(ctx, args.sessionSlug);
+
+    if (!session) {
+      return null;
+    }
+
+    const question = await resolveQuestionForRead(ctx, session, args.questionId);
+    const questionId = question?._id;
+    const rows = questionId
+      ? await ctx.db
+          .query("semanticEmbeddings")
+          .withIndex("by_questionId_and_entity_type", (q) =>
+            q.eq("questionId", questionId).eq("entityType", "submission"),
+          )
+          .take(EMBEDDING_LIMIT)
+      : await ctx.db
+          .query("semanticEmbeddings")
+          .withIndex("by_session_and_entity_type", (q) =>
+            q.eq("sessionId", session._id).eq("entityType", "submission"),
+          )
+          .take(EMBEDDING_LIMIT);
+
+    return {
+      sessionId: session._id,
+      questionId: questionId ?? null,
+      embeddings: rows
+        .filter((row) => row.sessionId === session._id)
+        .map((row) => ({
+          embeddingId: row._id,
+          submissionId: row.entityId as Id<"submissions">,
+          embedding: row.embedding,
+        })),
+    };
+  },
+});
+
+export const reclusterSimilarityMap = action({
+  args: {
+    previewPassword: v.string(),
+    sessionSlug: v.string(),
+    questionId: v.optional(v.id("sessionQuestions")),
+    clusterJoinThreshold: v.optional(v.number()),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ processed: number; clusterJoinThreshold: number } | null> => {
+    requireInstructorPreviewPassword(args.previewPassword);
+    const context: ReclusterContext = await ctx.runQuery(internal.semantic.loadReclusterContext, {
+      sessionSlug: args.sessionSlug,
+      questionId: args.questionId,
+    });
+
+    if (!context) {
+      return null;
+    }
+
+    const questionId = context.questionId ?? undefined;
+    const clusterJoinThreshold = normalizeClusterJoinThreshold(args.clusterJoinThreshold);
+
+    await ctx.runMutation(internal.semantic.clearSemanticClustersForScope, {
+      sessionId: context.sessionId,
+      questionId,
+    });
+
+    for (const submissionEmbedding of context.embeddings) {
+      const nearest = await ctx.vectorSearch("semanticEmbeddings", "by_embedding", {
+        vector: submissionEmbedding.embedding,
+        limit: NEAREST_EMBEDDING_LIMIT,
+        filter: (q) =>
+          questionId ? q.eq("questionId", questionId) : q.eq("sessionId", context.sessionId),
+      });
+
+      await ctx.runMutation(internal.semantic.assignSubmissionToSemanticCluster, {
+        submissionId: submissionEmbedding.submissionId,
+        clusterJoinThreshold,
+        nearest: nearest
+          .filter((neighbor) => neighbor._id !== submissionEmbedding.embeddingId)
+          .map((neighbor) => ({
+            embeddingId: neighbor._id,
+            score: neighbor._score,
+          })),
+      });
+    }
+
+    await ctx.runMutation(internal.semantic.refreshNoveltySignals, {
+      sessionId: context.sessionId,
+      questionId,
+    });
+
+    return {
+      processed: context.embeddings.length,
+      clusterJoinThreshold,
+    };
   },
 });
 
@@ -598,6 +731,7 @@ export const loadEmbeddingRowsById = internalQuery({
 export const assignSubmissionToSemanticCluster = internalMutation({
   args: {
     submissionId: v.id("submissions"),
+    clusterJoinThreshold: v.optional(v.number()),
     nearest: v.array(
       v.object({
         embeddingId: v.id("semanticEmbeddings"),
@@ -662,8 +796,9 @@ export const assignSubmissionToSemanticCluster = internalMutation({
       }
     }
 
+    const clusterJoinThreshold = normalizeClusterJoinThreshold(args.clusterJoinThreshold);
     const nearestCluster =
-      nearestMembers.find((row) => row.score >= CLUSTER_JOIN_THRESHOLD)?.member.clusterId ?? null;
+      nearestMembers.find((row) => row.score >= clusterJoinThreshold)?.member.clusterId ?? null;
     let clusterId = parentMember?.clusterId ?? nearestCluster;
     const score =
       parentMember && isReply
@@ -688,6 +823,7 @@ export const assignSubmissionToSemanticCluster = internalMutation({
         label: `Cluster ${existingClusters.length + 1}`,
         source: "vector",
         clusterKind: "provisional",
+        clusterJoinThreshold,
         rootSubmissionCount: isReply ? 0 : 1,
         messageCount: 0,
         representativeSubmissionId: isReply ? submission.parentSubmissionId : submission._id,
@@ -867,6 +1003,18 @@ export const getSimilarityMap = query({
         createdAt: submission.createdAt,
       };
     };
+    const clusterRootSizes = clusters.map(
+      (cluster) =>
+        (membersByCluster.get(cluster._id) ?? []).filter((member) => member.memberKind === "root")
+          .length,
+    );
+    const averageClusterSize =
+      clusterRootSizes.length > 0
+        ? clusterRootSizes.reduce((sum, size) => sum + size, 0) / clusterRootSizes.length
+        : 0;
+    const appliedClusterJoinThreshold =
+      clusters.find((cluster) => typeof cluster.clusterJoinThreshold === "number")
+        ?.clusterJoinThreshold ?? DEFAULT_CLUSTER_JOIN_THRESHOLD;
 
     return {
       session: {
@@ -930,6 +1078,11 @@ export const getSimilarityMap = query({
           updatedAt: cluster.updatedAt,
         };
       }),
+      diagnostics: {
+        clusterJoinThreshold: appliedClusterJoinThreshold,
+        singletonClusterCount: clusterRootSizes.filter((size) => size <= 1).length,
+        averageClusterSize,
+      },
       caps: {
         clusters: clusters.length === CLUSTER_LIMIT,
         members: members.length === CLUSTER_MEMBER_LIMIT,
