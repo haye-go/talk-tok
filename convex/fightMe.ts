@@ -11,6 +11,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { aiWorkpool, rateLimiter } from "./components";
+import { sourcePostJsonForDebrief, sourceSubmissionIdForDebrief } from "./fightDebriefContext";
 import { assertCanUseFightMe, canUseFightMe } from "./questionCapabilities";
 import { createDefaultQuestionForSession, listQuestionsForSession } from "./sessionQuestions";
 
@@ -73,6 +74,15 @@ async function hashClientKey(clientKey: string) {
   const digest = await crypto.subtle.digest("SHA-256", data);
 
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function createFightSlugSeed() {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(5);
+  crypto.getRandomValues(bytes);
+  const token = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+
+  return `fight-${token}`;
 }
 
 async function getSessionBySlug(ctx: QueryCtx | MutationCtx, sessionSlug: string) {
@@ -548,15 +558,10 @@ export const createChallenge = mutation({
       throw new Error("One participant is already in a pending or active real 1v1.");
     }
 
-    const defender = await ctx.db.get(defenderSubmission.participantId);
     const now = Date.now();
     const fightThreadId = await ctx.db.insert("fightThreads", {
       sessionId: session._id,
-      slug: await createUniqueFightSlug(
-        ctx,
-        session._id,
-        `${attacker.participantSlug}-vs-${defender?.participantSlug ?? "opponent"}`,
-      ),
+      slug: await createUniqueFightSlug(ctx, session._id, createFightSlugSeed()),
       mode: "real_1v1",
       status: "pending_acceptance",
       attackerParticipantId: attacker._id,
@@ -645,7 +650,7 @@ export const createVsAi = mutation({
     const now = Date.now();
     const fightThreadId = await ctx.db.insert("fightThreads", {
       sessionId: session._id,
-      slug: await createUniqueFightSlug(ctx, session._id, `${participant.participantSlug}-vs-ai`),
+      slug: await createUniqueFightSlug(ctx, session._id, createFightSlugSeed()),
       mode: "vs_ai",
       status: "active",
       attackerParticipantId: participant._id,
@@ -1515,12 +1520,21 @@ export const loadDebriefContext = internalQuery({
       .query("fightTurns")
       .withIndex("by_thread", (q) => q.eq("fightThreadId", thread._id))
       .take(20);
+    const sourceSubmissionId = sourceSubmissionIdForDebrief(thread);
+    const sourceSubmission = sourceSubmissionId ? await ctx.db.get(sourceSubmissionId) : null;
 
     if (!session) {
       throw new Error("Fight session not found.");
     }
 
-    return { debrief, thread, session, turns, questionId: await questionIdForThread(ctx, thread) };
+    return {
+      debrief,
+      thread,
+      session,
+      turns,
+      sourcePostJson: sourcePostJsonForDebrief(sourceSubmission),
+      questionId: await questionIdForThread(ctx, thread),
+    };
   },
 });
 
@@ -1591,7 +1605,7 @@ export const generateDebrief = internalAction({
     await ctx.runMutation(internal.fightMe.markDebriefProcessing, args);
 
     try {
-      const { thread, session, turns, questionId } = await ctx.runQuery(
+      const { thread, session, turns, sourcePostJson, questionId } = await ctx.runQuery(
         internal.fightMe.loadDebriefContext,
         {
           debriefId: args.debriefId,
@@ -1607,6 +1621,7 @@ export const generateDebrief = internalAction({
           openingPrompt: session.openingPrompt,
           mode: thread.mode,
           status: thread.status,
+          sourcePostJson,
           turnsJson: JSON.stringify(
             turns
               .sort((a, b) => a.turnNumber - b.turnNumber)
